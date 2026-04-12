@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "import": true,
+        "True": true,
+        "print(proc.stdout)": true,
+        "proc.stdout": true,
+        "print(proc.stderr,": true,
+        "proc.stderr": true,
+        "0:": true,
+        "raise": true
+    }
+}

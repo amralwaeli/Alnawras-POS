@@ -5,7 +5,7 @@ import { AuthController } from '../controllers/AuthController';
 import { User, UserRole } from '../models/types';
 
 export function StaffView() {
-  const { users, currentUser, setUsers } = usePOS();
+  const { users, currentUser, addUser, loading } = usePOS();
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -13,6 +13,7 @@ export function StaffView() {
     pin: '',
   });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-generate next employment number
   const generateEmploymentNumber = () => {
@@ -31,7 +32,7 @@ export function StaffView() {
 
   const activeUsers = users.filter(u => u.status === 'active');
 
-  const handleAddStaff = () => {
+  const handleAddStaff = async () => {
     if (!currentUser || currentUser.role !== 'admin') {
       setError('Only admins can add staff');
       return;
@@ -48,6 +49,9 @@ export function StaffView() {
       return;
     }
 
+    setIsSubmitting(true);
+    setError('');
+
     const employmentNumber = generateEmploymentNumber();
     const email = `${formData.name.toLowerCase().replace(/\s+/g, '.')}@storehub.com`;
 
@@ -61,10 +65,9 @@ export function StaffView() {
       branchId: currentUser.branchId,
     };
 
-    const result = AuthController.createUser(users, newUser, currentUser);
+    const result = await addUser(newUser);
 
-    if (result.success && result.user) {
-      setUsers([...users, result.user]);
+    if (result.success) {
       setShowAddModal(false);
       setFormData({
         name: '',
@@ -75,6 +78,8 @@ export function StaffView() {
     } else {
       setError(result.error || 'Failed to create user');
     }
+
+    setIsSubmitting(false);
   };
 
   const handleCancel = () => {
@@ -271,9 +276,17 @@ export function StaffView() {
               </button>
               <button
                 onClick={handleAddStaff}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Add Staff Member
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Adding...
+                  </>
+                ) : (
+                  'Add Staff Member'
+                )}
               </button>
             </div>
           </div>

@@ -1,15 +1,16 @@
 import { Table, Order, User } from '../models/types';
 import { AuthController } from './AuthController';
+import { supabase } from '../../lib/supabase';
 
 export class TableController {
   /**
-   * Get all tables
+   * Get all tables from database
    */
-  static getTables(tables: Table[], user: User): {
+  static async getTables(user: User): Promise<{
     success: boolean;
     tables?: Table[];
     error?: string;
-  } {
+  }> {
     if (!AuthController.hasPermission(user, 'canViewTables')) {
       return {
         success: false,
@@ -17,168 +18,254 @@ export class TableController {
       };
     }
 
-    // Cashiers only see their assigned tables
-    if (user.role === 'cashier') {
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('branch_id', user.branchId)
+        .order('number');
+
+      if (error) throw error;
+
+      const tables: Table[] = data.map(table => ({
+        id: table.id,
+        number: table.number,
+        capacity: table.capacity,
+        status: table.status,
+        branchId: table.branch_id,
+        currentOrderId: table.current_order_id,
+        assignedCashierId: table.assigned_cashier_id,
+      }));
+
+      // Cashiers only see their assigned tables
+      if (user.role === 'cashier') {
+        return {
+          success: true,
+          tables: tables.filter(t => t.assignedCashierId === user.id),
+        };
+      }
+
       return {
         success: true,
-        tables: tables.filter(t => t.assignedCashierId === user.id),
+        tables,
+      };
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch tables',
+      };
+    }
+  }
+
+  /**
+   * Add a new table
+   */
+  static async addTable(
+    tableData: { number: number; capacity: number },
+    user: User
+  ): Promise<{
+    success: boolean;
+    table?: Table;
+    error?: string;
+  }> {
+    if (!AuthController.hasPermission(user, 'canManageInventory')) {
+      return {
+        success: false,
+        error: 'Unauthorized: Cannot manage tables',
       };
     }
 
-    return {
-      success: true,
-      tables,
-    };
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .insert({
+          id: `table-${Date.now()}`,
+          number: tableData.number,
+          capacity: tableData.capacity,
+          status: 'available',
+          branch_id: user.branchId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const table: Table = {
+        id: data.id,
+        number: data.number,
+        capacity: data.capacity,
+        status: data.status,
+        branchId: data.branch_id,
+        currentOrderId: data.current_order_id,
+        assignedCashierId: data.assigned_cashier_id,
+      };
+
+      return {
+        success: true,
+        table,
+      };
+    } catch (error) {
+      console.error('Error adding table:', error);
+      return {
+        success: false,
+        error: 'Failed to add table',
+      };
+    }
+  }
+
+  /**
+   * Update table
+   */
+  static async updateTable(
+    tableId: string,
+    updates: Partial<{ number: number; capacity: number; status: string; assignedCashierId?: string }>,
+    user: User
+  ): Promise<{
+    success: boolean;
+    table?: Table;
+    error?: string;
+  }> {
+    if (!AuthController.hasPermission(user, 'canManageInventory')) {
+      return {
+        success: false,
+        error: 'Unauthorized: Cannot manage tables',
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .update({
+          number: updates.number,
+          capacity: updates.capacity,
+          status: updates.status,
+          assigned_cashier_id: updates.assignedCashierId,
+        })
+        .eq('id', tableId)
+        .eq('branch_id', user.branchId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const table: Table = {
+        id: data.id,
+        number: data.number,
+        capacity: data.capacity,
+        status: data.status,
+        branchId: data.branch_id,
+        currentOrderId: data.current_order_id,
+        assignedCashierId: data.assigned_cashier_id,
+      };
+
+      return {
+        success: true,
+        table,
+      };
+    } catch (error) {
+      console.error('Error updating table:', error);
+      return {
+        success: false,
+        error: 'Failed to update table',
+      };
+    }
+  }
+
+  /**
+   * Delete table
+   */
+  static async deleteTable(
+    tableId: string,
+    user: User
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (!AuthController.hasPermission(user, 'canManageInventory')) {
+      return {
+        success: false,
+        error: 'Unauthorized: Cannot manage tables',
+      };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .delete()
+        .eq('id', tableId)
+        .eq('branch_id', user.branchId);
+
+      if (error) throw error;
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      return {
+        success: false,
+        error: 'Failed to delete table',
+      };
+    }
   }
 
   /**
    * Get table by ID
    */
-  static getTableById(
-    tables: Table[],
+  static async getTableById(
     tableId: string,
     user: User
-  ): Table | undefined {
-    if (!AuthController.hasPermission(user, 'canViewTables')) {
-      return undefined;
-    }
-
-    const table = tables.find(t => t.id === tableId);
-
-    // Cashiers can only see their assigned tables
-    if (user.role === 'cashier' && table?.assignedCashierId !== user.id) {
-      return undefined;
-    }
-
-    return table;
-  }
-
-  /**
-   * Get occupied tables
-   */
-  static getOccupiedTables(tables: Table[], user: User): Table[] {
-    if (!AuthController.hasPermission(user, 'canViewTables')) {
-      return [];
-    }
-
-    const occupied = tables.filter(t => t.status === 'occupied');
-
-    if (user.role === 'cashier') {
-      return occupied.filter(t => t.assignedCashierId === user.id);
-    }
-
-    return occupied;
-  }
-
-  /**
-   * Get available tables
-   */
-  static getAvailableTables(tables: Table[]): Table[] {
-    return tables.filter(t => t.status === 'available');
-  }
-
-  /**
-   * Update table status
-   */
-  static updateTableStatus(
-    tables: Table[],
-    tableId: string,
-    status: 'available' | 'occupied' | 'reserved',
-    user: User,
-    orderId?: string
-  ): {
+  ): Promise<{
     success: boolean;
-    tables?: Table[];
+    table?: Table;
     error?: string;
-  } {
-    if (user.role !== 'admin' && user.role !== 'waiter') {
+  }> {
+    if (!AuthController.hasPermission(user, 'canViewTables')) {
       return {
         success: false,
-        error: 'Unauthorized: Only admin or waiter can update table status',
+        error: 'Unauthorized: Cannot view tables',
       };
     }
 
-    const table = tables.find(t => t.id === tableId);
-    if (!table) {
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('id', tableId)
+        .eq('branch_id', user.branchId)
+        .single();
+
+      if (error) throw error;
+
+      const table: Table = {
+        id: data.id,
+        number: data.number,
+        capacity: data.capacity,
+        status: data.status,
+        branchId: data.branch_id,
+        currentOrderId: data.current_order_id,
+        assignedCashierId: data.assigned_cashier_id,
+      };
+
+      // Cashiers can only see their assigned tables
+      if (user.role === 'cashier' && table.assignedCashierId !== user.id) {
+        return {
+          success: false,
+          error: 'Unauthorized: Cannot view this table',
+        };
+      }
+
+      return {
+        success: true,
+        table,
+      };
+    } catch (error) {
+      console.error('Error fetching table:', error);
       return {
         success: false,
-        error: 'Table not found',
+        error: 'Failed to fetch table',
       };
     }
-
-    const updatedTables = tables.map(t =>
-      t.id === tableId
-        ? {
-            ...t,
-            status,
-            currentOrderId: status === 'occupied' ? orderId : undefined,
-          }
-        : t
-    );
-
-    return {
-      success: true,
-      tables: updatedTables,
-    };
-  }
-
-  /**
-   * Assign cashier to table
-   */
-  static assignCashier(
-    tables: Table[],
-    tableId: string,
-    cashierId: string,
-    user: User
-  ): {
-    success: boolean;
-    tables?: Table[];
-    error?: string;
-  } {
-    if (user.role !== 'admin') {
-      return {
-        success: false,
-        error: 'Unauthorized: Only admin can assign cashiers',
-      };
-    }
-
-    const table = tables.find(t => t.id === tableId);
-    if (!table) {
-      return {
-        success: false,
-        error: 'Table not found',
-      };
-    }
-
-    const updatedTables = tables.map(t =>
-      t.id === tableId ? { ...t, assignedCashierId: cashierId } : t
-    );
-
-    return {
-      success: true,
-      tables: updatedTables,
-    };
-  }
-
-  /**
-   * Get table with order details
-   */
-  static getTableWithOrder(
-    tables: Table[],
-    orders: Order[],
-    tableId: string,
-    user: User
-  ): {
-    table: Table;
-    order?: Order;
-  } | null {
-    const table = this.getTableById(tables, tableId, user);
-    if (!table) return null;
-
-    const order = table.currentOrderId
-      ? orders.find(o => o.id === table.currentOrderId)
-      : undefined;
-
-    return { table, order };
   }
 }

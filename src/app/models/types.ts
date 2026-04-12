@@ -60,19 +60,33 @@ export interface Order {
 
 // ==================== Products & Inventory ====================
 
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon?: string;
+  displayOrder: number;
+  isActive: boolean;
+  branchId: string;
+  createdAt: Date;
+}
+
 export interface Product {
   id: string;
   name: string;
+  categoryId?: string;
   category: string;
   price: number;
   stock: number;
-  image: string;
-  sku: string;
+  image?: string;
+  sku?: string;
   taxRate: number;
   reorderPoint: number;
   branchId: string;
   kitchenStatus: 'available' | 'out-of-stock' | 'finished'; // Kitchen can mark
   isActive: boolean;
+  createdAt: Date;
 }
 
 export interface InventoryItem {
@@ -203,9 +217,10 @@ export interface SalesAnalytics {
 export interface ProductImportData {
   name: string;
   category: string;
+  categoryId?: string;
   price: number;
   stock: number;
-  sku: string;
+  sku?: string;
   taxRate: number;
   reorderPoint: number;
   image?: string;

@@ -11,6 +11,9 @@ import { AttendanceView } from './views/AttendanceView';
 import { TableQRView } from './views/TableQRView';
 import { CheckInView } from './views/CheckInView';
 import { CustomerMenuView } from './views/CustomerMenuView';
+import { TableManagementView } from './views/TableManagementView';
+import { ProductManagementView } from './views/ProductManagementView';
+import { CategoryManagementView } from './views/CategoryManagementView';
 
 export const router = createHashRouter([
   {
@@ -20,6 +23,9 @@ export const router = createHashRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', Component: DashboardView },
       { path: 'tables', Component: TablesView },
+      { path: 'table-management', Component: TableManagementView },
+      { path: 'product-management', Component: ProductManagementView },
+      { path: 'category-management', Component: CategoryManagementView },
       { path: 'kitchen', Component: KitchenView },
       { path: 'inventory', Component: InventoryView },
       { path: 'reports', Component: ReportsView },

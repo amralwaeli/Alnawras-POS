@@ -1,192 +1,135 @@
 import { Staff } from '../models/types';
+import { supabase } from '../../lib/supabase';
 
 export class StaffController {
   /**
-   * Get all staff members
+   * Get all staff members from database
    */
-  static getStaff(staff: Staff[], activeOnly: boolean = false): Staff[] {
-    if (activeOnly) {
-      return staff.filter(s => s.status === 'active');
-    }
-    return staff;
-  }
+  static async getStaff(activeOnly: boolean = false): Promise<{ success: boolean; data?: Staff[]; error?: string }> {
+    try {
+      let query = supabase.from('users').select('*');
 
-  /**
-   * Get staff by ID
-   */
-  static getStaffById(staff: Staff[], staffId: string): Staff | undefined {
-    return staff.find(s => s.id === staffId);
-  }
-
-  /**
-   * Get staff by role
-   */
-  static getStaffByRole(
-    staff: Staff[],
-    role: 'manager' | 'cashier' | 'inventory'
-  ): Staff[] {
-    return staff.filter(s => s.role === role);
-  }
-
-  /**
-   * Add new staff member
-   */
-  static addStaff(
-    staff: Staff[],
-    newStaff: Omit<Staff, 'id' | 'createdAt'>
-  ): {
-    success: boolean;
-    updatedStaff?: Staff[];
-    staff?: Staff;
-    error?: string;
-  } {
-    // Check for duplicate email
-    const emailExists = staff.some(s => s.email === newStaff.email);
-    if (emailExists) {
-      return {
-        success: false,
-        error: 'Email already exists',
-      };
-    }
-
-    const staffMember: Staff = {
-      ...newStaff,
-      id: `staff-${Date.now()}`,
-      createdAt: new Date(),
-    };
-
-    return {
-      success: true,
-      updatedStaff: [...staff, staffMember],
-      staff: staffMember,
-    };
-  }
-
-  /**
-   * Update staff member
-   */
-  static updateStaff(
-    staff: Staff[],
-    staffId: string,
-    updates: Partial<Omit<Staff, 'id' | 'createdAt'>>
-  ): {
-    success: boolean;
-    updatedStaff?: Staff[];
-    error?: string;
-  } {
-    const staffMember = staff.find(s => s.id === staffId);
-
-    if (!staffMember) {
-      return {
-        success: false,
-        error: 'Staff member not found',
-      };
-    }
-
-    // Check for duplicate email if email is being updated
-    if (updates.email && updates.email !== staffMember.email) {
-      const emailExists = staff.some(s => s.email === updates.email && s.id !== staffId);
-      if (emailExists) {
-        return {
-          success: false,
-          error: 'Email already exists',
-        };
+      if (activeOnly) {
+        query = query.eq('status', 'active');
       }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching staff:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: data || [] };
+    } catch (err) {
+      console.error('Error in getStaff:', err);
+      return { success: false, error: 'Failed to fetch staff' };
     }
-
-    const updatedStaff = staff.map(s =>
-      s.id === staffId ? { ...s, ...updates } : s
-    );
-
-    return {
-      success: true,
-      updatedStaff,
-    };
   }
 
   /**
-   * Deactivate staff member
+   * Get staff by ID from database
    */
-  static deactivateStaff(staff: Staff[], staffId: string): {
-    success: boolean;
-    updatedStaff?: Staff[];
-    error?: string;
-  } {
-    return this.updateStaff(staff, staffId, { status: 'inactive' });
+  static async getStaffById(staffId: string): Promise<{ success: boolean; data?: Staff; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', staffId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching staff by ID:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data };
+    } catch (err) {
+      console.error('Error in getStaffById:', err);
+      return { success: false, error: 'Failed to fetch staff member' };
+    }
   }
 
   /**
-   * Activate staff member
+   * Add new staff member to database
    */
-  static activateStaff(staff: Staff[], staffId: string): {
-    success: boolean;
-    updatedStaff?: Staff[];
-    error?: string;
-  } {
-    return this.updateStaff(staff, staffId, { status: 'active' });
-  }
+  static async addStaff(
+    newStaff: Omit<Staff, 'id' | 'createdAt'>
+  ): Promise<{ success: boolean; data?: Staff; error?: string }> {
+    try {
+      // Generate ID
+      const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  /**
-   * Delete staff member
-   */
-  static deleteStaff(staff: Staff[], staffId: string): {
-    success: boolean;
-    updatedStaff?: Staff[];
-    error?: string;
-  } {
-    const exists = staff.some(s => s.id === staffId);
-
-    if (!exists) {
-      return {
-        success: false,
-        error: 'Staff member not found',
+      const staffData = {
+        id,
+        ...newStaff,
+        created_at: new Date().toISOString(),
       };
-    }
 
-    return {
-      success: true,
-      updatedStaff: staff.filter(s => s.id !== staffId),
-    };
+      const { data, error } = await supabase
+        .from('users')
+        .insert([staffData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding staff:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data };
+    } catch (err) {
+      console.error('Error in addStaff:', err);
+      return { success: false, error: 'Failed to add staff member' };
+    }
   }
 
   /**
-   * Get staff statistics
+   * Update staff member in database
    */
-  static getStaffStatistics(staff: Staff[]): {
-    total: number;
-    active: number;
-    inactive: number;
-    byRole: {
-      role: string;
-      count: number;
-    }[];
-    averageHourlyRate: number;
-  } {
-    const total = staff.length;
-    const active = staff.filter(s => s.status === 'active').length;
-    const inactive = staff.filter(s => s.status === 'inactive').length;
+  static async updateStaff(
+    staffId: string,
+    updates: Partial<Staff>
+  ): Promise<{ success: boolean; data?: Staff; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', staffId)
+        .select()
+        .single();
 
-    const roleCount: Record<string, number> = {};
-    staff.forEach(s => {
-      roleCount[s.role] = (roleCount[s.role] || 0) + 1;
-    });
+      if (error) {
+        console.error('Error updating staff:', error);
+        return { success: false, error: error.message };
+      }
 
-    const byRole = Object.entries(roleCount).map(([role, count]) => ({
-      role,
-      count,
-    }));
+      return { success: true, data };
+    } catch (err) {
+      console.error('Error in updateStaff:', err);
+      return { success: false, error: 'Failed to update staff member' };
+    }
+  }
 
-    const totalHourlyRate = staff.reduce((sum, s) => sum + s.hourlyRate, 0);
-    const averageHourlyRate = total > 0
-      ? Math.round((totalHourlyRate / total) * 100) / 100
-      : 0;
+  /**
+   * Delete staff member from database
+   */
+  static async deleteStaff(staffId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', staffId);
 
-    return {
-      total,
-      active,
-      inactive,
-      byRole,
-      averageHourlyRate,
-    };
+      if (error) {
+        console.error('Error deleting staff:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Error in deleteStaff:', err);
+      return { success: false, error: 'Failed to delete staff member' };
+    }
   }
 }

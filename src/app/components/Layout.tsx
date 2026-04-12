@@ -17,6 +17,10 @@ export function Layout() {
   const allNavItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'canViewReports' as const },
     { path: '/tables', label: 'Tables', icon: ShoppingCart, permission: 'canViewTables' as const },
+    { path: '/table-management', label: 'Manage Tables', icon: ShoppingCart, permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/product-management', label: 'Manage Products', icon: Package, permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/category-management', label: 'Waiter Platform', icon: Tag, permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/category-management', label: 'Waiter Platform', icon: Tag, permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/kitchen', label: 'Kitchen', icon: ChefHat, permission: 'canManageInventory' as const },
     { path: '/inventory', label: 'Inventory', icon: Package, permission: 'canManageInventory' as const },
     { path: '/reports', label: 'Reports', icon: BarChart3, permission: 'canViewReports' as const },
@@ -26,7 +30,10 @@ export function Layout() {
     { path: '/table-qr', label: 'Table QR Codes', icon: QrCode, permission: 'canViewReports' as const },
   ];
 
-  const navItems = allNavItems.filter(item => permissions[item.permission]);
+  const navItems = allNavItems.filter(item => {
+    if (item.adminOnly && currentUser?.role !== 'admin') return false;
+    return permissions[item.permission];
+  });
 
   const handleLogout = () => {
     logout();

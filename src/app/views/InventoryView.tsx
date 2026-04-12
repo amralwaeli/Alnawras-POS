@@ -1,25 +1,52 @@
-<div className="col-span-2 flex items-center gap-3">
-                <input type="checkbox" id="isActive" checked={formData.isActive} onChange={e => setFormData({ ...formData, isActive: e.target.checked })} className="size-4 rounded" />
-                <label htmlFor="isActive" className="text-sm font-medium">Active (visible on menu)</label>
-              </div>
-            </div>
-
-            {formData.image && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <img src={formData.image} alt="preview" className="size-16 object-cover rounded" onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'; }} />
-                <span className="text-sm text-gray-500">Image preview</span>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleClose} className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleSubmit} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                {modalMode === 'add' ? 'Add Product' : 'Save Changes'}
-              </button>
-            </div>
+<div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Product</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Category</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">Stock</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">Price</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {products.map(product => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="size-10 object-cover rounded"
+                        />
+                        <span className="font-medium">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">{product.category}</td>
+                    <td className="px-4 py-3 text-right font-medium">{product.stock}</td>
+                    <td className="px-4 py-3 text-right">${product.price.toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            product.stock === 0
+                              ? 'bg-red-100 text-red-700'
+                              : product.stock <= product.reorderPoint
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {product.stock === 0 ? 'Out of Stock' : product.stock <= product.reorderPoint ? 'Low Stock' : 'In Stock'}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

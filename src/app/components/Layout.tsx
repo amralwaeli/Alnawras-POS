@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { ShoppingCart, Package, BarChart3, Users, LogOut, Clock, DollarSign, ChefHat, LayoutDashboard, QrCode } from 'lucide-react';
+import { ShoppingCart, Package, BarChart3, Users, LogOut, Clock, DollarSign, ChefHat, LayoutDashboard, QrCode, Tag } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
 
@@ -19,7 +19,6 @@ export function Layout() {
     { path: '/tables', label: 'Tables', icon: ShoppingCart, permission: 'canViewTables' as const },
     { path: '/table-management', label: 'Manage Tables', icon: ShoppingCart, permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/product-management', label: 'Manage Products', icon: Package, permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/category-management', label: 'Waiter Platform', icon: Tag, permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/category-management', label: 'Waiter Platform', icon: Tag, permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/kitchen', label: 'Kitchen', icon: ChefHat, permission: 'canManageInventory' as const },
     { path: '/inventory', label: 'Inventory', icon: Package, permission: 'canManageInventory' as const },

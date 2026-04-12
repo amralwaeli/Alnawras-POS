@@ -1,4 +1,66 @@
-<div className="overflow-x-auto">
+import { usePOS } from '../context/POSContext';
+import { Package, AlertTriangle } from 'lucide-react';
+
+export function InventoryView() {
+  const { products, currentUser } = usePOS();
+
+  if (!currentUser) return null;
+
+  const lowStockItems = products.filter(p => p.stock <= p.reorderPoint);
+  const outOfStockItems = products.filter(p => p.stock === 0);
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="font-semibold text-2xl">Inventory Management</h1>
+          <p className="text-gray-600">Monitor and manage product stock levels</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white p-4 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <div className="size-10 flex items-center justify-center bg-blue-100 rounded-lg">
+                <Package className="size-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Products</p>
+                <p className="text-2xl font-semibold">{products.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <div className="size-10 flex items-center justify-center bg-yellow-100 rounded-lg">
+                <AlertTriangle className="size-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Low Stock</p>
+                <p className="text-2xl font-semibold">{lowStockItems.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <div className="size-10 flex items-center justify-center bg-red-100 rounded-lg">
+                <AlertTriangle className="size-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Out of Stock</p>
+                <p className="text-2xl font-semibold">{outOfStockItems.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border">
+          <div className="p-4 border-b">
+            <h2 className="font-semibold">Product Inventory</h2>
+          </div>
+
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>

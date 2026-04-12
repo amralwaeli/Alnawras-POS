@@ -1,52 +1,131 @@
-{/* Footer */}
-          <div className="border-t border-gray-100 bg-white p-4 shrink-0 space-y-3">
-            {selectedOrder && selectedOrder.items.length > 0 && (
-              <div className="text-xs space-y-1 text-gray-500">
-                <div className="flex justify-between">
-                  <span>Sub-Total</span>
-                  <span>${selectedOrder.subtotal.toFixed(2)}</span>
-                </div>
-                {selectedOrder.discount > 0 && (
-                  <div className="flex justify-between text-red-500">
-                    <span>Discount</span>
-                    <span>- ${selectedOrder.discount.toFixed(2)}</span>
+import { usePOS } from '../context/POSContext';
+import { Table as TableIcon, Plus } from 'lucide-react';
+
+export function TablesView() {
+  const { tables, orders, currentUser } = usePOS();
+
+  if (!currentUser) return null;
+
+  // Filter tables based on role
+  const visibleTables = currentUser.role === 'cashier'
+    ? tables.filter(t => t.assignedCashierId === currentUser.id)
+    : tables;
+
+  const getTableOrder = (tableId: string) => {
+    const table = tables.find(t => t.id === tableId);
+    if (!table?.currentOrderId) return null;
+    return orders.find(o => o.id === table.currentOrderId);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return 'bg-green-100 border-green-300 text-green-700';
+      case 'occupied':
+        return 'bg-blue-100 border-blue-300 text-blue-700';
+      case 'reserved':
+        return 'bg-yellow-100 border-yellow-300 text-yellow-700';
+      default:
+        return 'bg-gray-100 border-gray-300 text-gray-700';
+    }
+  };
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-semibold text-2xl">Tables</h1>
+            <p className="text-gray-600">
+              {currentUser.role === 'cashier'
+                ? 'Your assigned tables for payment processing'
+                : 'Manage table orders and assignments'
+              }
+            </p>
+          </div>
+          {currentUser.role === 'waiter' && (
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <Plus className="size-4" />
+              New Order
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          {visibleTables.map(table => {
+            const order = getTableOrder(table.id);
+
+            return (
+              <div
+                key={table.id}
+                className={`border-2 rounded-lg p-6 ${getStatusColor(table.status)} cursor-pointer hover:shadow-lg transition-all`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <TableIcon className="size-5" />
+                    <span className="font-semibold text-lg">Table {table.number}</span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Tax</span>
-                  <span>${selectedOrder.tax.toFixed(2)}</span>
+                  <span className="text-xs px-2 py-1 bg-white/50 rounded capitalize">
+                    {table.status}
+                  </span>
                 </div>
-                {cart.length > 0 && (
-                  <div className="flex justify-between font-semibold text-amber-600 border-t border-amber-100 pt-1">
-                    <span>+ New items</span>
-                    <span>+ ${cartTotal.toFixed(2)}</span>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Capacity:</span>
+                    <span className="font-medium">{table.capacity} seats</span>
                   </div>
-                )}
-                <div className="flex justify-between font-bold text-gray-800 text-sm border-t border-gray-200 pt-1.5">
-                  <span>Total</span>
-                  <span>${(selectedOrder.total + (cart.length > 0 ? cartTotal : 0)).toFixed(2)}</span>
+
+                  {order && (
+                    <>
+                      <div className="pt-2 border-t border-current/20">
+                        <div className="flex justify-between">
+                          <span>Items:</span>
+                          <span className="font-medium">{order.items.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total:</span>
+                          <span className="font-semibold">${order.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {currentUser.role === 'admin' && order.waiters.length > 0 && (
+                        <div className="pt-2 border-t border-current/20">
+                          <span className="text-xs">Waiters: {order.waiters.length}</span>
+                        </div>
+                      )}
+
+                      {currentUser.role === 'cashier' && (
+                        <button className="w-full mt-3 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                          Process Payment
+                        </button>
+                      )}
+
+                      {currentUser.role === 'waiter' && (
+                        <button className="w-full mt-3 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                          Add Items
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {!order && currentUser.role === 'waiter' && (
+                    <button className="w-full mt-3 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                      Start Order
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-
-            {cart.length > 0 ? (
-              <button
-                onClick={submitCart}
-                className="w-full bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm"
-              >
-                <Plus className="size-4" />
-                {'Add ' + cartCount + ' item' + (cartCount !== 1 ? 's' : '') + ' to Order'}
-              </button>
-            ) : (
-              <button
-                disabled
-                className="w-full bg-gray-100 text-gray-400 font-semibold py-3.5 rounded-xl text-sm cursor-not-allowed"
-              >
-                Select items to add
-              </button>
-            )}
-          </div>
+            );
+          })}
         </div>
+
+        {visibleTables.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+            <TableIcon className="size-16 mb-4" />
+            <p>No tables available</p>
+          </div>
+        )}
       </div>
     </div>
   );

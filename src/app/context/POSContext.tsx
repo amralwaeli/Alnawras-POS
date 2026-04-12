@@ -5,8 +5,12 @@ import { OrderController } from '../controllers/OrderController';
 import { ProductController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
 import { AuthController } from '../controllers/AuthController';
+import { supabase } from '../../lib/supabase';
 
 interface POSContextType {
+  // Supabase client
+  supabase: typeof supabase;
+
   // State
   products: Product[];
   orders: Order[];
@@ -82,6 +86,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   return (
     <POSContext.Provider
       value={{
+        supabase,
         products,
         orders,
         users,

@@ -15,7 +15,7 @@ export const supabase = createClient(
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {
     const { error } = await supabase.from('_health_check_').select('*').limit(1)
-    if (error && (error.code === '42P01' ||  error.message?.includes('does not exist'))) {
+    if (error && (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('does not exist'))) {
       return true
     }
     if (error) {

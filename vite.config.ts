@@ -17,7 +17,7 @@ function figmaAssetResolver() {
 }
 
 export default defineConfig({
-  base: './alnawras-POS/',
+  base: './Alnawras-POS/',
   build: {
     outDir: 'docs',
   },

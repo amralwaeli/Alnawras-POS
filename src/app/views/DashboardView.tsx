@@ -1,6 +1,7 @@
 import { usePOS } from '../context/POSContext';
 import { Link } from 'react-router';
-import { ShoppingCart, Package, DollarSign, Users, TrendingUp, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
+import { ShoppingCart, Package, DollarSign, Users, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import { orderTotal, fmt } from '../../lib/currency';
 
 function StatCard({ label, value, icon: Icon, color, sub }: {
   label: string; value: string | number; icon: any;
@@ -36,7 +37,7 @@ export function DashboardView() {
   const activeUsers = users.filter(u => u.status === 'active');
   const todayRevenue = orders
     .filter(o => new Date(o.createdAt).toDateString() === new Date().toDateString() && o.status === 'completed')
-    .reduce((sum, o) => sum + o.total, 0);
+    .reduce((sum, o) => sum + orderTotal(o), 0);
 
   const roleCards: Record<string, JSX.Element> = {
     cashier: (
@@ -104,7 +105,7 @@ export function DashboardView() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Open Orders" value={openOrders.length} icon={ShoppingCart} color="blue" />
             <StatCard label="Tables Occupied" value={`${occupiedTables.length}/${tables.length}`} icon={TrendingUp} color="green" />
-            <StatCard label="Today's Revenue" value={`SAR ${todayRevenue.toFixed(0)}`} icon={DollarSign} color="amber" />
+            <StatCard label="Today's Revenue" value={fmt(todayRevenue)} icon={DollarSign} color="amber" />
             <StatCard label="Low Stock" value={lowStockItems.length} icon={AlertTriangle} color={lowStockItems.length > 0 ? 'red' : 'green'} sub={lowStockItems.length > 0 ? 'items need restocking' : 'all good'} />
           </div>
         )}
@@ -133,7 +134,7 @@ export function DashboardView() {
                         <p className="text-xs text-gray-400">{order.items.length} items</p>
                       </div>
                     </div>
-                    <p className="font-semibold text-gray-900 text-sm">SAR {order.total.toFixed(2)}</p>
+                    <p className="font-semibold text-gray-900 text-sm">{fmt(orderTotal(order))}</p>
                   </div>
                 ))}
                 {openOrders.length === 0 && (

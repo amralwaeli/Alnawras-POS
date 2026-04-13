@@ -2,14 +2,14 @@
 
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice';
 
 export interface User {
   id: string;
   name: string;
-  employmentNumber: string; // Used for staff check-in
+  employmentNumber: string; 
   role: UserRole;
-  pin: string; // 4-digit PIN for login
+  pin: string; 
   email: string;
   status: 'active' | 'inactive';
   branchId: string;
@@ -26,7 +26,7 @@ export interface Table {
   status: 'available' | 'occupied' | 'reserved';
   branchId: string;
   currentOrderId?: string;
-  assignedCashierId?: string; // For payment processing
+  assignedCashierId?: string; 
 }
 
 export interface OrderItem {
@@ -36,9 +36,11 @@ export interface OrderItem {
   quantity: number;
   price: number;
   subtotal: number;
-  addedBy: string; // Waiter ID
-  addedByName: string; // Waiter name
+  addedBy: string; 
+  addedByName: string; 
   addedAt: Date;
+  // This tells the UI whether to show this item on the Kitchen screen or Juice screen
+  station: 'kitchen' | 'juice' | 'none'; 
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
 }
@@ -55,7 +57,7 @@ export interface Order {
   status: 'open' | 'completed' | 'cancelled';
   createdAt: Date;
   completedAt?: Date;
-  waiters: string[]; // List of waiter IDs who added items
+  waiters: string[]; 
 }
 
 // ==================== Products & Inventory ====================
@@ -84,7 +86,10 @@ export interface Product {
   taxRate: number;
   reorderPoint: number;
   branchId: string;
-  kitchenStatus: 'available' | 'out-of-stock' | 'finished'; // Kitchen can mark
+  // Route product to specific display
+  station: 'kitchen' | 'juice' | 'none'; 
+  // Renamed from kitchenStatus to be more generic
+  availabilityStatus: 'available' | 'out-of-stock' | 'finished'; 
   isActive: boolean;
   createdAt: Date;
 }
@@ -96,7 +101,8 @@ export interface InventoryItem {
   reorderPoint: number;
   lastUpdated: Date;
   status: 'in-stock' | 'low-stock' | 'out-of-stock';
-  kitchenStatus: 'available' | 'out-of-stock' | 'finished';
+  // Staff at Juice or Kitchen can mark items finished
+  availabilityStatus: 'available' | 'out-of-stock' | 'finished';
 }
 
 // ==================== Payments ====================
@@ -115,9 +121,9 @@ export interface Payment {
   tableId: string;
   amount: number;
   method: PaymentMethod;
-  breakdown?: PaymentBreakdown; // For mixed payments
+  breakdown?: PaymentBreakdown; 
   status: 'completed' | 'pending' | 'failed';
-  processedBy: string; // Cashier ID
+  processedBy: string; 
   processedByName: string;
   timestamp: Date;
 }
@@ -130,13 +136,13 @@ export interface Expense {
   category: 'utilities' | 'supplies' | 'salary' | 'rent' | 'maintenance' | 'other';
   amount: number;
   date: Date;
-  createdBy: string; // Admin ID
+  createdBy: string; 
   branchId: string;
-  receipt?: string; // File path or URL
+  receipt?: string; 
 }
 
 export interface DailyAccounting {
-  date: string; // YYYY-MM-DD
+  date: string; 
   branchId: string;
   totalSales: number;
   totalExpenses: number;
@@ -159,9 +165,9 @@ export interface Attendance {
   checkInTime: Date;
   checkOutTime?: Date;
   scheduledTime: Date;
-  lateMinutes: number; // Calculated automatically
+  lateMinutes: number; 
   branchId: string;
-  date: string; // YYYY-MM-DD
+  date: string; 
 }
 
 export interface Staff extends User {
@@ -178,68 +184,6 @@ export interface Branch {
   location: string;
   managerId: string;
   isActive: boolean;
-}
-
-// ==================== Analytics ====================
-
-export interface SalesAnalytics {
-  totalRevenue: number;
-  totalOrders: number;
-  averageOrderValue: number;
-  itemsSold: number;
-  topProducts: {
-    productId: string;
-    productName: string;
-    quantitySold: number;
-    revenue: number;
-  }[];
-  revenueByDay: {
-    date: string;
-    revenue: number;
-    orders: number;
-  }[];
-  revenueByCategory: {
-    category: string;
-    revenue: number;
-    percentage: number;
-  }[];
-  waiterPerformance: {
-    waiterId: string;
-    waiterName: string;
-    ordersServed: number;
-    itemsAdded: number;
-    totalRevenue: number;
-  }[];
-}
-
-// ==================== Import/Export ====================
-
-export interface ProductImportData {
-  name: string;
-  category: string;
-  categoryId?: string;
-  price: number;
-  stock: number;
-  sku?: string;
-  taxRate: number;
-  reorderPoint: number;
-  image?: string;
-}
-
-export interface ExportReport {
-  type: 'daily' | 'weekly' | 'monthly';
-  startDate: string;
-  endDate: string;
-  format: 'pdf' | 'excel';
-  data: {
-    sales: DailyAccounting[];
-    expenses: Expense[];
-    summary: {
-      totalSales: number;
-      totalExpenses: number;
-      netIncome: number;
-    };
-  };
 }
 
 // ==================== Permissions ====================
@@ -302,7 +246,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
-    canManageInventory: true,
+    canManageInventory: true, // Kitchen can manage their stock/status
+    canViewReports: false,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+  },
+  juice: {
+    canViewTables: false,
+    canAddOrders: false,
+    canProcessPayments: false,
+    canManageInventory: true, // Juice bar can manage their stock/status
     canViewReports: false,
     canManageStaff: false,
     canManageAccounting: false,
@@ -317,7 +274,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canProcessPayments: false,
     canManageInventory: false,
     canViewReports: false,
-    canManageStaff: false,
+    canManageStaff: true,
     canManageAccounting: false,
     canExportReports: false,
     canImportProducts: false,

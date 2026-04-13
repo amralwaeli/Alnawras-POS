@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router';
-import { usePOS } from '../context/POSContext';
+import { supabase } from '../../lib/supabase';
 import { OrderController } from '../controllers/OrderController';
 import { Plus, Minus, ShoppingCart, Receipt, X } from 'lucide-react';
 import { Product } from '../models/types';
@@ -12,11 +12,36 @@ interface CartItem {
 
 export function CustomerMenuView() {
   const { tableId } = useParams();
-  const { tables, products, orders, setOrders, updateTable } = usePOS();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [tables, setTables] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [showBill, setShowBill] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: prods }, { data: tbls }, { data: ords }] = await Promise.all([
+        supabase.from('products').select('*').eq('branch_id', 'branch-1').eq('is_active', true),
+        supabase.from('tables').select('*').eq('branch_id', 'branch-1'),
+        supabase.from('orders').select('*, order_items(*)').eq('branch_id', 'branch-1').eq('status', 'open'),
+      ]);
+      if (prods) setProducts(prods.map((p: any) => ({
+        ...p, isActive: p.is_active, kitchenStatus: p.kitchen_status ?? 'available',
+        categoryId: p.category_id, createdAt: p.created_at,
+      })));
+      if (tbls) setTables(tbls.map((t: any) => ({
+        ...t, currentOrderId: t.current_order_id, assignedCashierId: t.assigned_cashier_id,
+      })));
+      if (ords) setOrders(ords.map((o: any) => ({
+        ...o, items: (o.order_items || []).map((i: any) => ({
+          ...i, productName: i.product_name, addedBy: i.added_by, addedByName: i.added_by_name,
+        })),
+      })));
+    };
+    load();
+  }, []);
 
   const table = tables.find(t => t.id === tableId);
   const currentOrder = table?.currentOrderId
@@ -89,33 +114,29 @@ export function CustomerMenuView() {
       const newOrder = OrderController.createOrder(tables, tableId!, customerUser as any);
       if (newOrder.success && newOrder.order) {
         orderId = newOrder.order.id;
-        setOrders([...orders, newOrder.order]);
-
-        // Update table status
-        updateTable(tableId!, { status: 'occupied', currentOrderId: orderId });
+        const newOrderWithItems = { ...newOrder.order, items: [] };
+        setOrders((prev: any[]) => [...prev, newOrderWithItems]);
+        await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', tableId);
+        await supabase.from('orders').insert({
+          id: newOrder.order.id, table_id: tableId, table_number: newOrder.order.tableNumber,
+          subtotal: 0, tax: 0, discount: 0, total: 0, status: 'open', branch_id: 'branch-1',
+        });
+        setTables((prev: any[]) => prev.map(t => t.id === tableId ? { ...t, status: 'occupied', currentOrderId: orderId } : t));
       }
     }
 
-    // Add items to order
     if (orderId) {
-      let updatedOrders = [...orders];
-
-      cart.forEach(cartItem => {
-        const result = OrderController.addItemToOrder(
-          updatedOrders,
-          orderId!,
-          cartItem.product,
-          cartItem.quantity,
-          customerUser as any,
-          products
-        );
-
-        if (result.success && result.orders) {
-          updatedOrders = result.orders;
-        }
-      });
-
-      setOrders(updatedOrders);
+      for (const cartItem of cart) {
+        const itemId = `item-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const subtotal = cartItem.product.price * cartItem.quantity;
+        await supabase.from('order_items').insert({
+          id: itemId, order_id: orderId, product_id: cartItem.product.id,
+          product_name: cartItem.product.name, quantity: cartItem.quantity,
+          price: cartItem.product.price, subtotal, added_by: 'customer',
+          added_by_name: `Table ${tables.find(t => t.id === tableId)?.number ?? ''} (Customer)`,
+          status: 'pending',
+        });
+      }
       setCart([]);
       setShowCart(false);
       alert('Order placed successfully!');

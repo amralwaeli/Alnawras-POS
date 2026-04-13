@@ -1,6 +1,20 @@
 import { lazy, Suspense } from 'react';
 import { createHashRouter, Navigate } from 'react-router';
 import { Layout } from './components/Layout';
+import { usePOS } from './context/POSContext';
+import { ROLE_PERMISSIONS } from './models/types';
+
+function ProtectedRoute({ children, permission, adminOnly }: {
+  children: React.ReactNode;
+  permission?: keyof typeof ROLE_PERMISSIONS['admin'];
+  adminOnly?: boolean;
+}) {
+  const { currentUser } = usePOS();
+  if (!currentUser) return <Navigate to="/check-in" replace />;
+  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
 // Lazy load all views — only loaded when the user navigates to them
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
@@ -39,18 +53,18 @@ export const router = createHashRouter([
     Component: Layout,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard', element: <Lazy><DashboardView /></Lazy> },
-      { path: 'tables', element: <Lazy><TablesView /></Lazy> },
-      { path: 'table-management', element: <Lazy><TableManagementView /></Lazy> },
-      { path: 'product-management', element: <Lazy><ProductManagementView /></Lazy> },
-      { path: 'category-management', element: <Lazy><CategoryManagementView /></Lazy> },
-      { path: 'kitchen', element: <Lazy><KitchenView /></Lazy> },
-      { path: 'inventory', element: <Lazy><InventoryView /></Lazy> },
-      { path: 'reports', element: <Lazy><ReportsView /></Lazy> },
-      { path: 'accounting', element: <Lazy><AccountingView /></Lazy> },
-      { path: 'staff', element: <Lazy><StaffView /></Lazy> },
-      { path: 'attendance', element: <Lazy><AttendanceView /></Lazy> },
-      { path: 'table-qr', element: <Lazy><TableQRView /></Lazy> },
+      { path: 'dashboard',           element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
+      { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
+      { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },
+      { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
+      { path: 'category-management', element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },
+      { path: 'kitchen',             element: <Lazy><ProtectedRoute permission="canManageInventory"><KitchenView /></ProtectedRoute></Lazy> },
+      { path: 'inventory',           element: <Lazy><ProtectedRoute permission="canManageInventory"><InventoryView /></ProtectedRoute></Lazy> },
+      { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports"><ReportsView /></ProtectedRoute></Lazy> },
+      { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
+      { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
+      { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
+      { path: 'table-qr',            element: <Lazy><ProtectedRoute permission="canViewReports"><TableQRView /></ProtectedRoute></Lazy> },
     ],
   },
   {

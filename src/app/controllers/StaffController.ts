@@ -1,90 +1,4 @@
-import { Staff } from '../models/types';
-import { supabase } from '../../lib/supabase';
-
-export class StaffController {
-  /**
-   * Get all staff members from database
-   */
-  static async getStaff(activeOnly: boolean = false): Promise<{ success: boolean; data?: Staff[]; error?: string }> {
-    try {
-      let query = supabase.from('users').select('*');
-
-      if (activeOnly) {
-        query = query.eq('status', 'active');
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching staff:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, data: data || [] };
-    } catch (err) {
-      console.error('Error in getStaff:', err);
-      return { success: false, error: 'Failed to fetch staff' };
-    }
-  }
-
-  /**
-   * Get staff by ID from database
-   */
-  static async getStaffById(staffId: string): Promise<{ success: boolean; data?: Staff; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', staffId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching staff by ID:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, data };
-    } catch (err) {
-      console.error('Error in getStaffById:', err);
-      return { success: false, error: 'Failed to fetch staff member' };
-    }
-  }
-
-  /**
-   * Add new staff member to database
-   */
-  static async addStaff(
-    newStaff: Omit<Staff, 'id' | 'createdAt'>
-  ): Promise<{ success: boolean; data?: Staff; error?: string }> {
-    try {
-      // Generate ID
-      const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      const staffData = {
-        id,
-        ...newStaff,
-        created_at: new Date().toISOString(),
-      };
-
-      const { data, error } = await supabase
-        .from('users')
-        .insert([staffData])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding staff:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, data };
-    } catch (err) {
-      console.error('Error in addStaff:', err);
-      return { success: false, error: 'Failed to add staff member' };
-    }
-  }
-
-  /**
+/
    * Update staff member in database
    */
   static async updateStaff(
@@ -92,9 +6,18 @@ export class StaffController {
     updates: Partial<Staff>
   ): Promise<{ success: boolean; data?: Staff; error?: string }> {
     try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.employmentNumber !== undefined) dbUpdates.employment_number = updates.employmentNumber;
+      if (updates.role !== undefined) dbUpdates.role = updates.role;
+      if (updates.pin !== undefined) dbUpdates.pin = updates.pin;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.branchId !== undefined) dbUpdates.branch_id = updates.branchId;
+
       const { data, error } = await supabase
         .from('users')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', staffId)
         .select()
         .single();
@@ -104,14 +27,14 @@ export class StaffController {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data };
+      return { success: true, data: mapDbRowToStaff(data) };
     } catch (err) {
       console.error('Error in updateStaff:', err);
       return { success: false, error: 'Failed to update staff member' };
     }
   }
 
-  /**
+  /
    * Delete staff member from database
    */
   static async deleteStaff(staffId: string): Promise<{ success: boolean; error?: string }> {

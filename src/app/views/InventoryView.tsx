@@ -1,5 +1,6 @@
 import { usePOS } from '../context/POSContext';
 import { Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { fmt } from '../../lib/currency';
 
 export function InventoryView() {
   const { products, currentUser } = usePOS();
@@ -83,7 +84,7 @@ export function InventoryView() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-sm text-gray-400 text-right">{p.reorderPoint}</td>
-                      <td className="px-5 py-3.5 text-sm font-medium text-right">SAR {p.price.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-right">{fmt(p.price)}</td>
                       <td className="px-5 py-3.5 text-center">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.cls}`}>{st.label}</span>
                       </td>

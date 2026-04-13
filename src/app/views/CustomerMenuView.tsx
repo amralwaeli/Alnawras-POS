@@ -215,7 +215,7 @@ export function CustomerMenuView() {
               />
               <div className="p-4">
                 <h3 className="font-medium mb-1">{product.name}</h3>
-                <p className="text-sm text-gray-600 mb-3">${product.price.toFixed(2)}</p>
+                <p className="text-sm text-gray-600 mb-3">RM ${product.price.toFixed(2)}</p>
                 <button
                   onClick={() => addToCart(product)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -256,7 +256,7 @@ export function CustomerMenuView() {
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{item.product.name}</h4>
-                      <p className="text-sm text-gray-600">${item.product.price.toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">RM ${item.product.price.toFixed(2)}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => updateQuantity(item.product.id, -1)}
@@ -280,7 +280,7 @@ export function CustomerMenuView() {
                       </div>
                     </div>
                     <div className="font-semibold">
-                      ${(item.product.price * item.quantity).toFixed(2)}
+                      RM ${(item.product.price * item.quantity).toFixed(2)}
                     </div>
                   </div>
                 ))
@@ -290,7 +290,7 @@ export function CustomerMenuView() {
             <div className="border-t p-4 space-y-3">
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total</span>
-                <span>${cartTotal.toFixed(2)}</span>
+                <span>RM ${cartTotal.toFixed(2)}</span>
               </div>
               <button
                 onClick={handlePlaceOrder}
@@ -328,22 +328,22 @@ export function CustomerMenuView() {
                       <span>
                         {item.quantity}x {item.productName}
                       </span>
-                      <span className="font-medium">${item.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">RM ${item.subtotal.toFixed(2)}</span>
                     </div>
                   ))}
 
                   <div className="space-y-2 pt-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal</span>
-                      <span>${orderSubtotal.toFixed(2)}</span>
+                      <span>RM ${orderSubtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Tax</span>
-                      <span>${orderTax.toFixed(2)}</span>
+                      <span>RM ${orderTax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-lg font-semibold pt-2 border-t">
                       <span>Total</span>
-                      <span>${orderTotal.toFixed(2)}</span>
+                      <span>RM {orderTotal.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

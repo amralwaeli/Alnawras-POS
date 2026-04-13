@@ -1,5 +1,3 @@
-// Enhanced data models for POS system with RBAC
-
 // ==================== User & Authentication ====================
 
 export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice';
@@ -15,6 +13,12 @@ export interface User {
   branchId: string;
   createdAt: Date;
   lastLogin?: Date;
+}
+
+export interface Staff extends User {
+  hourlyRate?: number;
+  position: string;
+  hireDate: Date;
 }
 
 // ==================== Tables & Orders ====================
@@ -39,7 +43,6 @@ export interface OrderItem {
   addedBy: string; 
   addedByName: string; 
   addedAt: Date;
-  // This tells the UI whether to show this item on the Kitchen screen or Juice screen
   station: 'kitchen' | 'juice' | 'none'; 
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
@@ -86,104 +89,10 @@ export interface Product {
   taxRate: number;
   reorderPoint: number;
   branchId: string;
-  // Route product to specific display
   station: 'kitchen' | 'juice' | 'none'; 
-  // Renamed from kitchenStatus to be more generic
   availabilityStatus: 'available' | 'out-of-stock' | 'finished'; 
   isActive: boolean;
   createdAt: Date;
-}
-
-export interface InventoryItem {
-  productId: string;
-  productName: string;
-  stockLevel: number;
-  reorderPoint: number;
-  lastUpdated: Date;
-  status: 'in-stock' | 'low-stock' | 'out-of-stock';
-  // Staff at Juice or Kitchen can mark items finished
-  availabilityStatus: 'available' | 'out-of-stock' | 'finished';
-}
-
-// ==================== Payments ====================
-
-export type PaymentMethod = 'cash' | 'card' | 'qr' | 'mixed';
-
-export interface PaymentBreakdown {
-  cash?: number;
-  card?: number;
-  qr?: number;
-}
-
-export interface Payment {
-  id: string;
-  orderId: string;
-  tableId: string;
-  amount: number;
-  method: PaymentMethod;
-  breakdown?: PaymentBreakdown; 
-  status: 'completed' | 'pending' | 'failed';
-  processedBy: string; 
-  processedByName: string;
-  timestamp: Date;
-}
-
-// ==================== Accounting ====================
-
-export interface Expense {
-  id: string;
-  description: string;
-  category: 'utilities' | 'supplies' | 'salary' | 'rent' | 'maintenance' | 'other';
-  amount: number;
-  date: Date;
-  createdBy: string; 
-  branchId: string;
-  receipt?: string; 
-}
-
-export interface DailyAccounting {
-  date: string; 
-  branchId: string;
-  totalSales: number;
-  totalExpenses: number;
-  netIncome: number;
-  orderCount: number;
-  paymentMethods: {
-    cash: number;
-    card: number;
-    qr: number;
-  };
-}
-
-// ==================== Staff & Attendance ====================
-
-export interface Attendance {
-  id: string;
-  employmentNumber: string;
-  staffId: string;
-  staffName: string;
-  checkInTime: Date;
-  checkOutTime?: Date;
-  scheduledTime: Date;
-  lateMinutes: number; 
-  branchId: string;
-  date: string; 
-}
-
-export interface Staff extends User {
-  hourlyRate?: number;
-  position: string;
-  hireDate: Date;
-}
-
-// ==================== Branch ====================
-
-export interface Branch {
-  id: string;
-  name: string;
-  location: string;
-  managerId: string;
-  isActive: boolean;
 }
 
 // ==================== Permissions ====================
@@ -246,7 +155,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
-    canManageInventory: true, // Kitchen can manage their stock/status
+    canManageInventory: true,
     canViewReports: false,
     canManageStaff: false,
     canManageAccounting: false,
@@ -259,7 +168,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
-    canManageInventory: true, // Juice bar can manage their stock/status
+    canManageInventory: true,
     canViewReports: false,
     canManageStaff: false,
     canManageAccounting: false,

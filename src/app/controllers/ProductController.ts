@@ -262,66 +262,96 @@ export class ProductController {
       const errors: string[] = [];
       let imported = 0;
 
-      // Get existing categories for validation
-      const { data: categories } = await supabase
+      // ── Step 1: fetch existing categories (1 round-trip) ──────────────────
+      const { data: existingCategories } = await supabase
         .from('categories')
         .select('id, name')
         .eq('branch_id', user.branchId)
         .eq('is_active', true);
 
-      const categoryMap = new Map(categories?.map(c => [c.name.toLowerCase(), c.id]) || []);
+      const categoryMap = new Map(
+        existingCategories?.map(c => [c.name.toLowerCase(), c.id]) || []
+      );
 
-      for (const item of importData) {
-        try {
-          // Find or create category
-          let categoryId = item.categoryId;
-          if (!categoryId) {
-            const categoryName = item.category.toLowerCase();
-            categoryId = categoryMap.get(categoryName);
+      // ── Step 2: collect unique new category names ─────────────────────────
+      const uniqueNewCategories = [
+        ...new Set(
+          importData
+            .map(item => item.category?.trim())
+            .filter(name => name && !categoryMap.has(name.toLowerCase()))
+        ),
+      ];
 
-            if (!categoryId) {
-              // Create new category
-              const { data: newCategory, error: catError } = await supabase
-                .from('categories')
-                .insert({
-                  id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                  name: item.category,
-                  branch_id: user.branchId,
-                })
-                .select()
-                .single();
+      // ── Step 3: batch-insert all new categories (1 round-trip) ───────────
+      if (uniqueNewCategories.length > 0) {
+        const now = Date.now();
+        const categoryRows = uniqueNewCategories.map((name, i) => ({
+          id: `cat-${now}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          name,
+          branch_id: user.branchId,
+          is_active: true,
+          display_order: 0,
+        }));
 
-              if (!catError && newCategory) {
-                categoryId = newCategory.id;
-                categoryMap.set(categoryName, categoryId);
-              }
+        const { data: newCats, error: catBatchError } = await supabase
+          .from('categories')
+          .insert(categoryRows)
+          .select('id, name');
+
+        if (catBatchError) {
+          // Non-fatal: log and continue; products without a category will be skipped
+          console.error('Batch category insert error:', catBatchError.message);
+        } else {
+          newCats?.forEach(c => categoryMap.set(c.name.toLowerCase(), c.id));
+        }
+      }
+
+      // ── Step 4: build product rows ────────────────────────────────────────
+      const now = Date.now();
+      const productRows: any[] = [];
+
+      importData.forEach((item, i) => {
+        const categoryId = categoryMap.get(item.category?.trim().toLowerCase());
+        if (!categoryId) {
+          errors.push(`Skipped "${item.name}": category "${item.category}" could not be created`);
+          return;
+        }
+        // Guard against duplicate SKUs in the same batch
+        const sku = item.sku && item.sku.trim() !== '' ? item.sku.trim() : undefined;
+        productRows.push({
+          id: `prod-${now}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          name: item.name,
+          category_id: categoryId,
+          category: item.category?.trim(),
+          price: isNaN(item.price) ? 0 : item.price,
+          stock: isNaN(item.stock) ? 0 : item.stock,
+          sku: sku || null,
+          tax_rate: item.taxRate || 0,
+          reorder_point: item.reorderPoint || 0,
+          image: item.image || null,
+          branch_id: user.branchId,
+          is_active: true,
+          kitchen_status: 'available',
+        });
+      });
+
+      // ── Step 5: batch-insert products in chunks of 50 (handles API limits) ─
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < productRows.length; i += CHUNK_SIZE) {
+        const chunk = productRows.slice(i, i + CHUNK_SIZE);
+        const { error: prodError } = await supabase.from('products').insert(chunk);
+        if (prodError) {
+          // Retry individually to isolate bad rows (e.g. duplicate SKU)
+          for (const row of chunk) {
+            const { error: singleError } = await supabase.from('products').insert(row);
+            if (singleError) {
+              errors.push(`Failed to import "${row.name}": ${singleError.message}`);
+            } else {
+              imported++;
             }
           }
-
-          // Insert product
-          const { error: prodError } = await supabase
-            .from('products')
-            .insert({
-              id: `prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              name: item.name,
-              category_id: categoryId,
-              category: item.category,
-              price: item.price,
-              stock: item.stock,
-              sku: item.sku,
-              tax_rate: item.taxRate,
-              reorder_point: item.reorderPoint,
-              image: item.image,
-              branch_id: user.branchId,
-            });
-
-          if (prodError) {
-            errors.push(`Failed to import "${item.name}": ${prodError.message}`);
-          } else {
-            imported++;
-          }
-        } catch (error) {
-          errors.push(`Failed to import "${item.name}": ${error}`);
+        } else {
+          imported += chunk.length;
         }
       }
 

@@ -208,89 +208,71 @@ export function ProductManagementView() {
 
     setImporting(true);
     try {
-      let jsonData: any[] = [];
+      // Use arrayBuffer for all file types — handles Arabic/UTF-8 encoding correctly
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array', codepage: 65001 });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-      if (file.name.endsWith('.csv')) {
-        // Parse CSV using XLSX (supports CSV natively)
-        const text = await file.text();
-        const workbook = XLSX.read(text, { type: 'string' });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        // Get raw rows - first row is field descriptions (instructions), second row is data
-        const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      // Get all rows as raw arrays to handle Lightspeed's two-row header structure
+      const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
 
-        // Detect if this is a Lightspeed/StoreHub export:
-        // Row 0 = actual column headers (SKU, Product Name, Category, ...)
-        // Row 1 = instruction/description row (starts with "#Required...")
-        // Row 2+ = actual product data
-        const headers = allRows[0] as string[];
-        const isLightspeedFormat = headers && (
-          headers.includes('Product Name') || headers.includes('SKU') || headers.includes('Tax-Exclusive Price')
-        );
-
-        if (isLightspeedFormat) {
-          // Skip the instruction row (row index 1) and map Lightspeed column names
-          for (let i = 2; i < allRows.length; i++) {
-            const row: any = {};
-            headers.forEach((h, idx) => { row[h] = allRows[i][idx]; });
-            jsonData.push(row);
-          }
-        } else {
-          // Generic CSV: use first row as headers, all subsequent rows as data
-          jsonData = XLSX.utils.sheet_to_json(worksheet);
-        }
-      } else {
-        // Excel (.xlsx / .xls)
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        jsonData = XLSX.utils.sheet_to_json(worksheet);
-      }
-
-      // Transform rows – supports both Lightspeed POS column names and generic names
-      const importData = jsonData.map((row: any) => ({
-        // Lightspeed: "Product Name" | generic: name / Name / product_name
-        name: row['Product Name'] || row.name || row.Name || row.product_name || '',
-        // Lightspeed: "Category" | generic: category / Category / category_name
-        category: row['Category'] || row.category || row.category_name || '',
-        // Lightspeed: "Tax-Exclusive Price" | generic: price / Price
-        price: parseFloat(row['Tax-Exclusive Price'] || row.price || row.Price || 0),
-        // Lightspeed: quantity column (branch-specific) | generic: stock / Stock / quantity
-        stock: parseInt(
-          row['Al-Nawras Yaman Restaurant_Quantity'] ||
-          row.stock || row.Stock || row.quantity || 0
-        ),
-        // Lightspeed: "SKU" | generic: sku / SKU / product_code
-        sku: (row['SKU'] || row.sku || row.SKU || row.product_code || '') || undefined,
-        taxRate: 0,
-        reorderPoint: parseInt(
-          row['Al-Nawras Yaman Restaurant_Warning Stock Level'] ||
-          row.reorder_point || row.reorderPoint || 0
-        ),
-      })).filter(item => item.name && item.category);
-
-      if (importData.length === 0) {
-        toast.error('No valid products found in the file. Make sure "Product Name" and "Category" columns are filled.');
+      if (allRows.length < 2) {
+        toast.error('File appears to be empty.');
         return;
       }
 
+      const headers = allRows[0] as string[];
+      let jsonData: any[] = [];
+
+      // Detect Lightspeed/StoreHub POS export format
+      // Row 0 = column headers, Row 1 = instruction text, Row 2+ = product data
+      const isLightspeedFormat = headers.includes('Product Name') || headers.includes('Tax-Exclusive Price');
+
+      if (isLightspeedFormat) {
+        for (let i = 2; i < allRows.length; i++) {
+          const row: any = {};
+          headers.forEach((h, idx) => { if (h) row[h] = allRows[i][idx]; });
+          jsonData.push(row);
+        }
+      } else {
+        // Generic format: first row is headers, rest is data
+        jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      }
+
+      // Map columns — supports both Lightspeed and generic column names
+      const importData = jsonData.map((row: any) => ({
+        name: (row['Product Name'] || row.name || row.Name || row.product_name || '').toString().trim(),
+        category: (row['Category'] || row.category || row.category_name || '').toString().trim(),
+        price: parseFloat(row['Tax-Exclusive Price'] || row.price || row.Price || 0) || 0,
+        stock: parseInt(row['Al-Nawras Yaman Restaurant_Quantity'] || row.stock || row.Stock || row.quantity || 0) || 0,
+        sku: (row['SKU'] || row.sku || row.product_code || '').toString().trim() || undefined,
+        taxRate: 0,
+        reorderPoint: parseInt(row['Al-Nawras Yaman Restaurant_Warning Stock Level'] || row.reorder_point || 0) || 0,
+      })).filter(item => item.name && item.category);
+
+      if (importData.length === 0) {
+        toast.error('No valid products found. Make sure "Product Name" and "Category" columns have data.');
+        return;
+      }
+
+      toast.info(`Processing ${importData.length} products…`);
       const result = await importProducts(importData);
+
       if (result.success) {
         toast.success(`Successfully imported ${result.imported} products`);
         if (result.errors && result.errors.length > 0) {
           console.warn('Import errors:', result.errors);
-          toast.warning(`${result.errors.length} products had errors during import`);
+          toast.warning(`${result.errors.length} rows had errors — check the console for details`);
         }
       } else {
         toast.error(result.error || 'Failed to import products');
       }
     } catch (error) {
       console.error('Import error:', error);
-      toast.error('Failed to process the file');
+      toast.error('Failed to read the file. Please check the format and try again.');
     } finally {
       setImporting(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

@@ -22,6 +22,7 @@ export function ProductManagementView() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [importing, setImporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [productFormData, setProductFormData] = useState({
@@ -311,6 +312,13 @@ export function ProductManagementView() {
         </TabsList>
 
         <TabsContent value="products" className="space-y-6">
+          <input
+            type="text"
+            placeholder="Search products or categories..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+          />
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
               <Button onClick={() => setIsProductDialogOpen(true)} disabled={!categories.length}>
@@ -347,7 +355,7 @@ export function ProductManagementView() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products.map(product => (
+            {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase())).map(product => (
               <Card key={product.id}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">{product.name}</CardTitle>

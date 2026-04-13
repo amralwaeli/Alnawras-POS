@@ -97,7 +97,7 @@ export function CustomerMenuView() {
     setCart(current => current.filter(item => item.product.id !== productId));
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
 
     // Create a "customer" user for ordering

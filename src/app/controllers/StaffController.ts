@@ -1,17 +1,16 @@
-import { Staff, User } from '../models/types';
+import { Staff, User, UserRole } from '../models/types';
 import { supabase } from '../../lib/supabase';
 
 /**
  * Maps a raw Supabase DB row (snake_case) to a typed User/Staff object (camelCase).
- * Without this mapping, fields like branchId, employmentNumber, createdAt are
- * always undefined, causing all branch-scoped DB writes to fail with NOT NULL errors.
+ * Now correctly handles the 'juice' role alongside kitchen and others.
  */
 function mapDbRowToStaff(row: any): Staff {
   return {
     id: row.id,
     name: row.name,
     employmentNumber: row.employment_number,
-    role: row.role,
+    role: row.role as UserRole, // Cast to our updated UserRole type (includes 'juice')
     pin: row.pin,
     email: row.email,
     status: row.status,
@@ -20,7 +19,8 @@ function mapDbRowToStaff(row: any): Staff {
     lastLogin: row.last_login ? new Date(row.last_login) : undefined,
     // Staff-specific fields
     hourlyRate: row.hourly_rate,
-    position: row.position ?? row.role,
+    // If no specific position is set, we default to the role name (e.g., 'juice')
+    position: row.position ?? row.role, 
     hireDate: row.hire_date ? new Date(row.hire_date) : new Date(row.created_at),
   };
 }
@@ -75,24 +75,29 @@ export class StaffController {
   }
 
   /**
-   * Add new staff member to database
+   * Add new staff member to database (including Juice/Kitchen roles)
    */
   static async addStaff(
     newStaff: Omit<Staff, 'id' | 'createdAt'>
   ): Promise<{ success: boolean; data?: Staff; error?: string }> {
     try {
+      // Generate a unique ID if your DB doesn't auto-gen UUIDs
       const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const staffData = {
         id,
         name: newStaff.name,
         employment_number: newStaff.employmentNumber,
-        role: newStaff.role,
+        role: newStaff.role, // 'juice', 'kitchen', etc.
         pin: newStaff.pin,
         email: newStaff.email,
         status: newStaff.status,
         branch_id: newStaff.branchId,
         created_at: new Date().toISOString(),
+        // Optional staff fields
+        hourly_rate: newStaff.hourlyRate || 0,
+        position: newStaff.position || newStaff.role,
+        hire_date: newStaff.hireDate ? newStaff.hireDate.toISOString() : new Date().toISOString()
       };
 
       const { data, error } = await supabase
@@ -129,6 +134,8 @@ export class StaffController {
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.branchId !== undefined) dbUpdates.branch_id = updates.branchId;
+      if (updates.hourlyRate !== undefined) dbUpdates.hourly_rate = updates.hourlyRate;
+      if (updates.position !== undefined) dbUpdates.position = updates.position;
 
       const { data, error } = await supabase
         .from('users')

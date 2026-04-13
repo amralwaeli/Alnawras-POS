@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router';
+import { NavLink, Outlet, useNavigate, Navigate } from 'react-router';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings
@@ -9,7 +9,7 @@ import { ROLE_PERMISSIONS } from '../models/types';
 export function Layout() {
   const { currentUser, logout } = usePOS();
 
-  if (!currentUser) return null;
+  if (!currentUser) return <Navigate to="/check-in" replace />;
 
   const permissions = ROLE_PERMISSIONS[currentUser.role];
 

@@ -8,13 +8,16 @@ const roleColors: Record<string, string> = {
   cashier: 'bg-blue-100 text-blue-700',
   waiter:  'bg-emerald-100 text-emerald-700',
   kitchen: 'bg-orange-100 text-orange-700',
+  juice:   'bg-amber-100 text-amber-700', // Added Juice color
   hr:      'bg-pink-100 text-pink-700',
 };
+
 const avatarColors: Record<string, string> = {
   admin:   'from-violet-500 to-purple-600',
   cashier: 'from-blue-500 to-cyan-600',
   waiter:  'from-emerald-500 to-green-600',
   kitchen: 'from-orange-500 to-amber-600',
+  juice:   'from-yellow-400 to-amber-500', // Added Juice gradient
   hr:      'from-pink-500 to-rose-600',
 };
 
@@ -44,6 +47,7 @@ export function StaffView() {
       email: `${formData.name.toLowerCase().replace(/\s+/g, '.')}@alnawras.com`,
       status: 'active',
       branchId: currentUser.branchId,
+      createdAt: new Date(), // Ensure required fields from your model are here
     });
     if (result.success) { setShowModal(false); setFormData({ name: '', role: 'cashier', pin: '' }); }
     else setError(result.error || 'Failed to add staff member');
@@ -149,8 +153,8 @@ export function StaffView() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Role *</label>
                 <select value={formData.role} onChange={e => setFormData(f => ({ ...f, role: e.target.value as UserRole }))}
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
-                  {['cashier', 'waiter', 'kitchen', 'hr', 'admin'].map(r => (
-                    <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                  {['cashier', 'waiter', 'kitchen', 'juice', 'hr', 'admin'].map(r => (
+                    <option key={r} value={r} className="capitalize">{r}</option>
                   ))}
                 </select>
               </div>

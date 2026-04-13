@@ -148,6 +148,77 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser]);
 
+  // Realtime subscriptions — keep all accounts in sync automatically
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const branch = 'branch-1';
+
+    const channel = supabase
+      .channel('pos-realtime')
+
+      // Products
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `branch_id=eq.${branch}` }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setProducts(prev => [...prev.filter(p => p.id !== (payload.new as any).id), payload.new as any]);
+        } else if (payload.eventType === 'UPDATE') {
+          setProducts(prev => prev.map(p => p.id === (payload.new as any).id ? { ...p, ...payload.new } : p));
+        } else if (payload.eventType === 'DELETE') {
+          setProducts(prev => prev.filter(p => p.id !== (payload.old as any).id));
+        }
+      })
+
+      // Categories
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `branch_id=eq.${branch}` }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setCategories(prev => [...prev.filter(c => c.id !== (payload.new as any).id), payload.new as any]);
+        } else if (payload.eventType === 'UPDATE') {
+          setCategories(prev => prev.map(c => c.id === (payload.new as any).id ? { ...c, ...payload.new } : c));
+        } else if (payload.eventType === 'DELETE') {
+          setCategories(prev => prev.filter(c => c.id !== (payload.old as any).id));
+        }
+      })
+
+      // Tables
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branch}` }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setTables(prev => [...prev.filter(t => t.id !== (payload.new as any).id), payload.new as any]);
+        } else if (payload.eventType === 'UPDATE') {
+          setTables(prev => prev.map(t => t.id === (payload.new as any).id ? { ...t, ...payload.new } : t));
+        } else if (payload.eventType === 'DELETE') {
+          setTables(prev => prev.filter(t => t.id !== (payload.old as any).id));
+        }
+      })
+
+      // Orders
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branch}` }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setOrders(prev => [...prev.filter(o => o.id !== (payload.new as any).id), { ...(payload.new as any), items: [] }]);
+        } else if (payload.eventType === 'UPDATE') {
+          setOrders(prev => prev.map(o => o.id === (payload.new as any).id ? { ...o, ...payload.new } : o));
+        } else if (payload.eventType === 'DELETE') {
+          setOrders(prev => prev.filter(o => o.id !== (payload.old as any).id));
+        }
+      })
+
+      // Users
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `branch_id=eq.${branch}` }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setUsers(prev => [...prev.filter(u => u.id !== (payload.new as any).id), payload.new as any]);
+        } else if (payload.eventType === 'UPDATE') {
+          setUsers(prev => prev.map(u => u.id === (payload.new as any).id ? { ...u, ...payload.new } : u));
+        } else if (payload.eventType === 'DELETE') {
+          setUsers(prev => prev.filter(u => u.id !== (payload.old as any).id));
+        }
+      })
+
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
   // Auth actions
   const login = async (pin: string) => {
     const result = AuthController.authenticate(pin, users);

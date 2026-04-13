@@ -1,4 +1,5 @@
 import { usePOS } from '../context/POSContext';
+import { useNavigate } from 'react-router';
 import { UtensilsCrossed, Users, DollarSign, Clock } from 'lucide-react';
 
 const statusConfig = {
@@ -9,6 +10,7 @@ const statusConfig = {
 
 export function TablesView() {
   const { tables, orders, currentUser } = usePOS();
+  const navigate = useNavigate();
   if (!currentUser) return null;
 
   const visibleTables = currentUser.role === 'cashier'
@@ -89,7 +91,7 @@ export function TablesView() {
                       </button>
                     )}
                     {currentUser.role === 'waiter' && (
-                      <button className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
                         Add Items
                       </button>
                     )}
@@ -97,7 +99,7 @@ export function TablesView() {
                 ) : (
                   <>
                     {currentUser.role === 'waiter' && (
-                      <button className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
                         Start Order
                       </button>
                     )}

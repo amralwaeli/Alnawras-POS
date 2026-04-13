@@ -137,6 +137,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
             console.error('Failed to load tables:', tableResult.error);
             setTables(mockTables);
           }
+
+          // Load open orders with their items
+          const branch = currentUser.branchId || 'branch-1';
+          const { data: ordersData } = await supabase
+            .from('orders')
+            .select('*, order_items(*)')
+            .eq('branch_id', branch)
+            .in('status', ['open', 'pending']);
+          if (ordersData) {
+            setOrders(ordersData.map((o: any) => ({
+              ...o,
+              tableId: o.table_id,
+              tableNumber: o.table_number,
+              createdAt: new Date(o.created_at),
+              items: (o.order_items || []).map((i: any) => ({
+                ...i,
+                productName: i.product_name,
+                addedBy: i.added_by,
+                addedByName: i.added_by_name,
+                addedAt: i.added_at ? new Date(i.added_at) : new Date(),
+              })),
+            })));
+          }
         } catch (error) {
           console.error('Error loading user data:', error);
           setProducts(mockProducts);
@@ -152,7 +175,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUser) return;
 
-    const branch = 'branch-1';
+    const branch = currentUser.branchId || 'branch-1';
 
     const channel = supabase
       .channel('pos-realtime')

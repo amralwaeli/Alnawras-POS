@@ -140,12 +140,12 @@ export function TableManagementView() {
               </div>
               <div>
                 <Label htmlFor="cashier">Assigned Cashier (Optional)</Label>
-                <Select value={formData.assignedCashierId} onValueChange={(value) => setFormData(prev => ({ ...prev, assignedCashierId: value }))}>
+                <Select value={formData.assignedCashierId || 'none'} onValueChange={(value) => setFormData(prev => ({ ...prev, assignedCashierId: value === 'none' ? '' : value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a cashier" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {cashiers.map(cashier => (
                       <SelectItem key={cashier.id} value={cashier.id}>
                         {cashier.name}

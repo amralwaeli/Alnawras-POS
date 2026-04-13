@@ -1,5 +1,6 @@
 import { usePOS } from '../context/POSContext';
 import { TrendingUp, TrendingDown, DollarSign, Download } from 'lucide-react';
+import { orderTotal, fmt } from '../../lib/currency';
 
 const expenseCategories = ['utilities', 'supplies', 'rent', 'salary', 'maintenance', 'other'];
 const catColors: Record<string, string> = {
@@ -12,7 +13,7 @@ export function AccountingView() {
   if (!currentUser) return null;
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalRevenue  = orders.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0);
+  const totalRevenue  = orders.filter(o => o.status === 'completed').reduce((s, o) => s + orderTotal(o), 0);
   const netIncome     = totalRevenue - totalExpenses;
 
   return (
@@ -28,17 +29,17 @@ export function AccountingView() {
           <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
             <div className="inline-flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mb-3"><TrendingUp className="size-5" /></div>
             <p className="text-sm text-gray-500">Total Revenue</p>
-            <p className="text-2xl font-bold text-emerald-700">SAR {totalRevenue.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-emerald-700">{fmt(totalRevenue)}</p>
           </div>
           <div className="bg-red-50 rounded-2xl p-5 border border-red-100">
             <div className="inline-flex size-10 items-center justify-center rounded-xl bg-red-100 text-red-600 mb-3"><TrendingDown className="size-5" /></div>
             <p className="text-sm text-gray-500">Total Expenses</p>
-            <p className="text-2xl font-bold text-red-700">SAR {totalExpenses.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-red-700">{fmt(totalExpenses)}</p>
           </div>
           <div className={`${netIncome >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'} rounded-2xl p-5 border`}>
             <div className={`inline-flex size-10 items-center justify-center rounded-xl ${netIncome >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'} mb-3`}><DollarSign className="size-5" /></div>
             <p className="text-sm text-gray-500">Net Income</p>
-            <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-700' : 'text-red-700'}`}>SAR {netIncome.toFixed(2)}</p>
+            <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(netIncome)}</p>
           </div>
         </div>
 
@@ -61,7 +62,7 @@ export function AccountingView() {
                       <span className="text-xs text-gray-400">{new Date(e.date).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-red-600">-SAR {e.amount.toFixed(2)}</p>
+                  <p className="text-sm font-bold text-red-600">-{fmt(e.amount)}</p>
                 </div>
               ))}
               {expenses.length === 0 && (
@@ -86,7 +87,7 @@ export function AccountingView() {
                         <span className={`inline-block size-2.5 rounded-full ${catColors[cat]}`} />
                         <span className="text-sm font-medium text-gray-700 capitalize">{cat}</span>
                       </div>
-                      <span className="text-sm text-gray-500">SAR {total.toFixed(2)}</span>
+                      <span className="text-sm text-gray-500">{fmt(total)}</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className={`${catColors[cat]} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />

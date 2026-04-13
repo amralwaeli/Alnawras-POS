@@ -191,13 +191,58 @@ export function POSProvider({ children }: { children: ReactNode }) {
       })
 
       // Orders
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branch}` }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branch}` }, async payload => {
         if (payload.eventType === 'INSERT') {
-          setOrders(prev => [...prev.filter(o => o.id !== (payload.new as any).id), { ...(payload.new as any), items: [] }]);
+          // Fetch existing items in case items were inserted before this event fired
+          const { data: existingItems } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', (payload.new as any).id);
+          const items = (existingItems || []).map((i: any) => ({
+            ...i,
+            productName: i.product_name,
+            addedBy: i.added_by,
+            addedByName: i.added_by_name,
+            addedAt: i.added_at,
+          }));
+          setOrders(prev => [...prev.filter(o => o.id !== (payload.new as any).id), { ...(payload.new as any), items }]);
         } else if (payload.eventType === 'UPDATE') {
           setOrders(prev => prev.map(o => o.id === (payload.new as any).id ? { ...o, ...payload.new } : o));
         } else if (payload.eventType === 'DELETE') {
           setOrders(prev => prev.filter(o => o.id !== (payload.old as any).id));
+        }
+      })
+
+      // Order Items — cashier sees new items instantly when customer orders
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          const newItem = payload.new as any;
+          const mappedItem = {
+            ...newItem,
+            productName: newItem.product_name,
+            addedBy: newItem.added_by,
+            addedByName: newItem.added_by_name,
+            addedAt: newItem.added_at,
+          };
+          setOrders(prev => prev.map(o =>
+            o.id === newItem.order_id
+              ? { ...o, items: [...(o.items || []).filter((i: any) => i.id !== newItem.id), mappedItem] }
+              : o
+          ));
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedItem = payload.new as any;
+          setOrders(prev => prev.map(o =>
+            o.id === updatedItem.order_id
+              ? { ...o, items: (o.items || []).map((i: any) => i.id === updatedItem.id ? { ...i, ...updatedItem, productName: updatedItem.product_name } : i) }
+              : o
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          const deletedItem = payload.old as any;
+          setOrders(prev => prev.map(o =>
+            o.id === deletedItem.order_id
+              ? { ...o, items: (o.items || []).filter((i: any) => i.id !== deletedItem.id) }
+              : o
+          ));
         }
       })
 

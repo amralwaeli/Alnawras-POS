@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { usePOS } from '../context/POSContext';
 import { Users, UserCheck, Plus, X } from 'lucide-react';
-import { User, UserRole } from '../models/types';
+import { UserRole } from '../models/types';
 
 const roleColors: Record<string, string> = {
   admin:   'bg-violet-100 text-violet-700',
   cashier: 'bg-blue-100 text-blue-700',
   waiter:  'bg-emerald-100 text-emerald-700',
   kitchen: 'bg-orange-100 text-orange-700',
-  juice:   'bg-amber-100 text-amber-700', // Added Juice color
+  juice:   'bg-amber-100 text-amber-700',
   hr:      'bg-pink-100 text-pink-700',
 };
 
@@ -17,7 +17,7 @@ const avatarColors: Record<string, string> = {
   cashier: 'from-blue-500 to-cyan-600',
   waiter:  'from-emerald-500 to-green-600',
   kitchen: 'from-orange-500 to-amber-600',
-  juice:   'from-yellow-400 to-amber-500', // Added Juice gradient
+  juice:   'from-yellow-400 to-amber-500',
   hr:      'from-pink-500 to-rose-600',
 };
 
@@ -47,7 +47,6 @@ export function StaffView() {
       email: `${formData.name.toLowerCase().replace(/\s+/g, '.')}@alnawras.com`,
       status: 'active',
       branchId: currentUser.branchId,
-      createdAt: new Date(), // Ensure required fields from your model are here
     });
     if (result.success) { setShowModal(false); setFormData({ name: '', role: 'cashier', pin: '' }); }
     else setError(result.error || 'Failed to add staff member');
@@ -126,7 +125,6 @@ export function StaffView() {
         </div>
       </div>
 
-      {/* Add Staff Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -164,7 +162,6 @@ export function StaffView() {
                   onChange={e => setFormData(f => ({ ...f, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-mono text-center tracking-[0.5em] text-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
                   placeholder="••••" maxLength={4} />
-                <p className="text-xs text-gray-400 mt-1">Staff will use this to login</p>
               </div>
             </div>
 
@@ -172,7 +169,7 @@ export function StaffView() {
               <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={handleAdd} disabled={submitting}
                 className="flex-1 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {submitting ? <><div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Adding...</> : 'Add Member'}
+                {submitting ? 'Adding...' : 'Add Member'}
               </button>
             </div>
           </div>

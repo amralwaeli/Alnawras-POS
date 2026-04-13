@@ -1,188 +1,170 @@
 import { usePOS } from '../context/POSContext';
 import { Link } from 'react-router';
-import { ShoppingCart, Package, DollarSign, Users, Clock, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Package, DollarSign, Users, TrendingUp, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
+
+function StatCard({ label, value, icon: Icon, color, sub }: {
+  label: string; value: string | number; icon: any;
+  color: 'blue' | 'green' | 'amber' | 'red' | 'purple'; sub?: string;
+}) {
+  const colors = {
+    blue:   { bg: 'bg-blue-50',   icon: 'bg-blue-100 text-blue-600',   val: 'text-blue-700' },
+    green:  { bg: 'bg-green-50',  icon: 'bg-green-100 text-green-600',  val: 'text-green-700' },
+    amber:  { bg: 'bg-amber-50',  icon: 'bg-amber-100 text-amber-600',  val: 'text-amber-700' },
+    red:    { bg: 'bg-red-50',    icon: 'bg-red-100 text-red-600',      val: 'text-red-700' },
+    purple: { bg: 'bg-purple-50', icon: 'bg-purple-100 text-purple-600',val: 'text-purple-700' },
+  };
+  const c = colors[color];
+  return (
+    <div className={`${c.bg} rounded-2xl p-5 border border-black/5`}>
+      <div className={`inline-flex size-10 items-center justify-center rounded-xl ${c.icon} mb-3`}>
+        <Icon className="size-5" />
+      </div>
+      <p className="text-sm text-gray-500 mb-0.5">{label}</p>
+      <p className={`text-3xl font-bold ${c.val}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
 
 export function DashboardView() {
   const { currentUser, orders, tables, products, users } = usePOS();
-
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
   const openOrders = orders.filter(o => o.status === 'open');
   const occupiedTables = tables.filter(t => t.status === 'occupied');
   const lowStockItems = products.filter(p => p.stock <= p.reorderPoint);
   const activeUsers = users.filter(u => u.status === 'active');
-
   const todayRevenue = orders
-    .filter(o => {
-      const orderDate = new Date(o.createdAt).toDateString();
-      const today = new Date().toDateString();
-      return orderDate === today && o.status === 'completed';
-    })
+    .filter(o => new Date(o.createdAt).toDateString() === new Date().toDateString() && o.status === 'completed')
     .reduce((sum, o) => sum + o.total, 0);
+
+  const roleCards: Record<string, JSX.Element> = {
+    cashier: (
+      <div className="bg-blue-600 text-white rounded-2xl p-6 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-lg mb-1">Your Assigned Tables</p>
+          <p className="text-blue-100 text-sm mb-4">{tables.filter(t => t.assignedCashierId === currentUser.id).length} tables waiting for payment</p>
+          <Link to="/tables" className="inline-flex items-center gap-2 bg-white text-blue-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
+            View Tables <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <ShoppingCart className="size-16 text-blue-400 opacity-50" />
+      </div>
+    ),
+    waiter: (
+      <div className="bg-emerald-600 text-white rounded-2xl p-6 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-lg mb-1">Active Tables</p>
+          <p className="text-emerald-100 text-sm mb-4">{occupiedTables.length} tables occupied</p>
+          <Link to="/tables" className="inline-flex items-center gap-2 bg-white text-emerald-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-emerald-50 transition-colors">
+            Manage Orders <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <ShoppingCart className="size-16 text-emerald-400 opacity-50" />
+      </div>
+    ),
+    kitchen: (
+      <div className="bg-orange-500 text-white rounded-2xl p-6 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-lg mb-1">Kitchen Dashboard</p>
+          <p className="text-orange-100 text-sm mb-4">Mark items as finished or out of stock</p>
+          <Link to="/kitchen" className="inline-flex items-center gap-2 bg-white text-orange-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors">
+            Open Kitchen <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <Package className="size-16 text-orange-300 opacity-50" />
+      </div>
+    ),
+    hr: (
+      <div className="bg-purple-600 text-white rounded-2xl p-6 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-lg mb-1">HR Dashboard</p>
+          <p className="text-purple-100 text-sm mb-4">{activeUsers.length} active employees</p>
+          <Link to="/attendance" className="inline-flex items-center gap-2 bg-white text-purple-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-purple-50 transition-colors">
+            View Attendance <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <Users className="size-16 text-purple-300 opacity-50" />
+      </div>
+    ),
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-6xl">
         <div>
-          <h1 className="font-semibold text-2xl">Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {currentUser.name}</p>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-blue-100 rounded-lg">
-                <ShoppingCart className="size-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Open Orders</p>
-                <p className="text-2xl font-semibold">{openOrders.length}</p>
-              </div>
-            </div>
+        {/* Stats grid */}
+        {(currentUser.role === 'admin' || currentUser.role === 'cashier') && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Open Orders" value={openOrders.length} icon={ShoppingCart} color="blue" />
+            <StatCard label="Tables Occupied" value={`${occupiedTables.length}/${tables.length}`} icon={TrendingUp} color="green" />
+            <StatCard label="Today's Revenue" value={`SAR ${todayRevenue.toFixed(0)}`} icon={DollarSign} color="amber" />
+            <StatCard label="Low Stock" value={lowStockItems.length} icon={AlertTriangle} color={lowStockItems.length > 0 ? 'red' : 'green'} sub={lowStockItems.length > 0 ? 'items need restocking' : 'all good'} />
           </div>
+        )}
 
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-green-100 rounded-lg">
-                <TrendingUp className="size-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Occupied Tables</p>
-                <p className="text-2xl font-semibold">{occupiedTables.length}</p>
-              </div>
-            </div>
-          </div>
+        {/* Role-specific CTA */}
+        {roleCards[currentUser.role]}
 
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-purple-100 rounded-lg">
-                <DollarSign className="size-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Today's Revenue</p>
-                <p className="text-2xl font-semibold">${todayRevenue.toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-orange-100 rounded-lg">
-                <Package className="size-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Low Stock Items</p>
-                <p className="text-2xl font-semibold">{lowStockItems.length}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
+        {/* Admin panels */}
         {currentUser.role === 'admin' && (
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg border">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold">Recent Orders</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent orders */}
+            <div className="bg-white rounded-2xl border border-gray-100">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Live Orders</h3>
+                <Link to="/tables" className="text-xs text-blue-600 hover:underline">View all</Link>
               </div>
-              <div className="p-4 space-y-3">
-                {openOrders.slice(0, 5).map(order => (
-                  <div key={order.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Table {order.tableNumber}</p>
-                      <p className="text-sm text-gray-600">{order.items.length} items</p>
+              <div className="divide-y divide-gray-50">
+                {openOrders.slice(0, 6).map(order => (
+                  <div key={order.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="size-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-semibold text-sm">
+                        {order.tableNumber}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">Table {order.tableNumber}</p>
+                        <p className="text-xs text-gray-400">{order.items.length} items</p>
+                      </div>
                     </div>
-                    <p className="font-semibold">${order.total.toFixed(2)}</p>
+                    <p className="font-semibold text-gray-900 text-sm">SAR {order.total.toFixed(2)}</p>
                   </div>
                 ))}
                 {openOrders.length === 0 && (
-                  <p className="text-center text-gray-400 py-4">No open orders</p>
+                  <div className="px-5 py-10 text-center text-gray-400 text-sm">No open orders right now</div>
                 )}
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold">Low Stock Alert</h3>
+            {/* Low stock */}
+            <div className="bg-white rounded-2xl border border-gray-100">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Stock Alerts</h3>
+                <Link to="/inventory" className="text-xs text-blue-600 hover:underline">View inventory</Link>
               </div>
-              <div className="p-4 space-y-3">
-                {lowStockItems.slice(0, 5).map(product => (
-                  <div key={product.id} className="flex items-center justify-between">
+              <div className="divide-y divide-gray-50">
+                {lowStockItems.slice(0, 6).map(p => (
+                  <div key={p.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
                     <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-gray-600">{product.category}</p>
+                      <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.category}</p>
                     </div>
-                    <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                      {product.stock} left
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-50 text-red-600">
+                      {p.stock} left
                     </span>
                   </div>
                 ))}
                 {lowStockItems.length === 0 && (
-                  <p className="text-center text-gray-400 py-4">All items well stocked</p>
+                  <div className="px-5 py-10 text-center text-gray-400 text-sm">All items well stocked ✓</div>
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {currentUser.role === 'cashier' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2">Your Assigned Tables</h3>
-            <p className="text-gray-600 mb-4">
-              You have {tables.filter(t => t.assignedCashierId === currentUser.id).length} tables assigned
-            </p>
-            <Link
-              to="/tables"
-              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              View Tables
-            </Link>
-          </div>
-        )}
-
-        {currentUser.role === 'waiter' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2">Active Tables</h3>
-            <p className="text-gray-600 mb-4">
-              {occupiedTables.length} tables currently occupied
-            </p>
-            <Link
-              to="/tables"
-              className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              Manage Orders
-            </Link>
-          </div>
-        )}
-
-        {currentUser.role === 'kitchen' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2">Kitchen Dashboard</h3>
-            <p className="text-gray-600 mb-4">
-              Manage inventory and mark items as finished/out-of-stock
-            </p>
-            <Link
-              to="/kitchen"
-              className="inline-block px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-            >
-              Go to Kitchen
-            </Link>
-          </div>
-        )}
-
-        {currentUser.role === 'hr' && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2">HR Dashboard</h3>
-            <p className="text-gray-600 mb-4">
-              {activeUsers.length} active employees
-            </p>
-            <Link
-              to="/attendance"
-              className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              View Attendance
-            </Link>
           </div>
         )}
       </div>

@@ -1,144 +1,107 @@
 import { usePOS } from '../context/POSContext';
-import { Clock, UserCheck, AlertCircle } from 'lucide-react';
+import { Clock, UserCheck, AlertCircle, ShieldOff } from 'lucide-react';
 
 export function AttendanceView() {
   const { attendance, currentUser } = usePOS();
-
   if (!currentUser) return null;
 
-  // Only admin and HR can view attendance tracking
   if (currentUser.role !== 'admin' && currentUser.role !== 'hr') {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">You don't have permission to view this page</p>
-          <p className="text-sm text-gray-500">Only Admin and HR can access attendance tracking</p>
+        <div className="text-center p-8">
+          <div className="size-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldOff className="size-6 text-gray-400" />
+          </div>
+          <h2 className="font-semibold text-gray-800 mb-1">Access Restricted</h2>
+          <p className="text-sm text-gray-500">Only Admin and HR can view attendance</p>
         </div>
       </div>
     );
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const todayAttendance = attendance.filter(a => a.date === today);
-  const lateArrivals = todayAttendance.filter(a => a.lateMinutes > 0);
+  const todayRecs = attendance.filter(a => a.date === today);
+  const lateRecs = todayRecs.filter(a => a.lateMinutes > 0);
+  const onTimeRecs = todayRecs.length - lateRecs.length;
+
+  const fmtTime = (d: Date | string) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-5xl">
         <div>
-          <h1 className="font-semibold text-2xl">Attendance Tracking</h1>
-          <p className="text-gray-600">Monitor staff check-ins and late arrivals</p>
+          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3">
-              <div className="size-10 flex items-center justify-center bg-blue-100 rounded-lg">
-                <Clock className="size-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Today's Check-ins</p>
-                <p className="text-2xl font-semibold">{todayAttendance.length}</p>
-              </div>
+          {[
+            { label: "Today's Check-ins", value: todayRecs.length, icon: Clock, bg: 'bg-blue-50', ic: 'bg-blue-100 text-blue-600', vc: 'text-blue-700' },
+            { label: 'On Time', value: onTimeRecs, icon: UserCheck, bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
+            { label: 'Late Arrivals', value: lateRecs.length, icon: AlertCircle, bg: lateRecs.length > 0 ? 'bg-red-50' : 'bg-gray-50', ic: lateRecs.length > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400', vc: lateRecs.length > 0 ? 'text-red-700' : 'text-gray-500' },
+          ].map(s => (
+            <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-black/5`}>
+              <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}><s.icon className="size-5" /></div>
+              <p className="text-sm text-gray-500 mb-0.5">{s.label}</p>
+              <p className={`text-3xl font-bold ${s.vc}`}>{s.value}</p>
             </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3">
-              <div className="size-10 flex items-center justify-center bg-green-100 rounded-lg">
-                <UserCheck className="size-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">On Time</p>
-                <p className="text-2xl font-semibold">{todayAttendance.length - lateArrivals.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3">
-              <div className="size-10 flex items-center justify-center bg-red-100 rounded-lg">
-                <AlertCircle className="size-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Late Arrivals</p>
-                <p className="text-2xl font-semibold">{lateArrivals.length}</p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="bg-white rounded-lg border">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">Today's Attendance</h2>
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900">Today's Attendance Log</h2>
+            {currentUser.role === 'admin' && (
+              <a href="#/check-in" target="_blank" className="text-xs text-blue-600 hover:underline">Staff check-in portal ↗</a>
+            )}
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Employee</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Employment #</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Scheduled</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Check-in</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">Late (min)</th>
-                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {todayAttendance.map(record => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="size-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                          {record.staffName.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <span className="font-medium">{record.staffName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{record.employmentNumber}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {new Date(record.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {new Date(record.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`font-medium ${record.lateMinutes > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {record.lateMinutes}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          record.lateMinutes === 0
-                            ? 'bg-green-100 text-green-700'
-                            : record.lateMinutes <= 5
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {record.lateMinutes === 0 ? 'On Time' : `Late ${record.lateMinutes}m`}
-                        </span>
-                      </div>
-                    </td>
+          {todayRecs.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 text-sm">No check-ins recorded for today</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    {['Employee', 'Emp #', 'Scheduled', 'Check-in', 'Late (min)', 'Status'].map(h => (
+                      <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {todayRecs.map(rec => (
+                    <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                            {rec.staffName.split(' ').map((n: string) => n[0]).join('')}
+                          </div>
+                          <span className="font-medium text-sm text-gray-900">{rec.staffName}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 font-mono text-sm text-gray-500">{rec.employmentNumber}</td>
+                      <td className="px-5 py-3.5 text-sm text-gray-600">{fmtTime(rec.scheduledTime)}</td>
+                      <td className="px-5 py-3.5 text-sm text-gray-600">{fmtTime(rec.checkInTime)}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`text-sm font-semibold ${rec.lateMinutes > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{rec.lateMinutes}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                          rec.lateMinutes === 0 ? 'bg-emerald-50 text-emerald-700' :
+                          rec.lateMinutes <= 5 ? 'bg-amber-50 text-amber-700' :
+                          'bg-red-50 text-red-700'
+                        }`}>
+                          {rec.lateMinutes === 0 ? 'On Time' : `Late ${rec.lateMinutes}m`}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-
-        {currentUser.role === 'admin' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-3">Staff Check-in Portal</h3>
-            <p className="text-gray-600 mb-4">
-              Staff members can check in at: <strong>/check-in</strong>
-            </p>
-            <p className="text-sm text-gray-500">
-              Share this URL with staff for daily check-ins
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,119 +1,95 @@
 import { usePOS } from '../context/POSContext';
-import { DollarSign, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Download } from 'lucide-react';
+
+const expenseCategories = ['utilities', 'supplies', 'rent', 'salary', 'maintenance', 'other'];
+const catColors: Record<string, string> = {
+  utilities: 'bg-blue-500', supplies: 'bg-purple-500', rent: 'bg-amber-500',
+  salary: 'bg-emerald-500', maintenance: 'bg-orange-500', other: 'bg-gray-400',
+};
 
 export function AccountingView() {
   const { expenses, orders, currentUser } = usePOS();
-
   if (!currentUser) return null;
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const completedOrders = orders.filter(o => o.status === 'completed');
-  const totalRevenue = completedOrders.reduce((sum, o) => sum + o.total, 0);
-  const netIncome = totalRevenue - totalExpenses;
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalRevenue  = orders.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0);
+  const netIncome     = totalRevenue - totalExpenses;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-5xl">
         <div>
-          <h1 className="font-semibold text-2xl">Accounting</h1>
-          <p className="text-gray-600">Track expenses, revenue, and financial reports</p>
+          <h1 className="text-2xl font-bold text-gray-900">Accounting</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Financial overview and expense tracking</p>
         </div>
 
+        {/* Summary cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-green-100 rounded-lg">
-                <TrendingUp className="size-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-semibold text-green-600">${totalRevenue.toFixed(2)}</p>
-              </div>
-            </div>
+          <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+            <div className="inline-flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mb-3"><TrendingUp className="size-5" /></div>
+            <p className="text-sm text-gray-500">Total Revenue</p>
+            <p className="text-2xl font-bold text-emerald-700">SAR {totalRevenue.toFixed(2)}</p>
           </div>
-
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="size-10 flex items-center justify-center bg-red-100 rounded-lg">
-                <TrendingDown className="size-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Expenses</p>
-                <p className="text-2xl font-semibold text-red-600">${totalExpenses.toFixed(2)}</p>
-              </div>
-            </div>
+          <div className="bg-red-50 rounded-2xl p-5 border border-red-100">
+            <div className="inline-flex size-10 items-center justify-center rounded-xl bg-red-100 text-red-600 mb-3"><TrendingDown className="size-5" /></div>
+            <p className="text-sm text-gray-500">Total Expenses</p>
+            <p className="text-2xl font-bold text-red-700">SAR {totalExpenses.toFixed(2)}</p>
           </div>
-
-          <div className="bg-white p-6 rounded-lg border">
-            <div className="flex items-center gap-3 mb-2">
-              <div className={`size-10 flex items-center justify-center rounded-lg ${
-                netIncome >= 0 ? 'bg-blue-100' : 'bg-red-100'
-              }`}>
-                <DollarSign className={`size-5 ${netIncome >= 0 ? 'text-blue-600' : 'text-red-600'}`} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Net Income</p>
-                <p className={`text-2xl font-semibold ${netIncome >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                  ${netIncome.toFixed(2)}
-                </p>
-              </div>
-            </div>
+          <div className={`${netIncome >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'} rounded-2xl p-5 border`}>
+            <div className={`inline-flex size-10 items-center justify-center rounded-xl ${netIncome >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'} mb-3`}><DollarSign className="size-5" /></div>
+            <p className="text-sm text-gray-500">Net Income</p>
+            <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-700' : 'text-red-700'}`}>SAR {netIncome.toFixed(2)}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg border">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold">Recent Expenses</h2>
-              <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                Add Expense
-              </button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Expenses list */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">Recent Expenses</h2>
+              <button className="text-xs font-medium px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">+ Add</button>
             </div>
-            <div className="p-4 space-y-3">
-              {expenses.slice(0, 10).map(expense => (
-                <div key={expense.id} className="flex items-start justify-between pb-3 border-b last:border-0">
+            <div className="divide-y divide-gray-50">
+              {expenses.slice(0, 10).map(e => (
+                <div key={e.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div>
-                    <p className="font-medium">{expense.description}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 rounded capitalize">
-                        {expense.category}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(expense.date).toLocaleDateString()}
-                      </span>
+                    <p className="text-sm font-medium text-gray-900">{e.description}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`inline-block size-2 rounded-full ${catColors[e.category] ?? 'bg-gray-400'}`} />
+                      <span className="text-xs text-gray-400 capitalize">{e.category}</span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">{new Date(e.date).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <p className="font-semibold text-red-600">-${expense.amount.toFixed(2)}</p>
+                  <p className="text-sm font-bold text-red-600">-SAR {e.amount.toFixed(2)}</p>
                 </div>
               ))}
               {expenses.length === 0 && (
-                <p className="text-center text-gray-400 py-8">No expenses recorded</p>
+                <div className="py-12 text-center text-gray-400 text-sm">No expenses recorded yet</div>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold">Expense Breakdown</h2>
-              <Calendar className="size-5 text-gray-400" />
+          {/* Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900">Expense Breakdown</h2>
             </div>
-            <div className="p-4 space-y-3">
-              {['utilities', 'supplies', 'rent', 'salary', 'maintenance', 'other'].map(category => {
-                const categoryExpenses = expenses.filter(e => e.category === category);
-                const total = categoryExpenses.reduce((sum, e) => sum + e.amount, 0);
-                const percentage = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
-
+            <div className="p-5 space-y-4">
+              {expenseCategories.map(cat => {
+                const total = expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+                const pct = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
                 return (
-                  <div key={category}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm capitalize font-medium">{category}</span>
-                      <span className="text-sm text-gray-600">${total.toFixed(2)}</span>
+                  <div key={cat}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block size-2.5 rounded-full ${catColors[cat]}`} />
+                        <span className="text-sm font-medium text-gray-700 capitalize">{cat}</span>
+                      </div>
+                      <span className="text-sm text-gray-500">SAR {total.toFixed(2)}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${percentage}%` }}
-                      />
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className={`${catColors[cat]} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
@@ -122,21 +98,19 @@ export function AccountingView() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border p-6">
-          <h2 className="font-semibold mb-4">Export Reports</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <button className="px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-colors">
-              <p className="font-medium">Daily Report</p>
-              <p className="text-sm text-gray-600">Export today's data</p>
-            </button>
-            <button className="px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-colors">
-              <p className="font-medium">Weekly Report</p>
-              <p className="text-sm text-gray-600">Last 7 days</p>
-            </button>
-            <button className="px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-colors">
-              <p className="font-medium">Monthly Report</p>
-              <p className="text-sm text-gray-600">Current month</p>
-            </button>
+        {/* Export */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h2 className="font-semibold text-gray-900 mb-4">Export Reports</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {['Daily', 'Weekly', 'Monthly'].map(period => (
+              <button key={period} className="flex items-center gap-3 p-4 border-2 border-gray-100 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all text-left">
+                <Download className="size-4 text-gray-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{period} Report</p>
+                  <p className="text-xs text-gray-400">{period === 'Daily' ? 'Today\'s data' : period === 'Weekly' ? 'Last 7 days' : 'Current month'}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>

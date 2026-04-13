@@ -37,14 +37,6 @@ export class TableController {
         assignedCashierId: table.assigned_cashier_id,
       }));
 
-      // Cashiers only see their assigned tables
-      if (user.role === 'cashier') {
-        return {
-          success: true,
-          tables: tables.filter(t => t.assignedCashierId === user.id),
-        };
-      }
-
       return {
         success: true,
         tables,

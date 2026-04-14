@@ -336,40 +336,41 @@ export function CustomerMenuView() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto pr-2">
-            {filteredProducts.map(product => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:shadow-lg"
-              >
-                <div className="relative h-48 overflow-hidden bg-slate-100">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-4 text-left">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-slate-900">{product.name}</h3>
-                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">
-                      RM {product.price.toFixed(2)}
-                    </span>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-auto pr-2">
+            {filteredProducts.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-orange-200 bg-white p-8 text-center text-slate-500">
+                No products found
+              </div>
+            ) : (
+              filteredProducts.map(product => (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product)}
+                  className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="relative h-40 overflow-hidden bg-slate-100">
+                    <img
+                      src={product.image || 'https://via.placeholder.com/400x300?text=No+Image'}
+                      alt={product.name}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
                   </div>
-                  <p className="mt-3 text-sm text-slate-500 min-h-[3rem]">{product.category}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-[0.15em] text-slate-400">
-                      {product.station === 'juice' ? 'Juice' : 'Kitchen'}
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
-                      Add
-                      <Plus className="ml-2 h-3.5 w-3.5" />
-                    </span>
+                  <div className="flex flex-1 flex-col justify-between p-4 text-left">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">{product.name}</h3>
+                      <p className="mt-2 text-sm text-slate-500 min-h-[3rem]">{product.category}</p>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-orange-700">RM {product.price.toFixed(2)}</span>
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+                        Add
+                        <Plus className="ml-2 h-3.5 w-3.5" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
         </section>
 

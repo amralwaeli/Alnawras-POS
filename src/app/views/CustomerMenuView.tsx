@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { usePOS } from '../context/POSContext';
 import { OrderController } from '../controllers/OrderController';
 import { StaffController } from '../controllers/StaffController';
-import { Plus, Minus, ShoppingCart, Stack, X } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Layers, X } from 'lucide-react';
 import { OrderItem, Product, Table, ROLE_PERMISSIONS } from '../models/types';
 
 interface CartItem {
@@ -313,7 +313,7 @@ export function CustomerMenuView() {
           onClick={handleOpenTableOverlay}
           className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-white shadow-lg shadow-orange-200 hover:bg-orange-600 transition"
         >
-          <Stack className="h-5 w-5" />
+          <Layers className="h-5 w-5" />
           Active Tables
         </button>
       </div>

@@ -11,6 +11,19 @@ export function Layout() {
 
   if (!currentUser) return <Navigate to="/check-in" replace />;
 
+  // Detect if user is a POS-only role (no sidebar)
+  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter'].includes(currentUser.role);
+
+  // If user is kitchen, cashier, or waiter, render fullscreen POS layout
+  if (isPOSOnlyRole) {
+    return (
+      <div className="h-screen w-screen overflow-hidden">
+        <Outlet />
+      </div>
+    );
+  }
+
+  // Otherwise, render sidebar layout for admin/manager
   const permissions = ROLE_PERMISSIONS[currentUser.role];
 
   const allNavItems = [

@@ -24,6 +24,7 @@ export function CustomerMenuView() {
   const navigate = useNavigate();
   const {
     products,
+    categories: menuCategories,
     tables,
     orders,
     currentUser,
@@ -100,10 +101,13 @@ export function CustomerMenuView() {
     return tables.filter(table => table.currentOrderId || table.status === 'occupied');
   }, [tables]);
 
-  const categories = useMemo(() => [
-    'All',
-    ...Array.from(new Set(products.map(p => p.category).filter(Boolean))),
-  ], [products]);
+  const categories = useMemo(() => {
+    const orderedCategories = menuCategories?.slice().sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    return [
+      'All',
+      ...(orderedCategories?.map(category => category.name) || []),
+    ];
+  }, [menuCategories]);
 
   const filteredProducts = useMemo(() => {
     const visibleProducts = products.filter(product => product.isActive && product.availabilityStatus === 'available');

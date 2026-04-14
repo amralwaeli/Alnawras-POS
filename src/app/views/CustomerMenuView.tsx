@@ -33,7 +33,6 @@ export function CustomerMenuView() {
     refreshData
   } = usePOS();
 
-  // ─── STATE ──────────────────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,7 +43,6 @@ export function CustomerMenuView() {
   const [isSending, setIsSending] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Load existing items ONLY when selecting an existing active table
   useEffect(() => {
     if (!selectedTableId) {
       setCartItems(prev => prev.filter(i => i.source === 'new'));
@@ -65,13 +63,11 @@ export function CustomerMenuView() {
       source: 'existing',
       status: item.status,
     }));
-
     setCartItems(prev => [...existingItems, ...prev.filter(i => i.source === 'new')]);
   }, [selectedTableId, orders, tables]);
 
   if (!currentUser) return null;
 
-  // ─── COMPUTED ───────────────────────────────────────────────────────────────
   const activeTables = useMemo(() => tables.filter(t => t.currentOrderId || t.status === 'occupied'), [tables]);
   const availableTables = useMemo(() => tables.filter(t => t.status === 'available'), [tables]);
   
@@ -88,51 +84,30 @@ export function CustomerMenuView() {
   const existingItemsOnly = cartItems.filter(i => i.source === 'existing');
   const cartTotal = cartItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
-  // ─── HANDLERS ───────────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {
     setCartItems(prev => {
       const existingNew = prev.find(i => i.productId === product.id && i.source === 'new');
-      if (existingNew) {
-        return prev.map(i => i.id === existingNew.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, {
-        id: `new-${Date.now()}`,
-        productId: product.id,
-        productName: product.name,
-        price: product.price,
-        quantity: 1,
-        station: (product.station as any) || 'kitchen',
-        source: 'new'
-      }];
+      if (existingNew) return prev.map(i => i.id === existingNew.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { id: `new-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, station: (product.station as any) || 'kitchen', source: 'new' }];
     });
   };
 
   const handleSendToKitchen = async (targetTableId?: string) => {
     const finalTableId = targetTableId || selectedTableId;
-    if (orderType === 'dine-in' && !finalTableId) {
-      setShowTableModal(true);
-      return;
-    }
-
+    if (orderType === 'dine-in' && !finalTableId) { setShowTableModal(true); return; }
     if (newItemsOnly.length === 0) return;
 
     setIsSending(true);
     try {
       let orderId = tables.find(t => t.id === finalTableId)?.currentOrderId;
-
       if (!orderId) {
         orderId = `order-${Date.now()}`;
         await supabase.from('orders').insert([{ 
-          id: orderId, 
-          table_id: orderType === 'dine-in' ? finalTableId : null,
+          id: orderId, table_id: orderType === 'dine-in' ? finalTableId : null,
           table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
-          status: 'open', 
-          branch_id: currentUser.branchId,
-          order_type: orderType
+          status: 'open', branch_id: currentUser.branchId, order_type: orderType
         }]);
-        if (orderType === 'dine-in') {
-          await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', finalTableId);
-        }
+        if (orderType === 'dine-in') await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', finalTableId);
       }
 
       const payload = newItemsOnly.map(i => ({
@@ -144,7 +119,6 @@ export function CustomerMenuView() {
       }));
 
       await supabase.from('order_items').insert(payload);
-
       setShowSuccess(true);
       setTimeout(async () => {
         setShowSuccess(false);
@@ -153,13 +127,11 @@ export function CustomerMenuView() {
         setOrderType('dine-in');  
         await refreshData();      
       }, 2000);
-    } catch (e: any) { console.error(e.message); } 
-    finally { setIsSending(false); }
+    } catch (e: any) { console.error(e.message); } finally { setIsSending(false); }
   };
 
   return (
     <div className="flex h-screen w-full bg-[#EAEEF3] overflow-hidden relative">
-      
       {showSuccess && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white/10 backdrop-blur-[2px] animate-in fade-in duration-300">
           <div className="bg-orange-500 text-white px-12 py-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-4 border-4 border-white animate-in zoom-in">
@@ -211,22 +183,39 @@ export function CustomerMenuView() {
         </div>
       </div>
 
-      {/* RIGHT SIDEBAR */}
+      {/* RIGHT SIDEBAR (Cleaned Header) */}
       <aside className="w-[380px] bg-white border-l flex flex-col shadow-2xl z-10">
         <div className="p-4 bg-orange-500">
-          <div className="flex bg-orange-600/30 p-1 rounded-2xl">
+          <div className="flex bg-orange-600/30 p-1 rounded-2xl relative">
             <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs uppercase transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-lg' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
             <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs uppercase transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-lg' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
+            
+            {/* Redesigned Close Button for Active Tables */}
+            {selectedTableId && (
+              <button 
+                onClick={() => setSelectedTableId(null)}
+                className="absolute -right-2 -top-2 bg-white text-orange-600 p-1.5 rounded-full shadow-lg border border-orange-100 hover:bg-gray-50 transition-colors"
+                title="Deselect Table"
+              >
+                <X className="size-4" strokeWidth={3} />
+              </button>
+            )}
           </div>
+          
+          {/* Table Indicator (Subtle) */}
           {selectedTable && (
-            <div className="mt-4 flex items-center justify-between text-white"><span className="text-2xl font-black italic tracking-tighter">TABLE {selectedTable.number}</span><button onClick={() => setSelectedTableId(null)}><X className="size-5" /></button></div>
+            <div className="mt-3 text-center">
+               <span className="text-white font-black italic tracking-tighter text-xl uppercase opacity-90">
+                ACTIVE: T-{selectedTable.number}
+               </span>
+            </div>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           {existingItemsOnly.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Bill History</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Table History</p>
               {existingItemsOnly.map(item => (
                 <div key={item.id} className="bg-gray-50 rounded-2xl p-4 border border-dashed border-gray-200 flex items-center gap-3 opacity-60">
                   <div className="flex-1"><h4 className="font-bold text-gray-700 text-xs">{item.productName}</h4><p className="text-[10px] font-bold text-gray-400">RM {(item.price * item.quantity).toFixed(2)} • {item.status}</p></div>
@@ -260,16 +249,16 @@ export function CustomerMenuView() {
         </div>
       </aside>
 
-      {/* MODAL: SELECT TABLE (AVAILABLE ONLY) */}
+      {/* SELECT TABLE MODAL */}
       {showTableModal && (
         <div className="fixed inset-0 z-[101] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white rounded-[45px] w-full max-w-2xl p-10 shadow-2xl">
-            <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase italic">Select Available Table</h2><button onClick={() => setShowTableModal(false)}><X className="size-6" /></button></div>
+            <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase italic">Select Table</h2><button onClick={() => setShowTableModal(false)}><X className="size-6" /></button></div>
             <div className="grid grid-cols-3 gap-4">
-              {availableTables.length === 0 ? <p className="col-span-3 text-center text-gray-400 py-10 font-bold uppercase">No Available Tables</p> : 
+              {availableTables.length === 0 ? <p className="col-span-3 text-center text-gray-400 py-10 font-bold uppercase tracking-widest">No Available Tables</p> : 
                 availableTables.map(t => (
                   <button key={t.id} onClick={() => { handleSendToKitchen(t.id); setShowTableModal(false); }} className="p-6 rounded-[30px] border-2 border-emerald-100 bg-emerald-50/50 hover:border-emerald-500 transition-all text-left">
-                    <p className="text-2xl font-black text-gray-800 italic">T-{t.number}</p><p className="text-[10px] font-bold opacity-60 uppercase">Available</p>
+                    <p className="text-2xl font-black text-gray-800 italic leading-none mb-1">T-{t.number}</p><p className="text-[10px] font-bold opacity-40 uppercase">Available</p>
                   </button>
                 ))
               }
@@ -278,7 +267,7 @@ export function CustomerMenuView() {
         </div>
       )}
 
-      {/* OVERLAY: ACTIVE TABLES */}
+      {/* ACTIVE TABLES OVERLAY */}
       {showTableOverlay && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white rounded-[45px] w-full max-w-4xl p-10 shadow-2xl flex flex-col max-h-[85vh]">
@@ -287,7 +276,7 @@ export function CustomerMenuView() {
               {activeTables.map(t => (
                 <button key={t.id} onClick={() => { setSelectedTableId(t.id); setOrderType('dine-in'); setShowTableOverlay(false); }} className="p-8 rounded-[40px] border-4 border-orange-100 bg-orange-50 text-left hover:border-orange-500 transition-all group">
                   <div className="flex items-center justify-between mb-4"><Utensils className="size-6 text-orange-500" /><span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black tracking-widest uppercase">Ordered</span></div>
-                  <p className="text-3xl font-black text-gray-800 italic group-hover:text-orange-600 transition-colors">T-{t.number}</p>
+                  <p className="text-3xl font-black text-gray-800 italic group-hover:text-orange-600 transition-colors leading-none">T-{t.number}</p>
                 </button>
               ))}
             </div>

@@ -104,17 +104,25 @@ export function CustomerMenuView() {
   const categories = useMemo(() => {
     const orderedCategories = menuCategories?.slice().sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     return [
-      'All',
-      ...(orderedCategories?.map(category => category.name) || []),
+      { id: 'All', name: 'All' },
+      ...(orderedCategories?.map(category => ({ id: category.id, name: category.name })) || []),
     ];
   }, [menuCategories]);
 
   const filteredProducts = useMemo(() => {
-    const visibleProducts = products.filter(product => product.isActive && product.availabilityStatus === 'available');
+    console.log('Products in state:', products);
+    console.log('Menu categories:', menuCategories);
+    console.log('Selected category:', selectedCategory);
+
+    const visibleProducts = products.filter(product =>
+      product.isActive &&
+      ((product.availabilityStatus ?? product.kitchenStatus ?? 'available') === 'available')
+    );
+
     return selectedCategory === 'All'
       ? visibleProducts
-      : visibleProducts.filter(product => product.category === selectedCategory);
-  }, [products, selectedCategory]);
+      : visibleProducts.filter(product => product.categoryId === selectedCategory);
+  }, [products, selectedCategory, menuCategories]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   const selectedTableLabel = selectedTable ? `Table ${selectedTable.number}` : 'No table selected';
@@ -327,15 +335,15 @@ export function CustomerMenuView() {
           <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-3 shadow-sm">
             {categories.map(category => (
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
                 className={`min-w-max rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  selectedCategory === category
+                  selectedCategory === category.id
                     ? 'bg-orange-500 text-white shadow-lg'
                     : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
                 }`}
               >
-                {category}
+                {category.name}
               </button>
             ))}
           </div>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePOS } from '../context/POSContext';
-import { CheckCircle2, Clock4, ChefHat, Bell } from 'lucide-react';
+import { CheckCircle2, Clock4, ChefHat, Bell, Utensils } from 'lucide-react';
 import { toast } from 'sonner';
 
 type KitchenStatus = 'available' | 'out-of-stock' | 'finished';
@@ -13,10 +13,10 @@ const itemStatusFlow: Record<string, string> = {
 };
 
 const itemStatusColors: Record<string, { badge: string; btn: string; label: string }> = {
-  pending:   { badge: 'bg-gray-100 text-gray-700 border-gray-200',    btn: 'bg-amber-500 hover:bg-amber-600 text-white',   label: 'Start Preparing' },
-  preparing: { badge: 'bg-amber-100 text-amber-700 border-amber-200', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', label: 'Mark Ready' },
-  ready:     { badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', btn: 'bg-blue-500 hover:bg-blue-600 text-white', label: 'Mark Served' },
-  served:    { badge: 'bg-blue-100 text-blue-700 border-blue-200', btn: '', label: 'Served' },
+  pending:   { badge: 'bg-gray-800 text-amber-400 border-amber-900/50', btn: 'bg-amber-600 hover:bg-amber-700 text-white', label: 'Start' },
+  preparing: { badge: 'bg-amber-900/30 text-amber-200 border-amber-700/50', btn: 'bg-emerald-600 hover:bg-emerald-700 text-white', label: 'Ready' },
+  ready:     { badge: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50', btn: 'bg-blue-600 hover:bg-blue-700 text-white', label: 'Serve' },
+  served:    { badge: 'bg-blue-900/20 text-blue-400 border-blue-900/30', btn: '', label: 'Done' },
 };
 
 export function KitchenView() {
@@ -25,134 +25,210 @@ export function KitchenView() {
   const [tab, setTab] = useState<'orders' | 'products'>('orders');
   const [newOrderAlert, setNewOrderAlert] = useState(false);
 
-  const loadTickets = async () => {
-    const { data: orders } = await supabase
+  // ─── LOAD DATA ──────────────────────────────────────────────────────────────
+  const loadTickets = useCallback(async () => {
+    if (!currentUser) return;
+
+    const { data: orders, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
       .eq('status', 'open')
-      .eq('branch_id', 'branch-1')
+      .eq('branch_id', currentUser.branchId) // FIX: Use dynamic branch ID
       .order('created_at', { ascending: true });
 
-    if (orders) {
-      setTickets(
-        orders.map(o => ({
-          ...o,
-          items: (o.order_items || []).filter((i: any) => i.status !== 'served'),
-        })).filter(o => o.items.length > 0)
-      );
+    if (error) {
+      console.error("Kitchen Fetch Error:", error);
+      return;
     }
-  };
 
+    if (orders) {
+      // Map and filter out tickets that have no pending/preparing items
+      const activeTickets = orders.map(o => ({
+        ...o,
+        items: (o.order_items || []).filter((i: any) => i.status !== 'served'),
+      })).filter(o => o.items.length > 0);
+      
+      setTickets(activeTickets);
+    }
+  }, [currentUser]);
+
+  // ─── REALTIME & HEARTBEAT ───────────────────────────────────────────────────
   useEffect(() => {
+    if (!currentUser) return;
+
     loadTickets();
-    const channel = supabase.channel('kitchen-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+
+    // Listen for changes in the specific branch
+    const branchId = currentUser.branchId;
+    const channel = supabase.channel('kitchen-ultra-sync')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'order_items',
+        filter: `branch_id=eq.${branchId}` 
+      }, (payload) => {
         loadTickets();
-        setNewOrderAlert(true);
-        setTimeout(() => setNewOrderAlert(false), 3000);
+        if (payload.eventType === 'INSERT') {
+          setNewOrderAlert(true);
+          const audio = new Audio('/notification.mp3'); // Optional: Add a notification sound
+          audio.play().catch(() => {}); 
+          setTimeout(() => setNewOrderAlert(false), 5000);
+        }
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'orders',
+        filter: `branch_id=eq.${branchId}` 
+      }, () => {
         loadTickets();
-        toast('🔔 New order received!', { duration: 4000 });
+        toast('🔔 New Order Received!', { 
+          style: { background: '#f97316', color: '#fff', fontWeight: 'bold' } 
+        });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
 
+    // Heartbeat: Refresh every 30s as a backup
+    const heartbeat = setInterval(loadTickets, 30000);
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      clearInterval(heartbeat);
+    };
+  }, [currentUser, loadTickets]);
+
+  // ─── ACTIONS ────────────────────────────────────────────────────────────────
   const advanceItem = async (itemId: string, currentStatus: string) => {
     const next = itemStatusFlow[currentStatus];
     if (!next) return;
-    await supabase.from('order_items').update({ status: next }).eq('id', itemId);
-    setTickets(prev =>
-      prev.map(t => ({
-        ...t,
-        items: t.items
-          .map((i: any) => i.id === itemId ? { ...i, status: next } : i)
-          .filter((i: any) => i.status !== 'served'),
-      })).filter(t => t.items.length > 0)
-    );
-    if (next === 'ready') toast.success('Item ready — notify waiter!');
+
+    // Optimistic Update
+    setTickets(prev => prev.map(t => ({
+      ...t,
+      items: t.items.map((i: any) => i.id === itemId ? { ...i, status: next } : i)
+    })));
+
+    const { error } = await supabase.from('order_items').update({ status: next }).eq('id', itemId);
+    
+    if (error) {
+      toast.error("Failed to update status");
+      loadTickets(); // Rollback
+    } else if (next === 'ready') {
+      toast.success('Order ready for pickup!');
+    }
   };
 
-  const set = (id: string, status: KitchenStatus) => updateProduct(id, { kitchenStatus: status });
+  const toggleProductStatus = (id: string, status: KitchenStatus) => {
+    updateProduct(id, { kitchenStatus: status });
+    toast.info(`Product marked as ${status}`);
+  };
 
   const counts = {
-    available: products.filter(p => p.kitchenStatus === 'available').length,
+    available: products.filter(p => (p.kitchenStatus || 'available') === 'available').length,
     finished:  products.filter(p => p.kitchenStatus === 'finished').length,
     'out-of-stock': products.filter(p => p.kitchenStatus === 'out-of-stock').length,
   };
 
+  if (!currentUser) return null;
+
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white">
-      <div className="p-6 space-y-6 max-w-7xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="size-10 bg-orange-500 rounded-xl flex items-center justify-center">
-              <ChefHat className="size-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">Kitchen Display</h1>
-              <p className="text-gray-400 text-sm">{tickets.length} active ticket{tickets.length !== 1 ? 's' : ''}</p>
-            </div>
+    <div className="h-screen flex flex-col bg-[#0B0E14] text-white font-sans overflow-hidden">
+      
+      {/* ─── Header ─── */}
+      <header className="h-20 bg-[#161B22] border-b border-gray-800 px-8 flex items-center justify-between shadow-xl z-10">
+        <div className="flex items-center gap-4">
+          <div className="size-12 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <ChefHat className="size-7 text-white" />
           </div>
-          <div className="flex items-center gap-4">
-            {newOrderAlert && (
-              <div className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl animate-pulse">
-                <Bell className="size-4" /> New order!
-              </div>
-            )}
-            <div className="flex bg-gray-800 rounded-xl p-1">
-              <button onClick={() => setTab('orders')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'orders' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'}`}>
-                Order Tickets
-              </button>
-              <button onClick={() => setTab('products')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'products' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'}`}>
-                Item Status
-              </button>
-            </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter uppercase italic">Kitchen Display</h1>
+            <p className="text-orange-500 text-[10px] font-bold uppercase tracking-[0.2em]">Live Monitoring System</p>
           </div>
         </div>
 
+        <div className="flex items-center gap-6">
+          {newOrderAlert && (
+            <div className="flex items-center gap-2 bg-orange-600 text-white px-6 py-2.5 rounded-full font-black text-sm animate-bounce shadow-lg">
+              <Bell className="size-4" /> NEW ORDER
+            </div>
+          )}
+          
+          <div className="flex bg-[#0B0E14] rounded-2xl p-1.5 border border-gray-800">
+            <button 
+              onClick={() => setTab('orders')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+            >
+              Tickets ({tickets.length})
+            </button>
+            <button 
+              onClick={() => setTab('products')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'products' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+            >
+              Inventory
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── Content ─── */}
+      <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
         {tab === 'orders' ? (
           tickets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-600 gap-3">
-              <CheckCircle2 className="size-16 opacity-30" />
-              <p>All caught up! No pending orders.</p>
+            <div className="h-full flex flex-col items-center justify-center text-gray-700">
+              <div className="bg-gray-900/50 p-10 rounded-[50px] mb-6">
+                <CheckCircle2 className="size-24 opacity-10" />
+              </div>
+              <h2 className="text-2xl font-bold uppercase tracking-widest opacity-20">Kitchen Clear</h2>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {tickets.map(ticket => {
                 const age = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 60000);
-                const urgent = age >= 15;
+                const isUrgent = age >= 15;
+                
                 return (
-                  <div key={ticket.id} className={`rounded-2xl border-2 p-4 space-y-3 ${urgent ? 'border-red-500 bg-red-950/30' : 'border-gray-700 bg-gray-900'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`size-8 rounded-lg flex items-center justify-center font-bold text-sm ${urgent ? 'bg-red-500' : 'bg-orange-500'}`}>
-                          {ticket.table_number}
+                  <div key={ticket.id} className={`flex flex-col rounded-[35px] border-b-8 overflow-hidden shadow-2xl transition-all ${isUrgent ? 'bg-red-950/20 border-red-600' : 'bg-[#161B22] border-orange-500'}`}>
+                    {/* Ticket Header */}
+                    <div className="p-5 flex items-center justify-between border-b border-white/5 bg-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className={`size-10 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${isUrgent ? 'bg-red-600' : 'bg-orange-500'}`}>
+                          {ticket.table_number || 'T'}
                         </div>
-                        <span className="font-semibold">Table {ticket.table_number}</span>
+                        <span className="font-black text-xl tracking-tighter italic uppercase">Table {ticket.table_number}</span>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${urgent ? 'bg-red-500/20 text-red-400' : 'bg-gray-700 text-gray-400'}`}>
-                        <Clock4 className="size-3" />{age}m ago
-                      </span>
+                      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black ${isUrgent ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-800 text-gray-400'}`}>
+                        <Clock4 className="size-3" /> {age}M
+                      </div>
                     </div>
-                    <div className="space-y-2">
+
+                    {/* Ticket Items */}
+                    <div className="flex-1 p-5 space-y-3">
                       {ticket.items.map((item: any) => {
-                        const s = itemStatusColors[item.status] ?? itemStatusColors.pending;
+                        const style = itemStatusColors[item.status] || itemStatusColors.pending;
                         return (
-                          <div key={item.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2.5">
-                            <div>
-                              <p className="text-sm font-medium">{item.product_name}</p>
-                              <span className={`text-xs px-2 py-0.5 rounded-full border ${s.badge}`}>{item.status}</span>
+                          <div key={item.id} className="bg-[#0B0E14] border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <p className="text-base font-bold leading-tight">{item.product_name}</p>
+                                <span className={`inline-block mt-2 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${style.badge}`}>
+                                  {item.status}
+                                </span>
+                              </div>
+                              <span className="text-xl font-black text-orange-500 ml-2">×{item.quantity}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-400">×{item.quantity}</span>
-                              {item.status !== 'served' && (
-                                <button onClick={() => advanceItem(item.id, item.status)} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${s.btn}`}>
-                                  {s.label}
-                                </button>
-                              )}
-                            </div>
+                            
+                            {item.notes && (
+                              <p className="text-[10px] text-amber-500 font-bold bg-amber-500/10 p-2 rounded-lg italic">
+                                "{item.notes}"
+                              </p>
+                            )}
+
+                            <button 
+                              onClick={() => advanceItem(item.id, item.status)}
+                              className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 ${style.btn}`}
+                            >
+                              {style.label}
+                            </button>
                           </div>
                         );
                       })}
@@ -163,39 +239,50 @@ export function KitchenView() {
             </div>
           )
         ) : (
-          <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-700">
-            <div className="grid grid-cols-3 gap-4 p-4 border-b border-gray-700">
+          /* ─── Inventory Management ─── */
+          <div className="max-w-4xl mx-auto bg-[#161B22] rounded-[40px] border border-gray-800 overflow-hidden shadow-2xl">
+            <div className="grid grid-cols-3 divide-x divide-gray-800 bg-white/5 p-8 border-b border-gray-800">
               {(['available', 'finished', 'out-of-stock'] as const).map(s => (
-                <div key={s} className={`rounded-xl p-3 text-center ${s === 'available' ? 'bg-emerald-900/40' : s === 'finished' ? 'bg-amber-900/40' : 'bg-red-900/40'}`}>
-                  <p className={`text-2xl font-bold ${s === 'available' ? 'text-emerald-400' : s === 'finished' ? 'text-amber-400' : 'text-red-400'}`}>{counts[s]}</p>
-                  <p className="text-xs text-gray-400 capitalize">{s.replace('-', ' ')}</p>
+                <div key={s} className="text-center">
+                  <p className={`text-5xl font-black italic tracking-tighter ${s === 'available' ? 'text-emerald-500' : s === 'finished' ? 'text-amber-500' : 'text-red-500'}`}>{counts[s]}</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">{s.replace('-', ' ')}</p>
                 </div>
               ))}
             </div>
-            <div className="divide-y divide-gray-800">
+            
+            <div className="divide-y divide-gray-800 max-h-[60vh] overflow-y-auto custom-scrollbar">
               {products.map(p => (
-                <div key={p.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-800/50">
+                <div key={p.id} className="flex items-center justify-between px-8 py-5 hover:bg-white/[0.02] transition-colors">
                   <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-gray-500">{p.category}</p>
+                    <p className="text-lg font-bold">{p.name}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{p.category}</p>
                   </div>
                   <div className="flex gap-2">
-                    {p.kitchenStatus !== 'available' && (
-                      <button onClick={() => set(p.id, 'available')} className="px-2.5 py-1.5 text-xs rounded-lg bg-emerald-900 text-emerald-400 hover:bg-emerald-800 transition-colors">Available</button>
-                    )}
-                    {p.kitchenStatus !== 'finished' && (
-                      <button onClick={() => set(p.id, 'finished')} className="px-2.5 py-1.5 text-xs rounded-lg bg-amber-900 text-amber-400 hover:bg-amber-800 transition-colors">Finished</button>
-                    )}
-                    {p.kitchenStatus !== 'out-of-stock' && (
-                      <button onClick={() => set(p.id, 'out-of-stock')} className="px-2.5 py-1.5 text-xs rounded-lg bg-red-900 text-red-400 hover:bg-red-800 transition-colors">Out of Stock</button>
-                    )}
+                    {['available', 'finished', 'out-of-stock'].map((status) => (
+                      <button 
+                        key={status}
+                        onClick={() => toggleProductStatus(p.id, status as any)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all 
+                          ${(p.kitchenStatus || 'available') === status 
+                            ? 'bg-white text-gray-900 border-white' 
+                            : 'border-gray-700 text-gray-500 hover:text-white'}`}
+                      >
+                        {status.split('-')[0]}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </main>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
     </div>
   );
 }

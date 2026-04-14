@@ -10,13 +10,22 @@ function ProtectedRoute({ children, permission, adminOnly }: {
   adminOnly?: boolean;
 }) {
   const { currentUser } = usePOS();
+  
+  // If no user, send back to login (Check-in)
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/dashboard" replace />;
-  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/dashboard" replace />;
+  
+  // If admin permission required and user is not admin
+  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
+  
+  // If specific permission required and user doesn't have it
+  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) {
+    return <Navigate to="/" replace />;
+  }
+  
   return <>{children}</>;
 }
 
-// Lazy load all views — only loaded when the user navigates to them
+// Lazy load views
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
 const TablesView = lazy(() => import('./views/TablesView').then(m => ({ default: m.TablesView })));
 const KitchenView = lazy(() => import('./views/KitchenView').then(m => ({ default: m.KitchenView })));
@@ -36,8 +45,8 @@ function PageLoader() {
   return (
     <div className="flex items-center justify-center h-full min-h-64">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500">Loading...</p>
+        <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-bold uppercase tracking-widest">Loading POS...</p>
       </div>
     </div>
   );
@@ -52,8 +61,12 @@ export const router = createHashRouter([
     path: '/',
     Component: Layout,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard',           element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
+      // ─── THE NEW DEFAULT LANDING PAGE (DASHBOARD) ───
+      { index: true, element: <Lazy><CustomerMenuView /></Lazy> },
+      { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
+      
+      // ─── OTHER ROUTES ───
+      { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
       { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
@@ -71,6 +84,7 @@ export const router = createHashRouter([
     path: '/check-in',
     element: <Lazy><CheckInView /></Lazy>,
   },
+  // Supporting legacy links but pointing them to the new unified Menu
   {
     path: '/table/:tableId',
     element: <Lazy><CustomerMenuView /></Lazy>,

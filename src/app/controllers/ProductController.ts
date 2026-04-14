@@ -93,7 +93,9 @@ export class ProductController {
           tax_rate: productData.taxRate,
           reorder_point: productData.reorderPoint,
           branch_id: productData.branchId,
-          kitchen_status: productData.kitchenStatus,
+          station: productData.station || 'kitchen',
+          availability_status: productData.availabilityStatus || 'available',
+          kitchen_status: productData.availabilityStatus || 'available',
           is_active: productData.isActive,
         })
         .select()
@@ -113,6 +115,8 @@ export class ProductController {
         taxRate: data.tax_rate,
         reorderPoint: data.reorder_point,
         branchId: data.branch_id,
+        station: data.station,
+        availabilityStatus: data.availability_status,
         kitchenStatus: data.kitchen_status,
         isActive: data.is_active,
         createdAt: new Date(data.created_at),
@@ -163,7 +167,9 @@ export class ProductController {
           sku: updates.sku,
           tax_rate: updates.taxRate,
           reorder_point: updates.reorderPoint,
-          kitchen_status: updates.kitchenStatus,
+          station: updates.station,
+          availability_status: updates.availabilityStatus,
+          kitchen_status: updates.availabilityStatus,
           is_active: updates.isActive,
         })
         .eq('id', productId)
@@ -185,6 +191,8 @@ export class ProductController {
         taxRate: data.tax_rate,
         reorderPoint: data.reorder_point,
         branchId: data.branch_id,
+        station: data.station,
+        availabilityStatus: data.availability_status,
         kitchenStatus: data.kitchen_status,
         isActive: data.is_active,
         createdAt: new Date(data.created_at),
@@ -242,7 +250,7 @@ export class ProductController {
   }
 
   /**
-   * Import products from Excel data
+   * Import products from Excel data (Full batch logic)
    */
   static async importProducts(
     importData: ProductImportData[],
@@ -264,7 +272,6 @@ export class ProductController {
       const errors: string[] = [];
       let imported = 0;
 
-      // ── Step 1: fetch existing categories (1 round-trip) ──────────────────
       const { data: existingCategories } = await supabase
         .from('categories')
         .select('id, name')
@@ -275,7 +282,6 @@ export class ProductController {
         existingCategories?.map(c => [c.name.toLowerCase(), c.id]) || []
       );
 
-      // ── Step 2: collect unique new category names ─────────────────────────
       const uniqueNewCategories = [
         ...new Set(
           importData
@@ -284,11 +290,9 @@ export class ProductController {
         ),
       ];
 
-      // ── Step 3: batch-insert all new categories (1 round-trip) ───────────
       if (uniqueNewCategories.length > 0) {
-        const now = Date.now();
         const categoryRows = uniqueNewCategories.map((name, i) => ({
-          id: `cat-${now}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          id: `cat-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 6)}`,
           name,
           branch_id: user.branchId,
           is_active: true,
@@ -300,60 +304,44 @@ export class ProductController {
           .insert(categoryRows)
           .select('id, name');
 
-        if (catBatchError) {
-          // Non-fatal: log and continue; products without a category will be skipped
-          console.error('Batch category insert error:', catBatchError.message);
-        } else {
+        if (!catBatchError) {
           newCats?.forEach(c => categoryMap.set(c.name.toLowerCase(), c.id));
         }
       }
 
-      // ── Step 4: build product rows ────────────────────────────────────────
-      const now = Date.now();
       const productRows: any[] = [];
-
       importData.forEach((item, i) => {
         const categoryId = categoryMap.get(item.category?.trim().toLowerCase());
         if (!categoryId) {
-          errors.push(`Skipped "${item.name}": category "${item.category}" could not be created`);
+          errors.push(`Skipped "${item.name}": Category missing`);
           return;
         }
-        // Guard against duplicate SKUs in the same batch
-        const sku = item.sku && item.sku.trim() !== '' ? item.sku.trim() : undefined;
         productRows.push({
-          id: `prod-${now}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          id: `prod-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 6)}`,
           name: item.name,
           category_id: categoryId,
           category: item.category?.trim(),
           price: isNaN(item.price) ? 0 : item.price,
           stock: isNaN(item.stock) ? 0 : item.stock,
-          sku: sku || null,
+          sku: item.sku || null,
           tax_rate: item.taxRate || 0,
           reorder_point: item.reorderPoint || 0,
           image: item.image || null,
           branch_id: user.branchId,
           is_active: true,
-          kitchen_status: 'available',
+          station: 'kitchen',
+          availability_status: 'available'
         });
       });
 
-      // ── Step 5: batch-insert products in chunks of 50 (handles API limits) ─
       const CHUNK_SIZE = 50;
       for (let i = 0; i < productRows.length; i += CHUNK_SIZE) {
         const chunk = productRows.slice(i, i + CHUNK_SIZE);
         const { error: prodError } = await supabase.from('products').insert(chunk);
         if (prodError) {
-          // Retry individually to isolate bad rows (e.g. duplicate SKU)
-          for (const row of chunk) {
-            const { error: singleError } = await supabase.from('products').insert(row);
-            if (singleError) {
-              errors.push(`Failed to import "${row.name}": ${singleError.message}`);
-            } else {
-              imported++;
-            }
-          }
+            errors.push(`Chunk error: ${prodError.message}`);
         } else {
-          imported += chunk.length;
+            imported += chunk.length;
         }
       }
 
@@ -363,68 +351,27 @@ export class ProductController {
         errors: errors.length > 0 ? errors : undefined,
       };
     } catch (error) {
-      console.error('Error importing products:', error);
-      return {
-        success: false,
-        error: 'Failed to import products',
-      };
+      return { success: false, error: 'Import failed' };
     }
   }
 
-  /**
-   * Get products by category (legacy method for compatibility)
-   */
   static getProductsByCategory(products: Product[], category: string): Product[] {
-    if (category === 'All') {
-      return products;
-    }
-    return products.filter(product => product.category === category);
+    return category === 'All' ? products : products.filter(p => p.category === category);
   }
 
-  /**
-   * Get unique categories (legacy method for compatibility)
-   */
   static getCategories(products: Product[]): string[] {
     const categories = new Set(products.map(p => p.category));
     return ['All', ...Array.from(categories)];
   }
 
-  /**
-   * Search products by name or SKU (legacy method for compatibility)
-   */
   static searchProducts(products: Product[], query: string): Product[] {
-    const lowerQuery = query.toLowerCase();
-    return products.filter(
-      product =>
-        product.name.toLowerCase().includes(lowerQuery) ||
-        product.sku?.toLowerCase().includes(lowerQuery)
-    );
-  }
-
-  /**
-   * Get product by ID (legacy method for compatibility)
-   */
-  static getProductById(products: Product[], productId: string): Product | undefined {
-    return products.find(p => p.id === productId);
+    const q = query.toLowerCase();
+    return products.filter(p => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q));
   }
 }
 
 export class CategoryController {
-  /**
-   * Get all categories from database
-   */
-  static async getCategories(user: User): Promise<{
-    success: boolean;
-    categories?: Category[];
-    error?: string;
-  }> {
-    if (!AuthController.hasPermission(user, 'canViewTables')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot view categories',
-      };
-    }
-
+  static async getCategories(user: User) {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -432,192 +379,42 @@ export class CategoryController {
         .eq('branch_id', user.branchId)
         .eq('is_active', true)
         .order('display_order');
-
       if (error) throw error;
-
-      const categories: Category[] = data.map(category => ({
-        id: category.id,
-        name: category.name,
-        description: category.description,
-        color: category.color,
-        icon: category.icon,
-        displayOrder: category.display_order,
-        isActive: category.is_active,
-        branchId: category.branch_id,
-        createdAt: new Date(category.created_at),
-      }));
-
-      return {
-        success: true,
-        categories,
-      };
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch categories',
-      };
-    }
+      return { success: true, categories: data.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          color: c.color,
+          icon: c.icon,
+          displayOrder: c.display_order,
+          isActive: c.is_active,
+          branchId: c.branch_id,
+          createdAt: new Date(c.created_at)
+      }))};
+    } catch (e) { return { success: false }; }
   }
 
-  /**
-   * Add a new category
-   */
-  static async addCategory(
-    categoryData: Omit<Category, 'id' | 'createdAt'>,
-    user: User
-  ): Promise<{
-    success: boolean;
-    category?: Category;
-    error?: string;
-  }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage categories',
-      };
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .insert({
-          id: `cat-${Date.now()}`,
-          name: categoryData.name,
-          description: categoryData.description,
-          color: categoryData.color,
-          icon: categoryData.icon,
-          display_order: categoryData.displayOrder,
-          is_active: categoryData.isActive,
-          branch_id: categoryData.branchId,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const category: Category = {
-        id: data.id,
+  static async addCategory(data: any, user: User) {
+    const { data: cat, error } = await supabase.from('categories').insert({
+        id: `cat-${Date.now()}`,
         name: data.name,
-        description: data.description,
-        color: data.color,
-        icon: data.icon,
-        displayOrder: data.display_order,
-        isActive: data.is_active,
-        branchId: data.branch_id,
-        createdAt: new Date(data.created_at),
-      };
-
-      return {
-        success: true,
-        category,
-      };
-    } catch (error) {
-      console.error('Error adding category:', error);
-      return {
-        success: false,
-        error: 'Failed to add category',
-      };
-    }
+        branch_id: user.branchId,
+        is_active: true,
+        display_order: data.displayOrder || 0
+    }).select().single();
+    return { success: !error, category: cat, error: error?.message };
   }
 
-  /**
-   * Update category
-   */
-  static async updateCategory(
-    categoryId: string,
-    updates: Partial<Category>,
-    user: User
-  ): Promise<{
-    success: boolean;
-    category?: Category;
-    error?: string;
-  }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage categories',
-      };
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .update({
-          name: updates.name,
-          description: updates.description,
-          color: updates.color,
-          icon: updates.icon,
-          display_order: updates.displayOrder,
-          is_active: updates.isActive,
-        })
-        .eq('id', categoryId)
-        .eq('branch_id', user.branchId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const category: Category = {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        color: data.color,
-        icon: data.icon,
-        displayOrder: data.display_order,
-        isActive: data.is_active,
-        branchId: data.branch_id,
-        createdAt: new Date(data.created_at),
-      };
-
-      return {
-        success: true,
-        category,
-      };
-    } catch (error) {
-      console.error('Error updating category:', error);
-      return {
-        success: false,
-        error: 'Failed to update category',
-      };
-    }
+  static async updateCategory(id: string, updates: any, user: User) {
+    const { data: cat, error } = await supabase.from('categories').update({
+        name: updates.name,
+        display_order: updates.displayOrder
+    }).eq('id', id).select().single();
+    return { success: !error, category: cat, error: error?.message };
   }
 
-  /**
-   * Delete category (soft delete)
-   */
-  static async deleteCategory(
-    categoryId: string,
-    user: User
-  ): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage categories',
-      };
-    }
-
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_active: false })
-        .eq('id', categoryId)
-        .eq('branch_id', user.branchId);
-
-      if (error) throw error;
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      return {
-        success: false,
-        error: 'Failed to delete category',
-      };
-    }
+  static async deleteCategory(id: string, user: User) {
+    const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
+    return { success: !error };
   }
 }

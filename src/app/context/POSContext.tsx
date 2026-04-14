@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Product, Order, User, Table, Category, Attendance, Expense } from '../models/types';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
-// FIXED PATH BELOW
 import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
 import { supabase } from '../../lib/supabase';
@@ -56,6 +55,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initial Load: Staff
   useEffect(() => {
     const init = async () => {
       const res = await StaffController.getStaff();
@@ -65,6 +65,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     init();
   }, []);
 
+  // Load Branch Data when User Logins
   useEffect(() => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
@@ -102,35 +103,58 @@ export function POSProvider({ children }: { children: ReactNode }) {
     loadBranchData();
   }, [currentUser]);
 
+  // Real-time Sync Engine
   useEffect(() => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
 
     const channel = supabase.channel('pos-realtime-sync')
+      // 1. Order Items Sync
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, payload => {
-        const item = payload.new as any;
+        const item = (payload.new || payload.old) as any;
         if (!item) return;
 
         setOrders(prev => prev.map(o => {
           if (o.id !== item.order_id) return o;
-          const mappedItem = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
+          const mappedItem = { 
+            ...item, 
+            productName: item.product_name, 
+            addedAt: new Date(item.added_at) 
+          };
           const filteredItems = (o.items || []).filter(i => i.id !== item.id);
-          return { ...o, items: payload.eventType === 'DELETE' ? filteredItems : [...filteredItems, mappedItem] };
+          return { 
+            ...o, 
+            items: payload.eventType === 'DELETE' ? filteredItems : [...filteredItems, mappedItem] 
+          };
         }));
       })
+      // 2. Product Sync with snake_to_camel mapping
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branch}` }, payload => {
         const updated = payload.new as any;
-        setProducts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated, availabilityStatus: updated.availability_status } : p));
+        setProducts(prev => prev.map(p => p.id === updated.id ? { 
+          ...p, 
+          ...updated, 
+          categoryId: updated.category_id, // CRITICAL: Map DB category_id to UI categoryId
+          availabilityStatus: updated.availability_status, // Map DB status
+          station: updated.station || 'kitchen', // Apply default
+          isActive: updated.is_active 
+        } : p));
       })
+      // 3. Tables Sync
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branch}` }, payload => {
         const table = payload.new as any;
-        if (table) setTables(prev => prev.map(t => t.id === table.id ? { ...t, ...table } : t));
+        if (table) setTables(prev => prev.map(t => t.id === table.id ? { 
+          ...t, 
+          ...table, 
+          currentOrderId: table.current_order_id 
+        } : t));
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
+  // Authentication Handlers
   const login = async (pin: string) => {
     const result = AuthController.authenticate(pin, users);
     if (result.success) setCurrentUser(result.user!);
@@ -139,19 +163,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const logout = () => setCurrentUser(null);
 
+  // Product CRUD
   const updateProduct = async (id: string, up: any) => ProductController.updateProduct(id, up, currentUser!);
   const addProduct = async (p: any) => ProductController.addProduct(p, currentUser!);
   const deleteProduct = async (id: string) => ProductController.deleteProduct(id, currentUser!);
   const importProducts = async (data: any[]) => ProductController.importProducts(data, currentUser!);
   
+  // Category CRUD
   const addCategory = async (c: any) => CategoryController.addCategory(c, currentUser!);
   const updateCategory = async (id: string, up: any) => CategoryController.updateCategory(id, up, currentUser!);
   const deleteCategory = async (id: string) => CategoryController.deleteCategory(id, currentUser!);
 
+  // Table CRUD
   const updateTable = async (id: string, up: any) => TableController.updateTable(id, up, currentUser!);
   const addTable = async (t: any) => TableController.addTable(t, currentUser!);
   const deleteTable = async (id: string) => TableController.deleteTable(id, currentUser!);
 
+  // Staff CRUD
   const addUser = async (u: any) => {
     const res = await StaffController.addStaff(u);
     if (res.success && res.data) setUsers(prev => [...prev, res.data!]);
@@ -165,7 +193,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
       supabase, products, categories, orders, users, tables, attendance, expenses, currentUser, loading,
       login, logout, setCurrentUser, setProducts, updateProduct, addProduct, deleteProduct, importProducts,
       setCategories, addCategory, updateCategory, deleteCategory, setOrders, setTables, updateTable, addTable, deleteTable,
-      setUsers, addUser, updateUser, deleteUser, setAttendance: (a: any) => setAttendance(a), setExpenses: (e: any) => setExpenses(e)
+      setUsers, addUser, updateUser, deleteUser, 
+      setAttendance: (a: Attendance[]) => setAttendance(a), 
+      setExpenses: (e: Expense[]) => setExpenses(e)
     }}>
       {children}
     </POSContext.Provider>

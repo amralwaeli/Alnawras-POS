@@ -1,359 +1,539 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router';
-import { supabase } from '../../lib/supabase';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { usePOS } from '../context/POSContext';
 import { OrderController } from '../controllers/OrderController';
-import { Plus, Minus, ShoppingCart, Receipt, X } from 'lucide-react';
-import { Product } from '../models/types';
+import { StaffController } from '../controllers/StaffController';
+import { Plus, Minus, ShoppingCart, Stack, X } from 'lucide-react';
+import { OrderItem, Product, Table, ROLE_PERMISSIONS } from '../models/types';
 
 interface CartItem {
-  product: Product;
+  id: string;
+  productId: string;
+  productName: string;
+  price: number;
   quantity: number;
+  station: 'kitchen' | 'juice' | 'none';
+  source: 'existing' | 'new';
+  status?: OrderItem['status'];
+  orderItemId?: string;
+  image?: string;
 }
 
 export function CustomerMenuView() {
   const { tableId } = useParams();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [tables, setTables] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [showCart, setShowCart] = useState(false);
-  const [showBill, setShowBill] = useState(false);
+  const navigate = useNavigate();
+  const {
+    products,
+    tables,
+    orders,
+    currentUser,
+    setOrders,
+    setTables,
+    supabase,
+  } = usePOS();
+
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showTableOverlay, setShowTableOverlay] = useState(false);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(tableId || null);
+  const [tableForSend, setTableForSend] = useState<string | null>(tableId || null);
+  const [isSending, setIsSending] = useState(false);
+  const [staffList, setStaffList] = useState<any[]>([]);
 
   useEffect(() => {
-    const load = async () => {
-      const [{ data: prods }, { data: tbls }, { data: ords }] = await Promise.all([
-        supabase.from('products').select('*').eq('branch_id', 'branch-1').eq('is_active', true),
-        supabase.from('tables').select('*').eq('branch_id', 'branch-1'),
-        supabase.from('orders').select('*, order_items(*)').eq('branch_id', 'branch-1').eq('status', 'open'),
-      ]);
-      if (prods) setProducts(prods.map((p: any) => ({
-        ...p, isActive: p.is_active, kitchenStatus: p.kitchen_status ?? 'available',
-        categoryId: p.category_id, createdAt: p.created_at,
-      })));
-      if (tbls) setTables(tbls.map((t: any) => ({
-        ...t, currentOrderId: t.current_order_id, assignedCashierId: t.assigned_cashier_id,
-      })));
-      if (ords) setOrders(ords.map((o: any) => ({
-        ...o, items: (o.order_items || []).map((i: any) => ({
-          ...i, productName: i.product_name, addedBy: i.added_by, addedByName: i.added_by_name,
-        })),
-      })));
-    };
-    load();
-  }, []);
+    if (!currentUser) return;
+    StaffController.getStaff(true).then(result => {
+      if (result.success && result.data) {
+        setStaffList(result.data);
+      }
+    });
+  }, [currentUser]);
 
-  const table = tables.find(t => t.id === tableId);
-  const currentOrder = table?.currentOrderId
-    ? orders.find(o => o.id === table.currentOrderId)
-    : null;
+  useEffect(() => {
+    if (tableId) {
+      setSelectedTableId(tableId);
+      setTableForSend(tableId);
+    }
+  }, [tableId]);
 
-  if (!table) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-xl font-semibold mb-2">Invalid Table</p>
-          <p className="text-gray-600">This QR code is not valid</p>
-        </div>
-      </div>
-    );
+  useEffect(() => {
+    if (!selectedTableId) {
+      setCartItems([]);
+      return;
+    }
+
+    const table = tables.find(t => t.id === selectedTableId);
+    if (!table || !table.currentOrderId) {
+      setCartItems([]);
+      return;
+    }
+
+    const order = orders.find(o => o.id === table.currentOrderId);
+    if (!order) {
+      setCartItems([]);
+      return;
+    }
+
+    const existingCart = order.items.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      price: item.price,
+      quantity: item.quantity,
+      station: item.station,
+      source: 'existing' as const,
+      status: item.status,
+      orderItemId: item.id,
+    }));
+
+    setCartItems(existingCart);
+  }, [selectedTableId, orders, tables]);
+
+  if (!currentUser) return null;
+  if (!ROLE_PERMISSIONS[currentUser.role].canAddOrders) {
+    navigate('/dashboard', { replace: true });
+    return null;
   }
 
-  const categories = ['All', ...new Set(products.map(p => p.category))];
-  const availableProducts = products.filter(
-    p => p.isActive && p.kitchenStatus === 'available'
-  );
-  const filteredProducts = selectedCategory === 'All'
-    ? availableProducts
-    : availableProducts.filter(p => p.category === selectedCategory);
+  const activeTables = useMemo(() => {
+    return tables.filter(table => table.currentOrderId || table.status === 'occupied');
+  }, [tables]);
+
+  const categories = useMemo(() => [
+    'All',
+    ...Array.from(new Set(products.map(p => p.category).filter(Boolean))),
+  ], [products]);
+
+  const filteredProducts = useMemo(() => {
+    const visibleProducts = products.filter(product => product.isActive && product.availabilityStatus === 'available');
+    return selectedCategory === 'All'
+      ? visibleProducts
+      : visibleProducts.filter(product => product.category === selectedCategory);
+  }, [products, selectedCategory]);
+
+  const selectedTable = tables.find(t => t.id === selectedTableId);
+  const selectedTableLabel = selectedTable ? `Table ${selectedTable.number}` : 'No table selected';
 
   const addToCart = (product: Product) => {
-    setCart(current => {
-      const existing = current.find(item => item.product.id === product.id);
-      if (existing) {
+    setCartItems(current => {
+      const existingNew = current.find(item => item.productId === product.id && item.source === 'new');
+      if (existingNew) {
         return current.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+          item.id === existingNew.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...current, { product, quantity: 1 }];
+
+      return [
+        ...current,
+        {
+          id: `cart-new-${product.id}`,
+          productId: product.id,
+          productName: product.name,
+          price: product.price,
+          quantity: 1,
+          station: product.station,
+          source: 'new' as const,
+          image: product.image,
+        },
+      ];
     });
   };
 
-  const updateQuantity = (productId: string, change: number) => {
-    setCart(current => {
-      return current.map(item => {
-        if (item.product.id === productId) {
-          const newQuantity = item.quantity + change;
-          return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
+  const updateQuantity = (cartItemId: string, change: number) => {
+    setCartItems(current => current
+      .map(item => {
+        if (item.id !== cartItemId) return item;
+        if (item.source === 'existing') return item;
+        const nextQty = item.quantity + change;
+        return nextQty > 0 ? { ...item, quantity: nextQty } : item;
+      })
+      .filter(item => item.quantity > 0)
+    );
+  };
+
+  const removeFromCart = (cartItemId: string) => {
+    setCartItems(current => current.filter(item => item.id !== cartItemId));
+  };
+
+  const handleOpenTableOverlay = () => {
+    setShowTableOverlay(true);
+  };
+
+  const handleSelectActiveTable = (table: Table) => {
+    setSelectedTableId(table.id);
+    setTableForSend(table.id);
+    setShowTableOverlay(false);
+  };
+
+  const assignTableAndSend = async (targetTableId: string) => {
+    setTableForSend(targetTableId);
+    setShowTableModal(false);
+    await handleSendToKitchen(targetTableId);
+  };
+
+  const handleSendToKitchen = async (targetTableId?: string) => {
+    const tableIdToSend = targetTableId || tableForSend;
+    if (!tableIdToSend) {
+      setShowTableModal(true);
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert('Add items before sending to kitchen.');
+      return;
+    }
+
+    const targetTable = tables.find(table => table.id === tableIdToSend);
+    if (!targetTable) {
+      alert('Table not found.');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      let orderId = targetTable.currentOrderId;
+      let orderExists = false;
+
+      if (!orderId) {
+        const result = OrderController.createOrder(tables, tableIdToSend, currentUser);
+        if (!result.success || !result.order) {
+          throw new Error(result.error || 'Unable to create order');
         }
-        return item;
-      }).filter(item => item.quantity > 0);
-    });
-  };
 
-  const removeFromCart = (productId: string) => {
-    setCart(current => current.filter(item => item.product.id !== productId));
-  };
+        orderId = result.order.id;
+        await supabase.from('orders').insert([{ 
+          id: orderId,
+          table_id: tableIdToSend,
+          table_number: result.order.tableNumber,
+          subtotal: 0,
+          tax: 0,
+          discount: 0,
+          total: 0,
+          status: 'open',
+          branch_id: currentUser.branchId,
+          created_at: new Date().toISOString(),
+        }]);
 
-  const handlePlaceOrder = async () => {
-    if (cart.length === 0) return;
+        await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId })
+          .eq('id', tableIdToSend);
 
-    // Create a "customer" user for ordering
-    const customerUser = {
-      id: 'customer',
-      name: `Table ${table.number} (Customer)`,
-      role: 'waiter' as const,
-    };
-
-    // If table has no order, we need to create one first
-    let orderId = table.currentOrderId;
-
-    if (!orderId) {
-      const newOrder = OrderController.createOrder(tables, tableId!, customerUser as any);
-      if (newOrder.success && newOrder.order) {
-        orderId = newOrder.order.id;
-        const newOrderWithItems = { ...newOrder.order, items: [] };
-        setOrders((prev: any[]) => [...prev, newOrderWithItems]);
-        await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', tableId);
-        await supabase.from('orders').insert({
-          id: newOrder.order.id, table_id: tableId, table_number: newOrder.order.tableNumber,
-          subtotal: 0, tax: 0, discount: 0, total: 0, status: 'open', branch_id: 'branch-1',
-        });
-        setTables((prev: any[]) => prev.map(t => t.id === tableId ? { ...t, status: 'occupied', currentOrderId: orderId } : t));
+        setTables(prev => prev.map(table =>
+          table.id === tableIdToSend ? { ...table, status: 'occupied', currentOrderId: orderId } : table
+        ));
+      } else {
+        orderExists = true;
       }
-    }
 
-    if (orderId) {
-      for (const cartItem of cart) {
-        const itemId = `item-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const subtotal = cartItem.product.price * cartItem.quantity;
-        await supabase.from('order_items').insert({
-          id: itemId, order_id: orderId, product_id: cartItem.product.id,
-          product_name: cartItem.product.name, quantity: cartItem.quantity,
-          price: cartItem.product.price, subtotal, added_by: 'customer',
-          added_by_name: `Table ${tables.find(t => t.id === tableId)?.number ?? ''} (Customer)`,
-          status: 'pending',
-        });
+      const itemsToSend = cartItems.filter(item => item.source === 'new');
+      if (itemsToSend.length === 0) {
+        alert('No new items to send to kitchen.');
+        return;
       }
-      setCart([]);
-      setShowCart(false);
-      alert('Order placed successfully!');
+
+      const insertPayload = itemsToSend.map(item => ({
+        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        order_id: orderId,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.price * item.quantity,
+        station: item.station,
+        status: 'pending',
+        added_by: currentUser.id,
+        added_by_name: currentUser.name,
+        added_at: new Date().toISOString(),
+        branch_id: currentUser.branchId,
+      }));
+
+      const { error: itemError, data: insertedItems } = await supabase
+        .from('order_items')
+        .insert(insertPayload)
+        .select('*');
+
+      if (itemError) {
+        throw new Error(itemError.message);
+      }
+
+      setCartItems(current => [
+        ...current.filter(item => item.source === 'existing'),
+        ...(insertedItems || []).map((row: any) => ({
+          id: row.id,
+          productId: row.product_id,
+          productName: row.product_name,
+          price: row.price,
+          quantity: row.quantity,
+          station: row.station,
+          source: 'existing' as const,
+          status: row.status,
+          orderItemId: row.id,
+        })),
+      ]);
+
+      if (!orderExists) {
+        const createdOrder = orders.find(o => o.id === orderId);
+        if (createdOrder) {
+          setOrders(prev => [...prev.filter(o => o.id !== orderId), createdOrder]);
+        }
+      }
+
+      setShowTableModal(false);
+      alert(`Sent ${itemsToSend.length} item(s) to kitchen for ${selectedTableLabel}.`);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : 'Failed to send to kitchen');
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const orderSubtotal = currentOrder?.subtotal || 0;
-  const orderTax = currentOrder?.tax || 0;
-  const orderTotal = currentOrder?.total || 0;
+  const statusStyle = (status?: OrderItem['status']) => {
+    if (status === 'ready') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'preparing') return 'bg-orange-100 text-orange-800';
+    if (status === 'served') return 'bg-slate-100 text-slate-700';
+    return 'bg-amber-100 text-amber-900';
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div className="h-screen overflow-hidden bg-orange-50">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white shadow-sm">
         <div>
-          <h1 className="font-semibold text-xl">Table {table.number}</h1>
-          <p className="text-sm text-gray-600">Scan & Order</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-orange-600">Waiter POS</p>
+          <h1 className="text-3xl font-bold text-slate-900">{selectedTableLabel}</h1>
+          <p className="mt-1 text-sm text-slate-500">Tap products to build the order instantly.</p>
+          {staffList.length > 0 && (
+            <p className="mt-2 text-sm text-slate-500">Active staff: {staffList.length}</p>
+          )}
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowBill(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
-            <Receipt className="size-4" />
-            View Bill
-          </button>
-          <button
-            onClick={() => setShowCart(true)}
-            className="relative flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <ShoppingCart className="size-4" />
-            Cart
-            {cartItemCount > 0 && (
-              <span className="absolute -top-2 -right-2 size-6 flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
-                {cartItemCount}
-              </span>
-            )}
-          </button>
-        </div>
+
+        <button
+          onClick={handleOpenTableOverlay}
+          className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-white shadow-lg shadow-orange-200 hover:bg-orange-600 transition"
+        >
+          <Stack className="h-5 w-5" />
+          Active Tables
+        </button>
       </div>
 
-      {/* Categories */}
-      <div className="bg-white border-b px-6 py-3 overflow-x-auto">
-        <div className="flex gap-2">
-          {categories.map(category => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                selectedCategory === category
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Menu Items */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map(product => (
-            <div
-              key={product.id}
-              className="bg-white rounded-lg overflow-hidden border hover:shadow-lg transition-shadow"
-            >
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full aspect-square object-cover"
-              />
-              <div className="p-4">
-                <h3 className="font-medium mb-1">{product.name}</h3>
-                <p className="text-sm text-gray-600 mb-3">RM ${product.price.toFixed(2)}</p>
-                <button
-                  onClick={() => addToCart(product)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Plus className="size-4" />
-                  Add to Cart
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Cart Modal */}
-      {showCart && (
-        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
-          <div className="bg-white w-full md:max-w-md md:rounded-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold text-lg">Your Order</h2>
+      <div className="flex h-[calc(100vh-76px)] overflow-hidden px-6 py-4 gap-4">
+        <section className="basis-[70%] flex flex-col gap-4 overflow-hidden">
+          <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-3 shadow-sm">
+            {categories.map(category => (
               <button
-                onClick={() => setShowCart(false)}
-                className="size-8 flex items-center justify-center hover:bg-gray-100 rounded"
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`min-w-max rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  selectedCategory === category
+                    ? 'bg-orange-500 text-white shadow-lg'
+                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                }`}
               >
-                <X className="size-5" />
+                {category}
               </button>
-            </div>
+            ))}
+          </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {cart.length === 0 ? (
-                <p className="text-center text-gray-400 py-8">Cart is empty</p>
-              ) : (
-                cart.map(item => (
-                  <div key={item.product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                    <img
-                      src={item.product.image}
-                      alt={item.product.name}
-                      className="size-16 object-cover rounded"
-                    />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto pr-2">
+            {filteredProducts.map(product => (
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
+                className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:shadow-lg"
+              >
+                <div className="relative h-48 overflow-hidden bg-slate-100">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="p-4 text-left">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold text-slate-900">{product.name}</h3>
+                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">
+                      RM {product.price.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-500 min-h-[3rem]">{product.category}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-[0.15em] text-slate-400">
+                      {product.station === 'juice' ? 'Juice' : 'Kitchen'}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+                      Add
+                      <Plus className="ml-2 h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <aside className="basis-[30%] flex flex-col rounded-2xl bg-white p-5 shadow-lg">
+          <div className="mb-4 rounded-2xl bg-orange-500 px-4 py-5 text-white shadow-inner">
+            <h2 className="text-xl font-semibold">Current Cart</h2>
+            <p className="mt-1 text-sm text-orange-100">{selectedTableLabel}</p>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-auto pr-2">
+            {cartItems.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-orange-200 p-6 text-center text-slate-500">
+                Add items to the cart to start the order.
+              </div>
+            ) : (
+              cartItems.map(item => (
+                <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <h4 className="font-medium">{item.product.name}</h4>
-                      <p className="text-sm text-gray-600">RM ${item.product.price.toFixed(2)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <button
-                          onClick={() => updateQuantity(item.product.id, -1)}
-                          className="size-6 flex items-center justify-center bg-white rounded border"
-                        >
-                          <Minus className="size-3" />
-                        </button>
-                        <span className="w-8 text-center">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product.id, 1)}
-                          className="size-6 flex items-center justify-center bg-white rounded border"
-                        >
-                          <Plus className="size-3" />
-                        </button>
-                        <button
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="ml-auto text-red-600 text-sm"
-                        >
-                          Remove
-                        </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-semibold text-slate-900">{item.productName}</h3>
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle(item.status)}`}>
+                          {item.status ?? 'sent'}
+                        </span>
                       </div>
+                      <p className="mt-2 text-sm text-slate-600">RM {(item.price * item.quantity).toFixed(2)}</p>
                     </div>
-                    <div className="font-semibold">
-                      RM ${(item.product.price * item.quantity).toFixed(2)}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="inline-flex items-center rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm">
+                        {item.quantity}
+                      </div>
+                      {item.source === 'new' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateQuantity(item.id, -1)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => updateQuantity(item.id, 1)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-sm"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">Existing</div>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              ))
+            )}
+          </div>
 
-            <div className="border-t p-4 space-y-3">
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span>RM ${cartTotal.toFixed(2)}</span>
+          <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+            <div className="flex items-center justify-between text-sm text-slate-600">
+              <span>Subtotal</span>
+              <span>RM {cartTotal.toFixed(2)}</span>
+            </div>
+            <div className="mt-3 flex flex-col gap-3">
+              <button
+                onClick={() => setShowTableModal(true)}
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-orange-700 shadow-sm hover:bg-orange-100"
+              >
+                Select Table
+              </button>
+              <button
+                onClick={() => handleSendToKitchen()}
+                disabled={cartItems.filter(item => item.source === 'new').length === 0 || isSending}
+                className="inline-flex items-center justify-center rounded-2xl bg-orange-500 px-4 py-4 text-white shadow-lg hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ShoppingCart className="mr-2 h-5 w-5" />
+                Send to Kitchen
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {showTableOverlay && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 p-6">
+          <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-4 pb-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">Open Tables</h2>
+                <p className="text-sm text-slate-500">Select a live table to load its current items.</p>
               </div>
               <button
-                onClick={handlePlaceOrder}
-                disabled={cart.length === 0}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowTableOverlay(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"
               >
-                Place Order
+                <X className="h-5 w-5" />
               </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto">
+              {activeTables.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+                  No active tables right now.
+                </div>
+              ) : (
+                activeTables.map(table => {
+                  const openOrder = orders.find(order => order.id === table.currentOrderId);
+                  return (
+                    <button
+                      key={table.id}
+                      onClick={() => handleSelectActiveTable(table)}
+                      className="rounded-3xl border border-orange-200 bg-orange-50 p-6 text-left transition hover:-translate-y-1 hover:bg-orange-100"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-2xl font-bold text-slate-900">Table {table.number}</span>
+                        <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">Open</span>
+                      </div>
+                      <p className="mt-3 text-sm text-slate-600">{openOrder?.items.length ?? 0} item(s)</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {openOrder?.items.slice(0, 3).map(item => (
+                          <span key={item.id} className="rounded-full bg-white px-3 py-1 text-xs text-slate-700 shadow-sm">
+                            {item.quantity}x {item.productName}
+                          </span>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Bill Modal */}
-      {showBill && (
-        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
-          <div className="bg-white w-full md:max-w-md md:rounded-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold text-lg">Current Bill</h2>
+      {showTableModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 p-6">
+          <div className="mx-auto max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-4 pb-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">Choose a Table</h2>
+                <p className="text-sm text-slate-500">Assign the cart to a table before sending it.</p>
+              </div>
               <button
-                onClick={() => setShowBill(false)}
-                className="size-8 flex items-center justify-center hover:bg-gray-100 rounded"
+                onClick={() => setShowTableModal(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"
               >
-                <X className="size-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              {!currentOrder || currentOrder.items.length === 0 ? (
-                <p className="text-center text-gray-400 py-8">No orders yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {currentOrder.items.map(item => (
-                    <div key={item.id} className="flex justify-between text-sm py-2 border-b">
-                      <span>
-                        {item.quantity}x {item.productName}
-                      </span>
-                      <span className="font-medium">RM ${item.subtotal.toFixed(2)}</span>
-                    </div>
-                  ))}
-
-                  <div className="space-y-2 pt-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span>RM ${orderSubtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Tax</span>
-                      <span>RM ${orderTax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-semibold pt-2 border-t">
-                      <span>Total</span>
-                      <span>RM {orderTotal.toFixed(2)}</span>
-                    </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {tables.map(table => (
+                <button
+                  key={table.id}
+                  onClick={() => assignTableAndSend(table.id)}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:bg-slate-100"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-lg font-semibold">Table {table.number}</span>
+                    <span className="rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white shadow-sm">
+                      {table.status === 'available' ? 'Available' : table.status === 'occupied' ? 'Occupied' : 'Reserved'}
+                    </span>
                   </div>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t p-4">
-              <p className="text-sm text-gray-600 text-center">
-                Please ask your waiter for payment
-              </p>
+                  <p className="mt-3 text-sm text-slate-600">Capacity: {table.capacity}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>

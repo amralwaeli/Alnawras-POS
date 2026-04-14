@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Product, Order, User, Table, Category, Attendance, Expense } from '../models/types';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
-import { AuthController } from './AuthController';
+// FIXED PATH BELOW
+import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
 import { supabase } from '../../lib/supabase';
 
@@ -17,7 +18,7 @@ interface POSContextType {
   expenses: Expense[];
   currentUser: User | null;
   loading: boolean;
-  login: (pin: string) => Promise<any>;
+  login: (pin: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   setCurrentUser: (user: User | null) => void;
   setProducts: (p: Product[]) => void;
@@ -55,38 +56,38 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initial Data Load (Staff only for login)
   useEffect(() => {
-    StaffController.getStaff().then(res => {
+    const init = async () => {
+      const res = await StaffController.getStaff();
       if (res.success && res.data) setUsers(res.data);
       setLoading(false);
-    });
+    };
+    init();
   }, []);
 
-  // Branch Data Load on Login
   useEffect(() => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
 
-    const loadData = async () => {
-      const [pRes, cRes, tRes] = await Promise.all([
+    const loadBranchData = async () => {
+      const [prodRes, catRes, tableRes] = await Promise.all([
         ProductController.getProducts(currentUser),
         CategoryController.getCategories(currentUser),
         TableController.getTables(currentUser)
       ]);
 
-      if (pRes.success) setProducts(pRes.products || []);
-      if (cRes.success) setCategories(cRes.categories || []);
-      if (tRes.success) setTables(tRes.tables || []);
+      if (prodRes.success) setProducts(prodRes.products || []);
+      if (catRes.success) setCategories(catRes.categories || []);
+      if (tableRes.success) setTables(tableRes.tables || []);
 
-      const { data: ords } = await supabase
+      const { data: ordersData } = await supabase
         .from('orders')
         .select('*, order_items(*)')
         .eq('branch_id', branch)
         .eq('status', 'open');
 
-      if (ords) {
-        setOrders(ords.map((o: any) => ({
+      if (ordersData) {
+        setOrders(ordersData.map((o: any) => ({
           ...o,
           tableId: o.table_id,
           createdAt: new Date(o.created_at),
@@ -98,52 +99,51 @@ export function POSProvider({ children }: { children: ReactNode }) {
         })));
       }
     };
-    loadData();
+    loadBranchData();
   }, [currentUser]);
 
-  // Realtime Sync Subscription
   useEffect(() => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
 
-    const channel = supabase.channel('pos-main-sync')
+    const channel = supabase.channel('pos-realtime-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, payload => {
         const item = payload.new as any;
         if (!item) return;
+
         setOrders(prev => prev.map(o => {
           if (o.id !== item.order_id) return o;
-          const mapped = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
-          const others = (o.items || []).filter(i => i.id !== item.id);
-          return { ...o, items: payload.eventType === 'DELETE' ? others : [...others, mapped] };
+          const mappedItem = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
+          const filteredItems = (o.items || []).filter(i => i.id !== item.id);
+          return { ...o, items: payload.eventType === 'DELETE' ? filteredItems : [...filteredItems, mappedItem] };
         }));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branch}` }, payload => {
-        const up = payload.new as any;
-        setProducts(prev => prev.map(p => p.id === up.id ? { ...p, ...up, availabilityStatus: up.availability_status } : p));
+        const updated = payload.new as any;
+        setProducts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated, availabilityStatus: updated.availability_status } : p));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branch}` }, payload => {
-        const t = payload.new as any;
-        if (t) setTables(prev => prev.map(old => old.id === t.id ? { ...old, ...t } : old));
+        const table = payload.new as any;
+        if (table) setTables(prev => prev.map(t => t.id === table.id ? { ...t, ...table } : t));
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // Auth
   const login = async (pin: string) => {
-    const res = AuthController.authenticate(pin, users);
-    if (res.success) setCurrentUser(res.user!);
-    return res;
+    const result = AuthController.authenticate(pin, users);
+    if (result.success) setCurrentUser(result.user!);
+    return result;
   };
+
   const logout = () => setCurrentUser(null);
 
-  // Actions
   const updateProduct = async (id: string, up: any) => ProductController.updateProduct(id, up, currentUser!);
   const addProduct = async (p: any) => ProductController.addProduct(p, currentUser!);
   const deleteProduct = async (id: string) => ProductController.deleteProduct(id, currentUser!);
-  const importProducts = async (d: any[]) => ProductController.importProducts(d, currentUser!);
-
+  const importProducts = async (data: any[]) => ProductController.importProducts(data, currentUser!);
+  
   const addCategory = async (c: any) => CategoryController.addCategory(c, currentUser!);
   const updateCategory = async (id: string, up: any) => CategoryController.updateCategory(id, up, currentUser!);
   const deleteCategory = async (id: string) => CategoryController.deleteCategory(id, currentUser!);
@@ -165,7 +165,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       supabase, products, categories, orders, users, tables, attendance, expenses, currentUser, loading,
       login, logout, setCurrentUser, setProducts, updateProduct, addProduct, deleteProduct, importProducts,
       setCategories, addCategory, updateCategory, deleteCategory, setOrders, setTables, updateTable, addTable, deleteTable,
-      setUsers, addUser, updateUser, deleteUser, setAttendance, setExpenses
+      setUsers, addUser, updateUser, deleteUser, setAttendance: (a: any) => setAttendance(a), setExpenses: (e: any) => setExpenses(e)
     }}>
       {children}
     </POSContext.Provider>
@@ -173,7 +173,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 }
 
 export const usePOS = () => {
-  const c = useContext(POSContext);
-  if (!c) throw new Error('usePOS error');
-  return c;
+  const context = useContext(POSContext);
+  if (!context) throw new Error('usePOS must be used within POSProvider');
+  return context;
 };

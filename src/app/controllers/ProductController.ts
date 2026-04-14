@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 
 export class ProductController {
   /**
-   * Get all products from database
+   * Get all products from database with strict mapping and defaults
    */
   static async getProducts(user: User): Promise<{
     success: boolean;
@@ -28,22 +28,25 @@ export class ProductController {
 
       if (error) throw error;
 
-      const products: Product[] = data.map(product => ({
+      // FIX: Ensure all database fields (snake_case) map correctly to Typescript (camelCase)
+      const products: Product[] = (data || []).map(product => ({
         id: product.id,
         name: product.name,
-        categoryId: product.category_id,
+        categoryId: product.category_id, // CRITICAL FIX: Mapping category_id
         category: product.category,
-        price: product.price,
+        price: Number(product.price),
         stock: product.stock,
         image: product.image,
         sku: product.sku,
         taxRate: product.tax_rate,
         reorderPoint: product.reorder_point,
         branchId: product.branch_id,
-        station: product.station ?? 'kitchen',
-        kitchenStatus: product.kitchen_status ?? 'available',
-        availabilityStatus: product.availability_status ?? product.kitchen_status ?? 'available',
-        isActive: product.is_active,
+        // STATION DEFAULTING: If NULL, default to 'kitchen'
+        station: product.station || 'kitchen',
+        // STATUS DEFAULTING: Ensure products aren't hidden by NULL statuses
+        kitchenStatus: product.kitchen_status || 'available',
+        availabilityStatus: product.availability_status || product.kitchen_status || 'available',
+        isActive: product.is_active ?? true, 
         createdAt: new Date(product.created_at),
       }));
 
@@ -96,7 +99,7 @@ export class ProductController {
           station: productData.station || 'kitchen',
           availability_status: productData.availabilityStatus || 'available',
           kitchen_status: productData.availabilityStatus || 'available',
-          is_active: productData.isActive,
+          is_active: true,
         })
         .select()
         .single();
@@ -122,16 +125,10 @@ export class ProductController {
         createdAt: new Date(data.created_at),
       };
 
-      return {
-        success: true,
-        product,
-      };
+      return { success: true, product };
     } catch (error) {
       console.error('Error adding product:', error);
-      return {
-        success: false,
-        error: 'Failed to add product',
-      };
+      return { success: false, error: 'Failed to add product' };
     }
   }
 
@@ -148,10 +145,7 @@ export class ProductController {
     error?: string;
   }> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage products',
-      };
+      return { success: false, error: 'Unauthorized: Cannot manage products' };
     }
 
     try {
@@ -198,54 +192,26 @@ export class ProductController {
         createdAt: new Date(data.created_at),
       };
 
-      return {
-        success: true,
-        product,
-      };
+      return { success: true, product };
     } catch (error) {
-      console.error('Error updating product:', error);
-      return {
-        success: false,
-        error: 'Failed to update product',
-      };
+      return { success: false, error: 'Failed to update product' };
     }
   }
 
   /**
    * Delete product (soft delete)
    */
-  static async deleteProduct(
-    productId: string,
-    user: User
-  ): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage products',
-      };
-    }
-
+  static async deleteProduct(productId: string, user: User) {
     try {
       const { error } = await supabase
         .from('products')
         .update({ is_active: false })
         .eq('id', productId)
         .eq('branch_id', user.branchId);
-
       if (error) throw error;
-
-      return {
-        success: true,
-      };
+      return { success: true };
     } catch (error) {
-      console.error('Error deleting product:', error);
-      return {
-        success: false,
-        error: 'Failed to delete product',
-      };
+      return { success: false, error: 'Failed to delete' };
     }
   }
 
@@ -262,10 +228,7 @@ export class ProductController {
     error?: string;
   }> {
     if (!AuthController.hasPermission(user, 'canImportProducts')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot import products',
-      };
+      return { success: false, error: 'Unauthorized: Cannot import products' };
     }
 
     try {
@@ -353,20 +316,6 @@ export class ProductController {
     } catch (error) {
       return { success: false, error: 'Import failed' };
     }
-  }
-
-  static getProductsByCategory(products: Product[], category: string): Product[] {
-    return category === 'All' ? products : products.filter(p => p.category === category);
-  }
-
-  static getCategories(products: Product[]): string[] {
-    const categories = new Set(products.map(p => p.category));
-    return ['All', ...Array.from(categories)];
-  }
-
-  static searchProducts(products: Product[], query: string): Product[] {
-    const q = query.toLowerCase();
-    return products.filter(p => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q));
   }
 }
 

@@ -56,7 +56,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ─── SYNC LOGIC ──────────────────────────────────────────────────────────
+  // ─── 1. CORE SYNC ENGINE (Manual & Initial Fetch) ─────────────────────────
   const syncFullSystem = useCallback(async () => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
@@ -66,67 +66,86 @@ export function POSProvider({ children }: { children: ReactNode }) {
         ProductController.getProducts(currentUser),
         CategoryController.getCategories(currentUser),
         TableController.getTables(currentUser),
-        supabase.from('orders').select('*, order_items(*)').eq('branch_id', branch).eq('status', 'open')
+        supabase
+          .from('orders')
+          .select('*, order_items(*)')
+          .eq('branch_id', branch)
+          .eq('status', 'open')
       ]);
 
       if (prodRes.success) setProducts(prodRes.products || []);
       if (catRes.success) setCategories(catRes.categories || []);
       if (tableRes.success) setTables(tableRes.tables || []);
+
       if (ordersRes.data) {
         setOrders(ordersRes.data.map((o: any) => ({
-          ...o, tableId: o.table_id, createdAt: new Date(o.created_at),
+          ...o,
+          tableId: o.table_id,
+          createdAt: new Date(o.created_at),
           items: (o.order_items || []).map((i: any) => ({
-            ...i, productName: i.product_name, addedAt: new Date(i.added_at)
+            ...i,
+            productName: i.product_name,
+            addedAt: new Date(i.added_at)
           }))
         })));
       }
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.error("[Sync Error]:", err);
     }
   }, [currentUser]);
 
-  // ─── EFFECTS ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    StaffController.getStaff().then(res => {
-      if (res.success && res.data) setUsers(res.data);
-      setLoading(false);
-    });
-  }, []);
-
+  // ─── 2. SUB-SECOND REALTIME ENGINE (Immediate Updates) ────────────────────
   useEffect(() => {
     if (!currentUser) return;
-    syncFullSystem();
-    const intervalId = setInterval(syncFullSystem, 30000); // 30s Auto Sync
-    return () => clearInterval(intervalId);
-  }, [currentUser, syncFullSystem]);
+    const branchId = currentUser.branchId;
 
-  useEffect(() => {
-    if (!currentUser) return;
-    const branch = currentUser.branchId;
-    const channel = supabase.channel('pos-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, payload => {
+    const channel = supabase.channel('pos-ultra-sync')
+      // Immediate Table Updates
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branchId}` }, (payload) => {
+        const table = (payload.new || payload.old) as any;
+        setTables(prev => prev.map(t => t.id === table.id ? { ...t, ...table, currentOrderId: table.current_order_id } : t));
+      })
+      // Immediate Product/Price Updates
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (payload) => {
+        const updated = payload.new as any;
+        setProducts(prev => prev.map(p => p.id === updated.id ? { 
+          ...p, ...updated, categoryId: updated.category_id, availabilityStatus: updated.availability_status 
+        } : p));
+      })
+      // Immediate Order Item Updates (Kitchen status / New additions)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
         const item = (payload.new || payload.old) as any;
-        if (!item) return;
-        setOrders(prev => prev.map(o => {
-          if (o.id !== item.order_id) return o;
-          const mapped = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
-          const filtered = (o.items || []).filter(i => i.id !== item.id);
-          return { ...o, items: payload.eventType === 'DELETE' ? filtered : [...filtered, mapped] };
+        setOrders(prev => prev.map(order => {
+          if (order.id !== item.order_id) return order;
+          const mappedItem = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
+          const otherItems = (order.items || []).filter(i => i.id !== item.id);
+          return {
+            ...order,
+            items: payload.eventType === 'DELETE' ? otherItems : [...otherItems, mappedItem]
+          };
         }));
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branch}` }, payload => {
-        const updated = payload.new as any;
-        setProducts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated, categoryId: updated.category_id, availabilityStatus: updated.availability_status } : p));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branch}` }, payload => {
-        const table = (payload.new || payload.old) as any;
-        if (table) setTables(prev => prev.map(t => t.id === table.id ? { ...t, ...table, currentOrderId: table.current_order_id } : t));
-      })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // ─── HANDLERS ────────────────────────────────────────────────────────────
+  // ─── 3. AUTO-SYNC BACKUP (30s Heartbeat) ──────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) return;
+    syncFullSystem().then(() => setLoading(false));
+    const intervalId = setInterval(syncFullSystem, 30000);
+    return () => clearInterval(intervalId);
+  }, [currentUser, syncFullSystem]);
+
+  // Initial Load for Staff
+  useEffect(() => {
+    StaffController.getStaff().then(res => {
+      if (res.success && res.data) setUsers(res.data);
+    });
+  }, []);
+
+  // ─── 4. EXPOSED METHODS & ACTIONS ──────────────────────────────────────────
   const login = async (pin: string) => {
     const result = AuthController.authenticate(pin, users);
     if (result.success) setCurrentUser(result.user!);
@@ -140,35 +159,44 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setTables([]);
   };
 
+  const setCurrentUserHandler = (user: User | null) => setCurrentUser(user);
+
+  // Product Actions
   const updateProduct = async (id: string, up: any) => ProductController.updateProduct(id, up, currentUser!);
   const addProduct = async (p: any) => ProductController.addProduct(p, currentUser!);
   const deleteProduct = async (id: string) => ProductController.deleteProduct(id, currentUser!);
   const importProducts = async (data: any[]) => ProductController.importProducts(data, currentUser!);
   
+  // Category Actions
   const addCategory = async (c: any) => CategoryController.addCategory(c, currentUser!);
   const updateCategory = async (id: string, up: any) => CategoryController.updateCategory(id, up, currentUser!);
   const deleteCategory = async (id: string) => CategoryController.deleteCategory(id, currentUser!);
 
+  // Table Actions
   const updateTable = async (id: string, up: any) => TableController.updateTable(id, up, currentUser!);
   const addTable = async (t: any) => TableController.addTable(t, currentUser!);
   const deleteTable = async (id: string) => TableController.deleteTable(id, currentUser!);
 
+  // User/Staff Actions (FIXED: All functions defined to prevent Blank Page)
   const addUser = async (u: any) => {
     const res = await StaffController.addStaff(u);
     if (res.success && res.data) setUsers(prev => [...prev, res.data!]);
     return res;
   };
-
-  // FIX: Added missing functions that caused the ReferenceError
   const updateUser = async (id: string, up: any) => StaffController.updateStaff(id, up);
   const deleteUser = async (id: string) => StaffController.deleteStaff(id);
 
   return (
     <POSContext.Provider value={{
       supabase, products, categories, orders, users, tables, attendance, expenses, currentUser, loading,
-      refreshData: syncFullSystem, login, logout, setCurrentUser, setProducts, updateProduct, addProduct, deleteProduct, 
-      importProducts, setCategories, addCategory, updateCategory, deleteCategory, setOrders, setTables, 
-      updateTable, addTable, deleteTable, setUsers, addUser, updateUser, deleteUser, setAttendance, setExpenses
+      refreshData: syncFullSystem,
+      login, logout, setCurrentUser: setCurrentUserHandler,
+      setProducts, updateProduct, addProduct, deleteProduct, importProducts,
+      setCategories, addCategory, updateCategory, deleteCategory,
+      setOrders, setTables, updateTable, addTable, deleteTable,
+      setUsers, addUser, updateUser, deleteUser,
+      setAttendance: (a: Attendance[]) => setAttendance(a),
+      setExpenses: (e: Expense[]) => setExpenses(e)
     }}>
       {children}
     </POSContext.Provider>

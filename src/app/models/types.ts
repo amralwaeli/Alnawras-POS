@@ -89,10 +89,22 @@ export interface Product {
   taxRate: number;
   reorderPoint: number;
   branchId: string;
-  station: 'kitchen' | 'juice' | 'none'; 
-  availabilityStatus: 'available' | 'out-of-stock' | 'finished'; 
+  station: 'kitchen' | 'juice' | 'none';
+  kitchenStatus: 'available' | 'out-of-stock' | 'finished';
+  availabilityStatus: 'available' | 'out-of-stock' | 'finished';
   isActive: boolean;
   createdAt: Date;
+}
+
+export interface ProductImportData {
+  name: string;
+  category?: string;
+  price?: number;
+  stock?: number;
+  image?: string;
+  sku?: string;
+  taxRate?: number;
+  reorderPoint?: number;
 }
 
 // ==================== Permissions ====================

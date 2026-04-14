@@ -11,7 +11,7 @@ export class ProductController {
     products?: Product[];
     error?: string;
   }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
+    if (!AuthController.hasPermission(user, 'canViewTables')) {
       return {
         success: false,
         error: 'Unauthorized: Cannot view products',
@@ -40,7 +40,9 @@ export class ProductController {
         taxRate: product.tax_rate,
         reorderPoint: product.reorder_point,
         branchId: product.branch_id,
-        kitchenStatus: product.kitchen_status,
+        station: product.station ?? 'kitchen',
+        kitchenStatus: product.kitchen_status ?? 'available',
+        availabilityStatus: product.availability_status ?? product.kitchen_status ?? 'available',
         isActive: product.is_active,
         createdAt: new Date(product.created_at),
       }));
@@ -416,7 +418,7 @@ export class CategoryController {
     categories?: Category[];
     error?: string;
   }> {
-    if (!AuthController.hasPermission(user, 'canManageInventory')) {
+    if (!AuthController.hasPermission(user, 'canViewTables')) {
       return {
         success: false,
         error: 'Unauthorized: Cannot view categories',

@@ -17,7 +17,7 @@ export interface BillFormatSettings {
   showCashierName: boolean;
 }
 
-const DEFAULT_SETTINGS: BillFormatSettings = {
+export const defaultBillFormatSettings: BillFormatSettings = {
   restaurantName: 'Your Restaurant',
   branchTagline: 'Fresh • Fast • Friendly',
   headerNote: 'Dine-in Order',
@@ -44,7 +44,7 @@ export function loadBillFormatSettings(): BillFormatSettings {
     const stored = localStorage.getItem('billFormatSettings');
     if (stored) {
       const parsed = JSON.parse(stored);
-      cachedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      cachedSettings = { ...defaultBillFormatSettings, ...parsed };
       return cachedSettings;
     }
   } catch (err) {
@@ -52,8 +52,8 @@ export function loadBillFormatSettings(): BillFormatSettings {
   }
   
   // Fallback to defaults
-  cachedSettings = DEFAULT_SETTINGS;
-  return DEFAULT_SETTINGS;
+  cachedSettings = defaultBillFormatSettings;
+  return defaultBillFormatSettings;
 }
 
 export function saveBillFormatSettings(settings: Partial<BillFormatSettings>): void {

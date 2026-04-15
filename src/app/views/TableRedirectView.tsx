@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { supabase } from '../../lib/supabase';
-import { Spinner } from 'lucide-react';
 
 export function TableRedirectView() {
   const { tableNumber, tableSlug } = useParams();
@@ -49,7 +48,7 @@ export function TableRedirectView() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="inline-flex items-center gap-3 rounded-3xl bg-white px-8 py-6 shadow-lg">
-        <Spinner className="size-6 text-orange-500 animate-spin" />
+        <div className="w-6 h-6 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
         <span className="text-slate-700 font-semibold">Redirecting to your table…</span>
       </div>
     </div>

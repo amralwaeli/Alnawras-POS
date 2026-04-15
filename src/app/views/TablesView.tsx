@@ -232,52 +232,75 @@ export function TablesView() {
   const occupied  = tables.filter(t => t.status === 'occupied').length;
 
   const openOrderModal = async (tableId: string) => {
-    const table = tables.find(t => t.id === tableId);
-    const order = getOrder(tableId);
+    try {
+      const table = tables.find(t => t.id === tableId);
+      const order = getOrder(tableId);
 
-    if (order) {
-      setSelectedOrder({ ...order, tableId });
+      if (order && order.items && order.items.length > 0) {
+        setSelectedOrder({ ...order, tableId });
+        setPaymentMode(null);
+        setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
+        return;
+      }
+
+      if (!table?.currentOrderId) {
+        toast.error('No active bill found for this table yet');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('id', table.currentOrderId)
+        .single();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        toast.error('Failed to load bill details: ' + (error.message || 'Unknown error'));
+        return;
+      }
+
+      if (!data) {
+        toast.error('Bill not found for this table');
+        return;
+      }
+
+      const fetchedOrder = {
+        ...data,
+        id: data.id,
+        tableId: data.table_id,
+        tableNumber: data.table_number,
+        status: data.status,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        discount: data.discount,
+        total: data.total,
+        createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+        items: (data.order_items || []).map((item: any) => ({
+          id: item.id,
+          orderId: item.order_id,
+          productId: item.product_id,
+          productName: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal,
+          status: item.status,
+          addedByName: item.added_by_name,
+          addedAt: item.added_at ? new Date(item.added_at) : new Date(),
+        })),
+      };
+
+      setOrders(prev => {
+        const exists = prev.some(o => o.id === fetchedOrder.id);
+        return exists ? prev.map(o => o.id === fetchedOrder.id ? fetchedOrder : o) : [...prev, fetchedOrder];
+      });
+      setSelectedOrder({ ...fetchedOrder, tableId });
       setPaymentMode(null);
       setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
-      return;
+    } catch (err) {
+      console.error('Error opening order modal:', err);
+      toast.error('An unexpected error occurred. Please try again.');
     }
-
-    if (!table?.currentOrderId) {
-      toast.error('No active bill found for this table yet');
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('id', table.currentOrderId)
-      .single();
-
-    if (error || !data) {
-      toast.error('Failed to load bill details');
-      return;
-    }
-
-    const fetchedOrder = {
-      ...data,
-      tableId: data.table_id,
-      tableNumber: data.table_number,
-      createdAt: data.created_at ? new Date(data.created_at) : new Date(),
-      items: (data.order_items || []).map((item: any) => ({
-        ...item,
-        productName: item.product_name,
-        addedByName: item.added_by_name,
-        addedAt: item.added_at ? new Date(item.added_at) : new Date(),
-      })),
-    };
-
-    setOrders(prev => {
-      const exists = prev.some(o => o.id === fetchedOrder.id);
-      return exists ? prev.map(o => o.id === fetchedOrder.id ? fetchedOrder : o) : [...prev, fetchedOrder];
-    });
-    setSelectedOrder({ ...fetchedOrder, tableId });
-    setPaymentMode(null);
-    setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

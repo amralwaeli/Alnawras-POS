@@ -310,7 +310,19 @@ export function TablesView() {
 
       if (!data) {
         console.warn('[openOrderModal] No data returned from Supabase');
-        toast.error('Bill not found for this table');
+        console.warn('[openOrderModal] The table references order:', table.currentOrderId, 'which does not exist');
+        
+        // Clear the invalid order reference from the table
+        await supabase
+          .from('tables')
+          .update({ current_order_id: null })
+          .eq('id', tableId);
+        
+        setTables(prev => prev.map(t => 
+          t.id === tableId ? { ...t, currentOrderId: undefined } : t
+        ));
+        
+        toast.error('The bill for this table no longer exists. Reference has been cleared.');
         return;
       }
 

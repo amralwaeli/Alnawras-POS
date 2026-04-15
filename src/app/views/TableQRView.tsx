@@ -18,6 +18,8 @@ export function TableQRView() {
     window.print();
   };
 
+  const hashPath = (path: string) => `${window.location.origin}/#${path}`;
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="p-6 space-y-6">
@@ -57,7 +59,7 @@ function TableQRCard({ tableNumber, tableId }: { tableNumber: number; tableId: s
 
   useEffect(() => {
     if (canvasRef.current) {
-      const url = `${window.location.origin}/table/${tableId}`;
+      const url = hashPath(`/table/${tableId}`);
       QRCode.toCanvas(canvasRef.current, url, {
         width: 200,
         margin: 2,
@@ -112,10 +114,10 @@ function TableQRCard({ tableNumber, tableId }: { tableNumber: number; tableId: s
       </div>
       <p className="text-sm text-gray-600 mb-2">Scan to order with this QR.</p>
       <p className="text-[11px] text-slate-500 mb-4 break-words">
-        New link: <span className="font-semibold">{`${window.location.origin}/table/${tableId}`}</span>
+        New link: <span className="font-semibold">{hashPath(`/table/${tableId}`)}</span>
       </p>
       <p className="text-[11px] text-slate-500 mb-4 break-words">
-        Legacy link: <span className="font-semibold">{`${window.location.origin}/order/table-${tableNumber}`}</span>
+        Legacy link: <span className="font-semibold">{hashPath(`/order/table-${tableNumber}`)}</span>
       </p>
       <button
         onClick={handlePrintSingle}

@@ -466,15 +466,17 @@ export function TablesView() {
         .from('tables')
         .update({
           status: 'available',
-          current_order_id: null,
-          updated_at: now
+          current_order_id: null
         })
         .eq('id', selectedOrder.tableId);
+
+      console.log('[handlePayment] Database updated. Table set to available, order cleared.');
 
       // Store bill info for optional printing
       setLastBillNo(billNo);
       setLastPaymentSummary(summary);
 
+      // Update local state immediately for responsive UI
       setOrders(prev => prev.map(o =>
         o.id === selectedOrder.id
           ? { ...o, status: 'completed', paymentMethod: summary }
@@ -485,6 +487,8 @@ export function TablesView() {
           ? { ...t, status: 'available', currentOrderId: undefined }
           : t
       ));
+
+      console.log('[handlePayment] Local state updated. Payment flow complete.');
 
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
       

@@ -281,3 +281,90 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canCheckIn: true,
   },
 };
+
+// ==================== HR & Fingerprint Attendance ====================
+
+export interface Employee {
+  id: string;
+  userId?: string;
+  employeeId: string;
+  fullName: string;
+  role: string;
+  monthlySalary: number;
+  shiftStart: string; // "HH:MM"
+  shiftEnd: string;   // "HH:MM"
+  earlyCheckinMinutes: number;
+  lateCheckoutMinutes: number;
+  status: 'active' | 'inactive';
+  branchId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  hasFingerprint?: boolean;
+}
+
+export interface EmployeeFingerprint {
+  id: string;
+  employeeId: string;
+  templateData: string;  // AES-encrypted, Base64
+  templateHash: string;  // SHA-256 for fast matching
+  fingerIndex: number;
+  qualityScore: number;
+  isActive: boolean;
+  enrolledBy: string;
+  enrolledAt: Date;
+}
+
+export interface AttendanceLog {
+  id: string;
+  employeeId: string;
+  fullName: string;
+  logDate: string;          // "YYYY-MM-DD"
+  checkInTime?: Date;
+  checkOutTime?: Date;
+  scheduledStart: string;   // "HH:MM"
+  scheduledEnd: string;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  overtimeMinutes: number;
+  status: 'present' | 'absent' | 'late' | 'on-time' | 'early-leave';
+  checkInMethod: 'fingerprint' | 'manual' | 'pin';
+  checkOutMethod?: 'fingerprint' | 'manual' | 'pin';
+  notes?: string;
+  branchId: string;
+}
+
+export interface PayrollSummary {
+  id: string;
+  employeeId: string;
+  fullName: string;
+  month: number;
+  year: number;
+  monthlySalary: number;
+  workingDays: number;
+  presentDays: number;
+  absentDays: number;
+  totalLateMinutes: number;
+  totalOvertimeMinutes: number;
+  lateDeduction: number;
+  overtimeBonus: number;
+  netSalary: number;
+  status: 'draft' | 'approved' | 'paid';
+  approvedBy?: string;
+  approvedAt?: Date;
+  branchId: string;
+  createdAt: Date;
+}
+
+export interface ShiftRule {
+  id: string;
+  employeeId: string;
+  effectiveDate: string;
+  shiftStart: string;
+  shiftEnd: string;
+  earlyCheckinMinutes: number;
+  lateCheckoutMinutes: number;
+  createdBy: string;
+}
+
+// Fingerprint scanner status
+export type ScannerStatus = 'disconnected' | 'ready' | 'scanning' | 'processing' | 'error';

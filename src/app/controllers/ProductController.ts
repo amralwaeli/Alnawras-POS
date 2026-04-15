@@ -11,7 +11,12 @@ export class ProductController {
     products?: Product[];
     error?: string;
   }> {
-    if (!AuthController.hasPermission(user, 'canViewTables')) {
+    // Kitchen needs canManageInventory, others need canViewTables
+    const canView = user.role === 'kitchen' 
+      ? AuthController.hasPermission(user, 'canManageInventory')
+      : AuthController.hasPermission(user, 'canViewTables');
+    
+    if (!canView) {
       return {
         success: false,
         error: 'Unauthorized: Cannot view products',

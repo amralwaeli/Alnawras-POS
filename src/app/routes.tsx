@@ -59,16 +59,39 @@ function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
+// Role-aware landing page component
+function LandingPage() {
+  const { currentUser } = usePOS();
+
+  if (!currentUser) return <Navigate to="/check-in" replace />;
+
+  // Admin goes to dashboard
+  if (currentUser.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+  
+  // Cashier goes to tables
+  if (currentUser.role === 'cashier') return <Navigate to="/tables" replace />;
+  
+  // Waiter, Kitchen, HR go to their respective views
+  if (currentUser.role === 'waiter') return <Navigate to="/dashboard" replace />;
+  if (currentUser.role === 'kitchen') return <Navigate to="/kitchen" replace />;
+  if (currentUser.role === 'hr') return <Navigate to="/hr-panel" replace />;
+
+  // Default fallback
+  return <Navigate to="/admin-dashboard" replace />;
+}
+
 export const router = createHashRouter([
   {
     path: '/',
     Component: Layout,
     children: [
-      // ─── THE DEFAULT LANDING PAGE ───
-      { index: true, element: <Lazy><CustomerMenuView /></Lazy> },
+      // ─── THE DEFAULT LANDING PAGE (role-aware) ───
+      { index: true, element: <Lazy><LandingPage /></Lazy> },
+      
+      // ─── WAITER DASHBOARD ───
       { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
-
-      // ─── OTHER ROUTES ───
+      
+      // ─── ADMIN DASHBOARD ───
       { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
       { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePOS } from '../context/POSContext';
-import { CheckCircle2, Clock4, ChefHat, Bell, Utensils } from 'lucide-react';
+import { CheckCircle2, Clock4, ChefHat, Bell, Utensils, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 type KitchenStatus = 'available' | 'out-of-stock' | 'finished';
@@ -144,13 +144,25 @@ export function KitchenView() {
 
   const toggleProductStatus = (id: string, status: KitchenStatus) => {
     console.log('[Kitchen] Toggling product status:', id, status);
-    updateProduct(id, { kitchenStatus: status });
+    // Update both availabilityStatus and kitchenStatus in database
+    updateProduct(id, { availabilityStatus: status });
     toast.success(`Product marked as ${status === 'available' ? '✅ Available' : '❌ Not Available'}`);
   };
 
+  const [inventorySearch, setInventorySearch] = useState('');
+
+  const filteredProducts = useMemo(() => {
+    if (!inventorySearch) return products;
+    const query = inventorySearch.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(query) || 
+      p.category.toLowerCase().includes(query)
+    );
+  }, [products, inventorySearch]);
+
   const counts = {
-    available: products.filter(p => (p.kitchenStatus || 'available') === 'available').length,
-    unavailable: products.filter(p => (p.kitchenStatus || 'available') !== 'available').length,
+    available: filteredProducts.filter(p => (p.kitchenStatus || 'available') === 'available').length,
+    unavailable: filteredProducts.filter(p => (p.kitchenStatus || 'available') !== 'available').length,
   };
 
   if (!currentUser) return null;
@@ -268,6 +280,28 @@ export function KitchenView() {
         ) : (
           /* ─── Inventory Management ─── */
           <div className="max-w-4xl mx-auto bg-[#161B22] rounded-[40px] border border-gray-800 overflow-hidden shadow-2xl">
+            {/* Search Bar */}
+            <div className="p-6 border-b border-gray-800 bg-white/5">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search products by name or category..."
+                  value={inventorySearch}
+                  onChange={e => setInventorySearch(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-[#0B0E14] border-2 border-gray-700 rounded-2xl text-white placeholder:text-gray-500 focus:outline-none focus:border-orange-500 transition-all"
+                />
+                {inventorySearch && (
+                  <button
+                    onClick={() => setInventorySearch('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 divide-x divide-gray-800 bg-white/5 p-8 border-b border-gray-800">
               <div className="text-center">
                 <p className="text-5xl font-black italic tracking-tighter text-emerald-500">{counts.available}</p>
@@ -280,34 +314,41 @@ export function KitchenView() {
             </div>
 
             <div className="divide-y divide-gray-800 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              {products.map(p => {
-                const isAvailable = (p.kitchenStatus || 'available') === 'available';
-                return (
-                  <div key={p.id} className={`flex items-center justify-between px-8 py-5 transition-colors ${!isAvailable ? 'bg-red-950/20' : 'hover:bg-white/[0.02]'}`}>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <p className={`text-lg font-bold ${!isAvailable ? 'text-red-400' : 'text-white'}`}>{p.name}</p>
-                        {!isAvailable && (
-                          <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">
-                            Not Available
-                          </span>
-                        )}
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-16 text-gray-500">
+                  <p className="text-lg font-bold">No products found</p>
+                  <p className="text-sm mt-2">Try a different search term</p>
+                </div>
+              ) : (
+                filteredProducts.map(p => {
+                  const isAvailable = (p.kitchenStatus || 'available') === 'available';
+                  return (
+                    <div key={p.id} className={`flex items-center justify-between px-8 py-5 transition-colors ${!isAvailable ? 'bg-red-950/20' : 'hover:bg-white/[0.02]'}`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <p className={`text-lg font-bold ${!isAvailable ? 'text-red-400' : 'text-white'}`}>{p.name}</p>
+                          {!isAvailable && (
+                            <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">
+                              Not Available
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{p.category}</p>
                       </div>
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{p.category}</p>
+                      <button
+                        onClick={() => toggleProductStatus(p.id, isAvailable ? 'out-of-stock' : 'available')}
+                        className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all active:scale-95 ${
+                          isAvailable
+                            ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                            : 'bg-red-600 border-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        {isAvailable ? '✅ Available' : '❌ Not Available'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => toggleProductStatus(p.id, isAvailable ? 'out-of-stock' : 'available')}
-                      className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all active:scale-95 ${
-                        isAvailable
-                          ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                          : 'bg-red-600 border-red-600 text-white hover:bg-red-700'
-                      }`}
-                    >
-                      {isAvailable ? '✅ Available' : '❌ Not Available'}
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}

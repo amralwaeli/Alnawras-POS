@@ -33,7 +33,7 @@ export function CustomerMenuView() {
 
   // ─── DASHBOARD STATE ────────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTableOverlay, setShowTableOverlay] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -41,13 +41,6 @@ export function CustomerMenuView() {
   const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>('dine-in');
   const [isSending, setIsSending] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-
-  // Set default category to the first available category if none is selected
-  useEffect(() => {
-    if (!selectedCategory && menuCategories && menuCategories.length > 0) {
-      setSelectedCategory(menuCategories[0].id);
-    }
-  }, [menuCategories, selectedCategory]);
 
   // ─── EFFECTS ───────────────────────────────────────────────────────────────
   
@@ -85,7 +78,7 @@ export function CustomerMenuView() {
   
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catMatch = p.categoryId === selectedCategory;
+      const catMatch = selectedCategory === 'All' || p.categoryId === selectedCategory;
       const searchMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       return catMatch && searchMatch && p.isActive && (p.availabilityStatus || 'available') === 'available';
     });
@@ -198,7 +191,7 @@ export function CustomerMenuView() {
         </div>
 
         <div className="bg-white border-t p-3 flex gap-2 overflow-x-auto no-scrollbar">
-          {(menuCategories || []).map(cat => (
+          {[{id:'All', name:'ALL'}, ...(menuCategories || [])].map(cat => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-10 py-5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>

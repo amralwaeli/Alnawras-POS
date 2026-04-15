@@ -191,13 +191,12 @@ export function CustomerMenuView() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {filteredProducts.map(p => (
-              <div key={p.id} onClick={() => addToCart(p)} className="bg-white rounded-[30px] overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer border-2 border-transparent active:scale-95 group flex flex-col">
-                <div className="relative h-32 bg-gray-50"><img src={p.image || 'https://via.placeholder.com/300'} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500" alt="" /></div>
-                <div className="p-4 flex flex-col flex-1">
-                  <h3 className="text-sm font-bold text-gray-800 line-clamp-2 mb-2 min-h-[2.5rem] tracking-tight leading-tight">{p.name}</h3>
-                  <div className="mt-auto flex items-center justify-between">
+              <div key={p.id} onClick={() => addToCart(p)} className="bg-white rounded-[24px] shadow-sm hover:shadow-md transition-all cursor-pointer border-2 border-transparent active:scale-95 group flex flex-col min-h-[120px]">
+                <div className="p-4 flex flex-col flex-1 justify-between gap-3">
+                  <h3 className="text-sm font-bold text-gray-800 leading-snug tracking-tight break-words">{p.name}</h3>
+                  <div className="mt-auto flex items-center justify-between gap-2">
                     <span className="text-orange-600 font-black">RM {p.price.toFixed(2)}</span>
                     <div className="bg-orange-500 text-white p-2 rounded-xl"><Plus className="size-4" strokeWidth={4} /></div>
                   </div>

@@ -95,7 +95,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const channel = supabase.channel('pos-ultra-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branchId}` }, (p) => {
         const table = (p.new || p.old) as any;
-        setTables(prev => prev.map(t => t.id === table.id ? { ...t, ...table, currentOrderId: table.current_order_id } : t));
+        console.log('[RealTime] Table update:', p.eventType, table.id, 'Status:', table.status, 'OrderID:', table.current_order_id);
+        
+        setTables(prev => {
+          const existing = prev.find(t => t.id === table.id);
+          if (!existing) {
+            // New table - add it
+            return [...prev, { ...table, currentOrderId: table.current_order_id }];
+          }
+          
+          // Update existing table - merge changes
+          return prev.map(t => {
+            if (t.id !== table.id) return t;
+            return {
+              ...t,
+              ...table,
+              currentOrderId: table.current_order_id
+            };
+          });
+        });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
         const up = p.new as any;

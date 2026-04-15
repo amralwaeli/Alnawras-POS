@@ -228,8 +228,19 @@ export function TablesView() {
     return orders.find(o => o.id === t.currentOrderId) ?? null;
   };
 
-  const available = tables.filter(t => t.status === 'available').length;
-  const occupied  = tables.filter(t => t.status === 'occupied').length;
+  // Filter tables based on user role
+  const getFilteredTables = () => {
+    if (currentUser.role === 'cashier') {
+      // Cashiers see only occupied tables for payment processing
+      return tables.filter(t => t.status === 'occupied');
+    }
+    // Waiters and admins see all tables
+    return tables;
+  };
+
+  const filteredTables = getFilteredTables();
+  const available = filteredTables.filter(t => t.status === 'available').length;
+  const occupied  = filteredTables.filter(t => t.status === 'occupied').length;
 
   const openOrderModal = async (tableId: string) => {
     try {
@@ -387,23 +398,29 @@ export function TablesView() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Tables</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Live table status — updates in real time</p>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {currentUser.role === 'cashier' 
+                ? 'Occupied tables — ready for payment'
+                : 'Live table status — updates in real time'}
+            </p>
           </div>
           <div className="flex gap-3">
-            <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
-              <p className="text-2xl font-bold text-emerald-600">{available}</p>
-              <p className="text-xs text-gray-400">Available</p>
-            </div>
+            {currentUser.role !== 'cashier' && (
+              <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
+                <p className="text-2xl font-bold text-emerald-600">{available}</p>
+                <p className="text-xs text-gray-400">Available</p>
+              </div>
+            )}
             <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
               <p className="text-2xl font-bold text-blue-600">{occupied}</p>
-              <p className="text-xs text-gray-400">Occupied</p>
+              <p className="text-xs text-gray-400">{currentUser.role === 'cashier' ? 'Ready to Bill' : 'Occupied'}</p>
             </div>
           </div>
         </div>
 
         {/* Table Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {tables.map(table => {
+          {filteredTables.map(table => {
             const order        = getOrder(table.id);
             const cfg          = statusConfig[table.status];
             const pendingItems = order?.items?.filter((i: any) => i.status === 'pending').length ?? 0;
@@ -477,10 +494,14 @@ export function TablesView() {
           })}
         </div>
 
-        {tables.length === 0 && (
+        {filteredTables.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
             <UtensilsCrossed className="size-12 opacity-30" />
-            <p className="text-sm">No tables found — add tables in Manage Tables</p>
+            <p className="text-sm">
+              {currentUser.role === 'cashier' 
+                ? 'No occupied tables — all tables have been paid'
+                : 'No tables found — add tables in Manage Tables'}
+            </p>
           </div>
         )}
       </div>

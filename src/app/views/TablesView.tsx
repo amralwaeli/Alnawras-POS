@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { usePOS } from '../context/POSContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../lib/supabase';
+import { CURRENCY, fmt } from '../../lib/currency';
 import {
   UtensilsCrossed, Users, DollarSign, X, Clock, CheckCircle,
   CreditCard, Banknote, QrCode, SplitSquareHorizontal, Plus, Minus,
@@ -9,7 +10,6 @@ import {
 import { toast } from 'sonner';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CURRENCY = 'RM';
 
 const statusConfig = {
   available: { label: 'Available', dot: 'bg-emerald-500', card: 'border-gray-100 bg-white hover:border-emerald-200', badge: 'bg-emerald-50 text-emerald-700' },
@@ -64,7 +64,7 @@ function CashChangeRow({ total, currency }: { total: number; currency: string })
       {change > 0 && (
         <div className="text-right">
           <p className="text-xs text-emerald-600 font-medium">Change</p>
-          <p className="text-lg font-bold text-emerald-700">{currency} {change.toFixed(2)}</p>
+          <p className="text-lg font-bold text-emerald-700">{fmt(change)}</p>
         </div>
       )}
     </div>
@@ -131,7 +131,7 @@ export function TablesView() {
     if (!selectedOrder || !paymentMode) return;
     if (paymentMode === 'mix') {
       if (!splitExact) {
-        toast.error(`Split amounts must total exactly ${CURRENCY} ${totals.total.toFixed(2)}`);
+        toast.error(`Split amounts must total exactly ${fmt(totals.total)}`);
         return;
       }
       for (const s of splits) {
@@ -149,9 +149,9 @@ export function TablesView() {
       setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: 'completed' } : o));
       setTables(prev => prev.map(t => t.id === selectedOrder.tableId ? { ...t, status: 'available', currentOrderId: undefined } : t));
       const summary = paymentMode === 'mix'
-        ? splits.map(s => `${s.method.toUpperCase()} ${CURRENCY} ${parseFloat(s.amount).toFixed(2)}`).join(' + ')
+        ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
-      toast.success(`Payment of ${CURRENCY} ${totals.total.toFixed(2)} processed via ${summary}`);
+      toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
       setSelectedOrder(null);
       setPaymentMode(null);
     } catch {
@@ -224,7 +224,7 @@ export function TablesView() {
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span>
-                        <span className="font-bold text-gray-900">{CURRENCY} {total.toFixed(2)}</span>
+                        <span className="font-bold text-gray-900">{fmt(total)}</span>
                       </div>
                     </div>
                     {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
@@ -299,7 +299,7 @@ export function TablesView() {
                       </span>
                       <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
                       <span className="text-sm font-semibold w-24 text-right">
-                        {CURRENCY} {((item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)}
+                        {fmt((item.price ?? 0) * (item.quantity ?? 1))}
                       </span>
                     </div>
                   </div>
@@ -310,20 +310,20 @@ export function TablesView() {
             {/* Totals */}
             <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
               <div className="flex justify-between text-sm text-gray-500">
-                <span>Subtotal</span><span>{CURRENCY} {totals.subtotal.toFixed(2)}</span>
+                <span>Subtotal</span><span>{fmt(totals.subtotal)}</span>
               </div>
               {totals.tax > 0 && (
                 <div className="flex justify-between text-sm text-gray-500">
-                  <span>Tax</span><span>{CURRENCY} {totals.tax.toFixed(2)}</span>
+                  <span>Tax</span><span>{fmt(totals.tax)}</span>
                 </div>
               )}
               {totals.discount > 0 && (
                 <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Discount</span><span>−{CURRENCY} {totals.discount.toFixed(2)}</span>
+                  <span>Discount</span><span>−{fmt(totals.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                <span>Total</span><span>{CURRENCY} {totals.total.toFixed(2)}</span>
+                <span>Total</span><span>{fmt(totals.total)}</span>
               </div>
             </div>
 
@@ -361,8 +361,8 @@ export function TablesView() {
                         {splitExact
                           ? '✓ Balanced'
                           : splitRemain > 0
-                            ? `${CURRENCY} ${splitRemain.toFixed(2)} remaining`
-                            : `${CURRENCY} ${(splitTotal - totals.total).toFixed(2)} over`}
+                            ? `${fmt(splitRemain)} remaining`
+                            : `${fmt(splitTotal - totals.total)} over`}
                       </span>
                     </div>
 
@@ -423,7 +423,7 @@ export function TablesView() {
                   className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   <CheckCircle className="size-4" />
-                  {processing ? 'Processing…' : `Confirm Payment — ${CURRENCY} ${totals.total.toFixed(2)}`}
+                  {processing ? 'Processing…' : `Confirm Payment — ${fmt(totals.total)}`}
                 </button>
               </div>
             )}

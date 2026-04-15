@@ -47,7 +47,9 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
     try {
       const result = await login(pin);
       if (result.success) {
-        if (result.user?.role === 'cashier') {
+        if (result.user?.role === 'admin') {
+          window.location.hash = '#/admin-dashboard';
+        } else if (result.user?.role === 'cashier') {
           window.location.hash = '#/tables';
         } else if (result.user?.role === 'waiter') {
           window.location.hash = '#/';

@@ -27,7 +27,10 @@ export function Layout() {
   const permissions = ROLE_PERMISSIONS[currentUser.role];
 
   const allNavItems = [
-    { path: '/dashboard',           label: 'Dashboard',       icon: LayoutDashboard, permission: 'canViewReports' as const },
+    ...(currentUser.role === 'admin' 
+      ? [{ path: '/admin-dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'canViewReports' as const }]
+      : [{ path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'canViewReports' as const }]
+    ),
     { path: '/tables',              label: 'Tables',          icon: ShoppingCart,    permission: 'canViewTables' as const },
     { path: '/kitchen',             label: 'Kitchen',         icon: ChefHat,         permission: 'canManageInventory' as const },
     { path: '/inventory',           label: 'Inventory',       icon: Package,         permission: 'canManageInventory' as const },

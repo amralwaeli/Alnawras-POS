@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Save, RotateCcw, ReceiptText } from 'lucide-react';
+import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +12,8 @@ import {
   loadBillFormatSettings,
   saveBillFormatSettings,
 } from '../../lib/billFormat';
-import { CURRENCY } from '../../lib/currency';
+import { CURRENCY, orderTotal } from '../../lib/currency';
+import { supabase } from '../../lib/supabase';
 
 const sampleItems = [
   { name: 'Mixed Grilled Al-Nawras + Bread', price: 30, qty: 1, discount: 0, amount: 30 },
@@ -20,21 +22,81 @@ const sampleItems = [
 ];
 
 export function BillFormatView() {
+  const { orders, tables, currentUser } = usePOS();
   const [settings, setSettings] = useState<BillFormatSettings>(defaultBillFormatSettings);
+  const [printedBillsCount, setPrintedBillsCount] = useState(0);
 
   useEffect(() => {
     setSettings(loadBillFormatSettings());
   }, []);
 
-  const totals = useMemo(() => {
-    const subtotal = sampleItems.reduce((sum, item) => sum + item.amount, 0);
-    return {
-      subtotal,
-      discount: 0,
-      tax: 0,
-      total: subtotal,
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const loadPrintedBillsCount = async () => {
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('branch_id', currentUser.branchId)
+        .eq('status', 'completed');
+
+      setPrintedBillsCount(count || 0);
     };
-  }, []);
+
+    void loadPrintedBillsCount();
+  }, [currentUser]);
+
+  const previewOrder = useMemo(() => {
+    if (!orders.length) return null;
+    return [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  }, [orders]);
+
+  const previewTableNumber = useMemo(() => {
+    if (!previewOrder) return 7;
+    if (previewOrder.tableNumber) return previewOrder.tableNumber;
+    return tables.find(table => table.id === previewOrder.tableId)?.number || 7;
+  }, [previewOrder, tables]);
+
+  const previewItems = useMemo(() => {
+    if (!previewOrder?.items?.length) return sampleItems;
+
+    return previewOrder.items.map(item => ({
+      name: item.productName,
+      price: Number(item.price || 0),
+      qty: Number(item.quantity || 0),
+      discount: 0,
+      amount: Number(item.subtotal || Number(item.price || 0) * Number(item.quantity || 0)),
+    }));
+  }, [previewOrder]);
+
+  const totals = useMemo(() => {
+    if (!previewOrder) {
+      const subtotal = sampleItems.reduce((sum, item) => sum + item.amount, 0);
+      return {
+        subtotal,
+        discount: 0,
+        tax: 0,
+        total: subtotal,
+      };
+    }
+
+    const subtotal = previewOrder.items?.reduce(
+      (sum, item) => sum + Number(item.subtotal || Number(item.price || 0) * Number(item.quantity || 0)),
+      0
+    ) || 0;
+
+    return {
+      subtotal: Number(previewOrder.subtotal || subtotal),
+      discount: Number(previewOrder.discount || 0),
+      tax: Number(previewOrder.tax || 0),
+      total: orderTotal(previewOrder),
+    };
+  }, [previewOrder]);
+
+  const nextBillNumber = useMemo(
+    () => String(printedBillsCount + 1).padStart(5, '0'),
+    [printedBillsCount]
+  );
 
   const updateField = (key: keyof BillFormatSettings, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -167,6 +229,14 @@ export function BillFormatView() {
                   onChange={(e) => updateField('footerNote', e.target.value)}
                 />
               </div>
+              <div className="md:col-span-2 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+                {previewOrder
+                  ? `Preview is using the latest live table order: Table ${previewTableNumber} with ${previewItems.length} item${previewItems.length === 1 ? '' : 's'}.`
+                  : 'No live table order found yet, so the preview is showing sample bill data.'}
+                <div className="mt-2 font-medium">
+                  Printed bills counted: {printedBillsCount} | Next bill no: {nextBillNumber}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -187,12 +257,15 @@ export function BillFormatView() {
                     <p className="text-[22px] font-serif italic leading-none">{settings.branchTagline}</p>
                     <p className="mt-2 text-[15px] font-bold uppercase tracking-wide">{settings.restaurantName}</p>
                     <p className="mt-3 text-[13px]">{settings.headerNote}</p>
-                    <p className="text-[34px] font-bold leading-none">7</p>
+                    <p className="text-[34px] font-bold leading-none">{previewTableNumber}</p>
                   </div>
 
                   <div className="py-3 text-[11px] border-b border-dashed border-[#bcb6aa]">
                     <p>{settings.cashierLabel}</p>
-                    <p>{settings.registerLabel}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p>{settings.registerLabel}</p>
+                      <p>Bill No: {nextBillNumber}</p>
+                    </div>
                   </div>
 
                   <div className="py-3 border-b border-dashed border-[#bcb6aa]">
@@ -204,7 +277,7 @@ export function BillFormatView() {
                       <span className="text-right">Amt</span>
                     </div>
                     <div className="mt-2 space-y-3">
-                      {sampleItems.map(item => (
+                      {previewItems.map(item => (
                         <div key={item.name}>
                           <p className="font-semibold text-[11px] leading-tight">{item.name}</p>
                           <div className="grid grid-cols-[1.6fr_.7fr_.45fr_.75fr_.8fr] gap-2">

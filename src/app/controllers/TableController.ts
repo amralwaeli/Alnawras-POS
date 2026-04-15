@@ -35,6 +35,7 @@ export class TableController {
         branchId: table.branch_id,
         currentOrderId: table.current_order_id,
         assignedCashierId: table.assigned_cashier_id,
+        needsWaiter: table.needs_waiter ?? false,
       }));
 
       return {
@@ -91,6 +92,7 @@ export class TableController {
         branchId: data.branch_id,
         currentOrderId: data.current_order_id,
         assignedCashierId: data.assigned_cashier_id,
+        needsWaiter: data.needs_waiter ?? false,
       };
 
       return {
@@ -149,6 +151,7 @@ export class TableController {
         branchId: data.branch_id,
         currentOrderId: data.current_order_id,
         assignedCashierId: data.assigned_cashier_id,
+        needsWaiter: data.needs_waiter ?? false,
       };
 
       return {
@@ -238,6 +241,7 @@ export class TableController {
         branchId: data.branch_id,
         currentOrderId: data.current_order_id,
         assignedCashierId: data.assigned_cashier_id,
+        needsWaiter: data.needs_waiter ?? false,
       };
 
       // Cashiers can only see their assigned tables

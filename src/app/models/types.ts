@@ -31,6 +31,7 @@ export interface Table {
   branchId: string;
   currentOrderId?: string;
   assignedCashierId?: string;
+  needsWaiter?: boolean;
 }
 
 export interface OrderItem {
@@ -46,6 +47,7 @@ export interface OrderItem {
   station: 'kitchen' | 'juice' | 'none';
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
+  sentToKitchen?: boolean;
 }
 
 export interface Order {
@@ -58,6 +60,8 @@ export interface Order {
   discount: number;
   total: number;
   status: 'open' | 'completed' | 'cancelled';
+  paymentStatus?: 'unpaid' | 'paid';
+  orderType?: 'dine-in' | 'takeaway';
   createdAt: Date;
   completedAt?: Date;
   waiters: string[];

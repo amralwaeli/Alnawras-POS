@@ -40,6 +40,8 @@ const AttendanceView          = lazy(() => import('./views/AttendanceView').then
 const TableQRView             = lazy(() => import('./views/TableQRView').then(m => ({ default: m.TableQRView })));
 const CheckInView             = lazy(() => import('./views/CheckInView').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView        = lazy(() => import('./views/CustomerMenuView').then(m => ({ default: m.CustomerMenuView })));
+const TableOrderingView       = lazy(() => import('./views/TableOrderingView').then(m => ({ default: m.TableOrderingView })));
+const TableRedirectView       = lazy(() => import('./views/TableRedirectView').then(m => ({ default: m.TableRedirectView })));
 const TableManagementView     = lazy(() => import('./views/TableManagementView').then(m => ({ default: m.TableManagementView })));
 const CategoryManagementView  = lazy(() => import('./views/CategoryManagementView').then(m => ({ default: m.CategoryManagementView })));
 const HRPanelView             = lazy(() => import('./views/HRPanelView').then(m => ({ default: m.HRPanelView })));
@@ -120,6 +122,14 @@ export const router = createHashRouter([
   },
   {
     path: '/table/:tableId',
-    element: <Lazy><CustomerMenuView /></Lazy>,
+    element: <Lazy><TableOrderingView /></Lazy>,
+  },
+  {
+    path: '/order/table-:tableNumber',
+    element: <Lazy><TableRedirectView /></Lazy>,
+  },
+  {
+    path: '/order/:tableSlug',
+    element: <Lazy><TableRedirectView /></Lazy>,
   },
 ]);

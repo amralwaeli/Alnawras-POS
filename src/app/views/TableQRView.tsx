@@ -110,7 +110,13 @@ function TableQRCard({ tableNumber, tableId }: { tableNumber: number; tableId: s
       <div className="flex justify-center mb-4">
         <canvas ref={canvasRef} className="border-2 border-gray-300 rounded" />
       </div>
-      <p className="text-sm text-gray-600 mb-4">Scan to order</p>
+      <p className="text-sm text-gray-600 mb-2">Scan to order with this QR.</p>
+      <p className="text-[11px] text-slate-500 mb-4 break-words">
+        New link: <span className="font-semibold">{`${window.location.origin}/table/${tableId}`}</span>
+      </p>
+      <p className="text-[11px] text-slate-500 mb-4 break-words">
+        Legacy link: <span className="font-semibold">{`${window.location.origin}/order/table-${tableNumber}`}</span>
+      </p>
       <button
         onClick={handlePrintSingle}
         className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 mx-auto print:hidden"

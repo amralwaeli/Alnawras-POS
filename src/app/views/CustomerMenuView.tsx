@@ -191,7 +191,7 @@ export function CustomerMenuView() {
         </div>
 
         <div className="bg-white border-t p-3 flex gap-2 overflow-x-auto no-scrollbar">
-          {[{id:'All', name:'ALL'}, ...(menuCategories || [])].map(cat => (
+          {(menuCategories || []).map(cat => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-10 py-5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>

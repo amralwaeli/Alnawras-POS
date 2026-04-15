@@ -347,6 +347,9 @@ export class CategoryController {
     const { data: cat, error } = await supabase.from('categories').insert({
         id: `cat-${Date.now()}`,
         name: data.name,
+        description: data.description || null,
+        color: data.color || '#3B82F6',
+        icon: data.icon || null,
         branch_id: user.branchId,
         is_active: true,
         display_order: data.displayOrder || 0
@@ -357,6 +360,9 @@ export class CategoryController {
   static async updateCategory(id: string, updates: any, user: User) {
     const { data: cat, error } = await supabase.from('categories').update({
         name: updates.name,
+        description: updates.description,
+        color: updates.color,
+        icon: updates.icon,
         display_order: updates.displayOrder
     }).eq('id', id).select().single();
     return { success: !error, category: cat, error: error?.message };

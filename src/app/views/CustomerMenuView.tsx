@@ -127,14 +127,15 @@ export function CustomerMenuView() {
 
       if (!orderId) {
         orderId = `order-${Date.now()}`;
-        console.log('[handleSendToKitchen] Creating new order:', orderId);
-        
+        console.log('[handleSendToKitchen] Creating new order:', orderId, 'Type:', orderType);
+
         const { error: orderError } = await supabase.from('orders').insert([{
           id: orderId,
           table_id: orderType === 'dine-in' ? finalTableId : null,
           table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
           status: 'open',
-          branch_id: currentUser.branchId
+          branch_id: currentUser.branchId,
+          order_type: orderType
         }]).select();
         
         if (orderError) {

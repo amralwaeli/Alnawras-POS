@@ -7,6 +7,7 @@ import { loadBillFormatSettings } from '../../lib/billFormat';
 import {
   UtensilsCrossed, Users, DollarSign, X, Clock, CheckCircle,
   CreditCard, Banknote, QrCode, SplitSquareHorizontal, Plus, Minus,
+  ShoppingBag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -254,7 +255,12 @@ export function TablesView() {
     return tables;
   };
 
+  const getTakeawayOrders = () => {
+    return orders.filter(o => o.order_type === 'takeaway' && o.status === 'open');
+  };
+
   const filteredTables = getFilteredTables();
+  const takeawayOrders = getTakeawayOrders();
   const available = filteredTables.filter(t => t.status === 'available').length;
   const occupied  = filteredTables.filter(t => t.status === 'occupied').length;
 
@@ -346,6 +352,7 @@ export function TablesView() {
         paymentMethod: data.payment_method,
         cashierId: data.cashier_id,
         cashierName: data.cashier_name,
+        orderType: data.order_type || 'dine-in',
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -378,6 +385,100 @@ export function TablesView() {
     } catch (err: any) {
       console.error('[openOrderModal] Unexpected error:', err);
       toast.error('Unable to open bill. Please try again.');
+    }
+  };
+
+  const openTakeawayOrderModal = async (order: any) => {
+    try {
+      console.log('[openTakeawayOrderModal] Opening takeaway order:', order.id);
+      
+      // If order is already in local state with items, use it
+      const localOrder = orders.find(o => o.id === order.id);
+      if (localOrder && localOrder.items?.length > 0) {
+        setSelectedOrder({ ...localOrder, tableId: null, tableNumber: 'Takeaway' });
+        setPaymentMode(null);
+        setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
+        return;
+      }
+
+      // Fetch from Supabase
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            order_id,
+            product_id,
+            product_name,
+            quantity,
+            price,
+            subtotal,
+            status,
+            added_by_name,
+            created_at
+          )
+        `)
+        .eq('id', order.id)
+        .eq('branch_id', currentUser.branchId)
+        .single();
+
+      if (error) {
+        console.error('[openTakeawayOrderModal] Supabase fetch error:', error);
+        toast.error('Failed to load order: ' + error.message);
+        return;
+      }
+
+      if (!data) {
+        toast.error('Order not found');
+        return;
+      }
+
+      const normalizedOrder = {
+        id: data.id,
+        tableId: null,
+        tableNumber: 'Takeaway',
+        status: data.status,
+        subtotal: Number(data.subtotal || 0),
+        tax: Number(data.tax || 0),
+        discount: Number(data.discount || 0),
+        total: Number(data.total || 0),
+        createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+        completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+        paymentMethod: data.payment_method,
+        cashierId: data.cashier_id,
+        cashierName: data.cashier_name,
+        orderType: data.order_type || 'takeaway',
+        items: (data.order_items || []).map((item: any) => ({
+          id: item.id,
+          orderId: item.order_id,
+          productId: item.product_id,
+          productName: item.product_name || 'Item',
+          quantity: Number(item.quantity || 1),
+          price: Number(item.price || 0),
+          subtotal: Number(item.subtotal || 0),
+          status: item.status || 'pending',
+          addedByName: item.added_by_name || 'Unknown',
+          addedAt: item.created_at ? new Date(item.created_at) : new Date(),
+        })),
+      };
+
+      setOrders(prev => {
+        const exists = prev.some(o => o.id === normalizedOrder.id);
+        return exists
+          ? prev.map(o => o.id === normalizedOrder.id ? normalizedOrder : o)
+          : [...prev, normalizedOrder];
+      });
+
+      setSelectedOrder(normalizedOrder);
+      setPaymentMode(null);
+      setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
+      
+      console.log('[openTakeawayOrderModal] Successfully opened order');
+
+    } catch (err: any) {
+      console.error('[openTakeawayOrderModal] Unexpected error:', err);
+      toast.error('Unable to open order. Please try again.');
     }
   };
 
@@ -534,6 +635,66 @@ export function TablesView() {
           </div>
         </div>
 
+        {/* Takeaway Orders Section - Only for Cashier */}
+        {currentUser.role === 'cashier' && takeawayOrders.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="size-5 text-purple-600" />
+              <h2 className="text-xl font-bold text-gray-900">Takeaway Orders</h2>
+              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">{takeawayOrders.length}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {takeawayOrders.map(order => {
+                const { total } = calcOrderTotals(order);
+                const pendingItems = order?.items?.filter((i: any) => i.status === 'pending').length ?? 0;
+
+                return (
+                  <div key={order.id} className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-4 cursor-pointer transition-all shadow-sm hover:border-purple-300 hover:shadow-md">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="size-10 bg-purple-200 rounded-xl flex items-center justify-center">
+                        <ShoppingBag className="size-5 text-purple-700" />
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                          <span className="size-1.5 rounded-full bg-purple-500" />
+                          Takeaway
+                        </span>
+                        {pendingItems > 0 && (
+                          <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+                            {pendingItems} new
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="font-bold text-gray-900 text-lg">Takeaway #{order.id.slice(-4)}</p>
+                    <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                      <Clock className="size-3" /> {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
+                    </p>
+                    <div className="space-y-2">
+                      <div className="bg-white/80 rounded-xl p-2.5 space-y-1.5 border border-black/5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Items</span>
+                          <span className="font-medium">{order.items?.length ?? 0}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span>
+                          <span className="font-bold text-gray-900">{fmt(total)}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => openTakeawayOrderModal(order)}
+                        className="w-full py-2 bg-purple-600 text-white rounded-xl text-xs font-semibold hover:bg-purple-700 transition-colors"
+                      >
+                        Process Payment
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Table Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredTables.map(table => {
@@ -639,7 +800,9 @@ export function TablesView() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
-                <h2 className="font-bold text-lg">Table {selectedOrder.tableNumber}</h2>
+                <h2 className="font-bold text-lg">
+                  {selectedOrder.orderType === 'takeaway' ? 'Takeaway Order' : `Table ${selectedOrder.tableNumber}`}
+                </h2>
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <Clock className="size-3" />
                   {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleTimeString() : '—'}

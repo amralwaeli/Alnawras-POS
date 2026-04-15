@@ -47,6 +47,9 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
     try {
       const result = await login(pin);
       if (result.success) {
+        if (result.user?.role === 'waiter') {
+          window.location.hash = '#/';
+        }
         // App.tsx detects the user change and shows the Router (Dashboard)
         onLoginSuccess();
       } else {
@@ -65,7 +68,6 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
   const demoRoles = [
     { label: 'Admin', pin: '1234', color: 'bg-violet-100 text-violet-700' },
     { label: 'Cashier', pin: '2345', color: 'bg-blue-100 text-blue-700' },
-    { label: 'Waiter', pin: '3456', color: 'bg-emerald-100 text-emerald-700' },
   ];
 
   return (

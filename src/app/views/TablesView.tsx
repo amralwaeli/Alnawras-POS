@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { usePOS } from '../context/POSContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../lib/supabase';
-import { CURRENCY, fmt } from '../../lib/currency';
+import { CURRENCY, fmt, orderTotal } from '../../lib/currency';
 import { loadBillFormatSettings } from '../../lib/billFormat';
 import {
   UtensilsCrossed, Users, DollarSign, X, Clock, CheckCircle,
@@ -31,14 +31,27 @@ type PaymentMode  = SimpleMethod | 'mix';
 interface SplitEntry { method: SimpleMethod; amount: string; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function calcOrderTotals(order: any) {
-  const items: any[] = order?.items ?? [];
-  const subtotal = items.reduce((s, i) => s + (Number(i.price ?? 0) * Number(i.quantity ?? 1)), 0);
-  const tax      = Number(order?.tax ?? 0);
-  const discount = Number(order?.discount ?? 0);
-  const dbTotal  = Number(order?.total ?? 0);
-  const total    = dbTotal > 0 ? dbTotal : Math.max(0, subtotal + tax - discount);
-  return { subtotal: subtotal > 0 ? subtotal : Number(order?.subtotal ?? 0), tax, discount, total };
+  if (!order) return { subtotal: 0, tax: 0, discount: 0, total: 0 };
+  
+  const total = orderTotal(order);
+  const items: any[] = order?.items ?? order?.order_items ?? [];
+  const subtotal = items.reduce((s, i) => {
+    const price = Number(i.price ?? i.unit_price ?? 0);
+    const qty = Number(i.quantity ?? i.qty ?? 1);
+    return s + (price * qty);
+  }, 0);
+  
+  const tax = Number(order?.tax ?? order?.tax_amount ?? 0);
+  const discount = Number(order?.discount ?? order?.discount_amount ?? 0);
+  
+  return { 
+    subtotal: subtotal > 0 ? subtotal : Number(order?.subtotal ?? 0), 
+    tax, 
+    discount, 
+    total 
+  };
 }
 
 function escapeHtml(value: string) {
@@ -53,13 +66,13 @@ function escapeHtml(value: string) {
 function printReceipt(order: any, paymentSummary: string, billNo: string) {
   const settings = loadBillFormatSettings();
   const totals = calcOrderTotals(order);
-  const items = order?.items ?? [];
+  const items = order?.items ?? order?.order_items ?? [];
 
   const rows = items.map((item: any) => {
     const name = escapeHtml(item.productName || item.product_name || 'Item');
-    const price = Number(item.price ?? 0).toFixed(2);
-    const qty = Number(item.quantity ?? 1);
-    const amount = Number(item.subtotal ?? Number(item.price ?? 0) * Number(item.quantity ?? 1)).toFixed(2);
+    const price = Number(item.price ?? item.unit_price ?? 0).toFixed(2);
+    const qty = Number(item.quantity ?? item.qty ?? 1);
+    const amount = Number(item.subtotal ?? (item.price ?? item.unit_price ?? 0) * (item.quantity ?? item.qty ?? 1)).toFixed(2);
 
     return `
       <div class="item-block">
@@ -76,7 +89,10 @@ function printReceipt(order: any, paymentSummary: string, billNo: string) {
   }).join('');
 
   const printWindow = window.open('', '', 'width=420,height=900');
-  if (!printWindow) return;
+  if (!printWindow) {
+    toast.error('Please allow pop-ups to print receipts');
+    return;
+  }
 
   printWindow.document.write(`
     <html>
@@ -118,7 +134,7 @@ function printReceipt(order: any, paymentSummary: string, billNo: string) {
             <div class="tagline">${escapeHtml(settings.branchTagline)}</div>
             <div class="restaurant">${escapeHtml(settings.restaurantName)}</div>
             <div class="table-note">${escapeHtml(settings.headerNote)}</div>
-            <div class="table-no">${escapeHtml(String(order.tableNumber || '-'))}</div>
+            <div class="table-no">${escapeHtml(String(order.tableNumber || order.table_number || '-'))}</div>
           </div>
 
           <div class="divider"></div>
@@ -228,13 +244,10 @@ export function TablesView() {
     return orders.find(o => o.id === t.currentOrderId) ?? null;
   };
 
-  // Filter tables based on user role
   const getFilteredTables = () => {
     if (currentUser.role === 'cashier') {
-      // Cashiers see only occupied tables for payment processing
       return tables.filter(t => t.status === 'occupied');
     }
-    // Waiters and admins see all tables
     return tables;
   };
 
@@ -245,29 +258,43 @@ export function TablesView() {
   const openOrderModal = async (tableId: string) => {
     try {
       const table = tables.find(t => t.id === tableId);
-      const order = getOrder(tableId);
+      const localOrder = getOrder(tableId);
 
-      if (order && order.items && order.items.length > 0) {
-        setSelectedOrder({ ...order, tableId });
+      if (localOrder && localOrder.items?.length > 0) {
+        setSelectedOrder({ ...localOrder, tableId, tableNumber: table?.number });
         setPaymentMode(null);
         setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
         return;
       }
 
       if (!table?.currentOrderId) {
-        toast.error('No active bill found for this table yet');
+        toast.error('No active bill found for this table');
         return;
       }
 
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select(`
+          *,
+          order_items (
+            id,
+            order_id,
+            product_id,
+            product_name,
+            quantity,
+            price,
+            subtotal,
+            status,
+            added_by_name,
+            added_at
+          )
+        `)
         .eq('id', table.currentOrderId)
         .single();
 
       if (error) {
-        console.error('Supabase error:', error);
-        toast.error('Failed to load bill details: ' + (error.message || 'Unknown error'));
+        console.error('Supabase fetch error:', error);
+        toast.error('Failed to load bill: ' + error.message);
         return;
       }
 
@@ -276,41 +303,45 @@ export function TablesView() {
         return;
       }
 
-      const fetchedOrder = {
-        ...data,
+      const normalizedOrder = {
         id: data.id,
-        tableId: data.table_id,
-        tableNumber: data.table_number,
+        tableId: data.table_id || tableId,
+        tableNumber: data.table_number || table?.number || '-',
         status: data.status,
-        subtotal: data.subtotal,
-        tax: data.tax,
-        discount: data.discount,
-        total: data.total,
+        subtotal: Number(data.subtotal || 0),
+        tax: Number(data.tax || 0),
+        discount: Number(data.discount || 0),
+        total: Number(data.total || 0),
         createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+        paymentMethod: data.payment_method,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
           productId: item.product_id,
-          productName: item.product_name,
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.subtotal,
-          status: item.status,
-          addedByName: item.added_by_name,
+          productName: item.product_name || 'Item',
+          quantity: Number(item.quantity || 1),
+          price: Number(item.price || 0),
+          subtotal: Number(item.subtotal || 0),
+          status: item.status || 'pending',
+          addedByName: item.added_by_name || 'Unknown',
           addedAt: item.added_at ? new Date(item.added_at) : new Date(),
         })),
       };
 
       setOrders(prev => {
-        const exists = prev.some(o => o.id === fetchedOrder.id);
-        return exists ? prev.map(o => o.id === fetchedOrder.id ? fetchedOrder : o) : [...prev, fetchedOrder];
+        const exists = prev.some(o => o.id === normalizedOrder.id);
+        return exists 
+          ? prev.map(o => o.id === normalizedOrder.id ? normalizedOrder : o) 
+          : [...prev, normalizedOrder];
       });
-      setSelectedOrder({ ...fetchedOrder, tableId });
+
+      setSelectedOrder(normalizedOrder);
       setPaymentMode(null);
       setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
-    } catch (err) {
-      console.error('Error opening order modal:', err);
-      toast.error('An unexpected error occurred. Please try again.');
+      
+    } catch (err: any) {
+      console.error('Error in openOrderModal:', err);
+      toast.error('Unable to open bill. Please try again.');
     }
   };
 
@@ -339,6 +370,12 @@ export function TablesView() {
 
   const handlePayment = async () => {
     if (!selectedOrder || !paymentMode) return;
+    
+    if (selectedOrder.status === 'completed') {
+      toast.error('This bill has already been paid');
+      return;
+    }
+    
     if (paymentMode === 'mix') {
       if (!splitExact) {
         toast.error(`Split amounts must total exactly ${fmt(totals.total)}`);
@@ -351,9 +388,11 @@ export function TablesView() {
         }
       }
     }
+    
     setProcessing(true);
     try {
       const now = new Date().toISOString();
+      
       const { count } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
@@ -373,15 +412,36 @@ export function TablesView() {
           payment_method: summary,
         })
         .eq('id', selectedOrder.id);
-      await supabase.from('tables').update({ status: 'available', current_order_id: null }).eq('id', selectedOrder.tableId);
+      
+      await supabase
+        .from('tables')
+        .update({ 
+          status: 'available', 
+          current_order_id: null,
+          updated_at: now 
+        })
+        .eq('id', selectedOrder.tableId);
+      
       printReceipt(selectedOrder, summary, billNo);
-      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: 'completed', paymentMethod: summary } : o));
-      setTables(prev => prev.map(t => t.id === selectedOrder.tableId ? { ...t, status: 'available', currentOrderId: undefined } : t));
+      
+      setOrders(prev => prev.map(o => 
+        o.id === selectedOrder.id 
+          ? { ...o, status: 'completed', paymentMethod: summary } 
+          : o
+      ));
+      setTables(prev => prev.map(t => 
+        t.id === selectedOrder.tableId 
+          ? { ...t, status: 'available', currentOrderId: undefined } 
+          : t
+      ));
+      
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
       setSelectedOrder(null);
       setPaymentMode(null);
-    } catch {
-      toast.error('Payment failed. Please try again.');
+      
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      toast.error('Payment failed: ' + (err.message || 'Please try again'));
     } finally {
       setProcessing(false);
     }
@@ -421,10 +481,13 @@ export function TablesView() {
         {/* Table Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredTables.map(table => {
-            const order        = getOrder(table.id);
-            const cfg          = statusConfig[table.status];
+            const order = getOrder(table.id);
+            const cfg = statusConfig[table.status];
             const pendingItems = order?.items?.filter((i: any) => i.status === 'pending').length ?? 0;
-            const { total }    = calcOrderTotals(order);
+            const { total } = calcOrderTotals(order);
+            
+            const hasOrderWithItems = order && order.items?.length > 0;
+            
             return (
               <div key={table.id} className={`rounded-2xl border-2 p-4 cursor-pointer transition-all shadow-sm ${cfg.card}`}>
                 <div className="flex items-start justify-between mb-3">
@@ -460,8 +523,11 @@ export function TablesView() {
                       </div>
                     </div>
                     {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
-                      <button onClick={() => void openOrderModal(table.id)} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
-                        Process Payment
+                      <button 
+                        onClick={() => void openOrderModal(table.id)} 
+                        className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors"
+                      >
+                        {hasOrderWithItems ? 'Process Payment' : 'Open Bill'}
                       </button>
                     )}
                     {currentUser.role === 'waiter' && (
@@ -477,15 +543,18 @@ export function TablesView() {
                   </div>
                 ) : (
                   <>
-                    {currentUser.role === 'cashier' && table.status === 'occupied' && (
-                      <button onClick={() => void openOrderModal(table.id)} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors mt-1">
+                    {currentUser.role === 'cashier' && table.status === 'occupied' && table.currentOrderId && (
+                      <button 
+                        onClick={() => void openOrderModal(table.id)} 
+                        className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors mt-1"
+                      >
                         Open Bill
                       </button>
                     )}
                     {(currentUser.role === 'waiter' || currentUser.role === 'admin') && (
-                    <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
-                      Start Order
-                    </button>
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
+                        Start Order
+                      </button>
                     )}
                   </>
                 )}
@@ -497,7 +566,7 @@ export function TablesView() {
         {filteredTables.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
             <UtensilsCrossed className="size-12 opacity-30" />
-            <p className="text-sm">
+            <p className="text-sm text-center">
               {currentUser.role === 'cashier' 
                 ? 'No occupied tables — all tables have been paid'
                 : 'No tables found — add tables in Manage Tables'}
@@ -520,7 +589,10 @@ export function TablesView() {
                   {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleTimeString() : '—'}
                 </p>
               </div>
-              <button onClick={() => { setSelectedOrder(null); setPaymentMode(null); }} className="p-2 rounded-xl hover:bg-gray-100">
+              <button 
+                onClick={() => { setSelectedOrder(null); setPaymentMode(null); }} 
+                className="p-2 rounded-xl hover:bg-gray-100"
+              >
                 <X className="size-5" />
               </button>
             </div>
@@ -528,15 +600,15 @@ export function TablesView() {
             {/* Items list */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
               {(selectedOrder.items ?? []).length === 0 ? (
-                <p className="text-center text-gray-400 py-8">No items</p>
+                <p className="text-center text-gray-400 py-8">No items in this order</p>
               ) : (
                 (selectedOrder.items ?? []).map((item: any) => (
                   <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{item.productName || item.product_name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
                       <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
                         {item.status}
                       </span>
@@ -570,8 +642,8 @@ export function TablesView() {
               </div>
             </div>
 
-            {/* Payment section */}
-            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
+            {/* Payment section - ONLY for cashier or admin, and only if not already paid */}
+            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && selectedOrder.status !== 'completed' && (
               <div className="px-6 py-4 border-t space-y-3">
                 <p className="text-sm font-semibold text-gray-700">Payment Method</p>
 
@@ -615,6 +687,7 @@ export function TablesView() {
                           value={entry.method}
                           onChange={e => updateSplit(idx, 'method', e.target.value as SimpleMethod)}
                           className="flex-none w-24 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none"
+                          disabled={processing}
                         >
                           {(['cash', 'card', 'qr'] as SimpleMethod[]).map(m => (
                             <option key={m} value={m} disabled={splits.some((s, i) => i !== idx && s.method === m)}>
@@ -632,20 +705,26 @@ export function TablesView() {
                             placeholder="0.00"
                             value={entry.amount}
                             onChange={e => updateSplit(idx, 'amount', e.target.value)}
-                            className="w-full pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none focus:border-orange-400"
+                            className="w-full pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 disabled:bg-gray-50"
+                            disabled={processing}
                           />
                         </div>
 
                         <button
                           onClick={() => fillRemaining(idx)}
                           title="Fill remaining"
-                          className="text-xs px-2 py-2 bg-white border border-orange-200 hover:bg-orange-100 rounded-lg text-orange-700 whitespace-nowrap"
+                          className="text-xs px-2 py-2 bg-white border border-orange-200 hover:bg-orange-100 rounded-lg text-orange-700 whitespace-nowrap disabled:opacity-50"
+                          disabled={processing}
                         >
                           Fill
                         </button>
 
                         {splits.length > 2 && (
-                          <button onClick={() => removeSplitRow(idx)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50">
+                          <button 
+                            onClick={() => removeSplitRow(idx)} 
+                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                            disabled={processing}
+                          >
                             <Minus className="size-3.5" />
                           </button>
                         )}
@@ -653,7 +732,11 @@ export function TablesView() {
                     ))}
 
                     {splits.length < 3 && (
-                      <button onClick={addSplitRow} className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-800 py-1">
+                      <button 
+                        onClick={addSplitRow} 
+                        className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-800 py-1 disabled:opacity-50"
+                        disabled={processing}
+                      >
                         <Plus className="size-3.5" /> Add payment method
                       </button>
                     )}
@@ -668,6 +751,16 @@ export function TablesView() {
                   <CheckCircle className="size-4" />
                   {processing ? 'Processing…' : `Confirm Payment — ${fmt(totals.total)}`}
                 </button>
+              </div>
+            )}
+            
+            {/* Show "Already Paid" badge if order is completed */}
+            {selectedOrder.status === 'completed' && (
+              <div className="px-6 py-4 border-t bg-emerald-50">
+                <div className="flex items-center justify-center gap-2 text-emerald-700 font-medium">
+                  <CheckCircle className="size-4" />
+                  <span>Bill already paid via {selectedOrder.paymentMethod}</span>
+                </div>
               </div>
             )}
           </div>

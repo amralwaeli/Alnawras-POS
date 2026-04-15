@@ -27,6 +27,7 @@ function ProtectedRoute({ children, permission, adminOnly }: {
 }
 
 // Lazy load views
+const AdminDashboardView      = lazy(() => import('./views/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
 const DashboardView           = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
 const TablesView              = lazy(() => import('./views/TablesView').then(m => ({ default: m.TablesView })));
 const KitchenView             = lazy(() => import('./views/KitchenView').then(m => ({ default: m.KitchenView })));
@@ -92,7 +93,7 @@ export const router = createHashRouter([
       { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
       
       // ─── ADMIN DASHBOARD ───
-      { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
+      { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><AdminDashboardView /></ProtectedRoute></Lazy> },
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
       { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },

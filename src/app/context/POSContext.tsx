@@ -178,7 +178,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUser) return;
     syncFullSystem().then(() => setLoading(false));
-    const int = setInterval(syncFullSystem, 30000);
+    const int = setInterval(syncFullSystem, 300);
     return () => clearInterval(int);
   }, [currentUser, syncFullSystem]);
 

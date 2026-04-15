@@ -59,7 +59,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const mapOrderItem = useCallback((item: any) => ({
     ...item,
     productName: item.product_name,
-    addedAt: item.added_at ? new Date(item.added_at) : new Date(),
+    addedAt: item.created_at ? new Date(item.created_at) : new Date(),
   }), []);
 
   const mapOrder = useCallback((order: any) => ({

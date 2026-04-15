@@ -568,22 +568,16 @@ export function TablesView() {
         })
         .eq('id', selectedOrder.id);
 
-      await supabase
-        .from('orders')
-        .update({
-          status: 'completed',
-          completed_at: now,
-          payment_method: summary,
-        })
-        .eq('id', selectedOrder.id);
-      
-      await supabase
-        .from('tables')
-        .update({
-          status: 'available',
-          current_order_id: null
-        })
-        .eq('id', selectedOrder.tableId);
+      // Update table only if it's a dine-in order (has tableId)
+      if (selectedOrder.tableId) {
+        await supabase
+          .from('tables')
+          .update({
+            status: 'available',
+            current_order_id: null
+          })
+          .eq('id', selectedOrder.tableId);
+      }
 
       console.log('[handlePayment] Database updated. Table set to available, order cleared.');
 
@@ -597,11 +591,15 @@ export function TablesView() {
           ? { ...o, status: 'completed', paymentMethod: summary }
           : o
       ));
-      setTables(prev => prev.map(t =>
-        t.id === selectedOrder.tableId
-          ? { ...t, status: 'available', currentOrderId: undefined }
-          : t
-      ));
+      
+      // Update table state only if it's a dine-in order
+      if (selectedOrder.tableId) {
+        setTables(prev => prev.map(t =>
+          t.id === selectedOrder.tableId
+            ? { ...t, status: 'available', currentOrderId: undefined }
+            : t
+        ));
+      }
 
       console.log('[handlePayment] Local state updated. Payment flow complete.');
 

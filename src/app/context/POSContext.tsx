@@ -93,6 +93,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const up = p.new as any;
         setProducts(prev => prev.map(prod => prod.id === up.id ? { ...prod, ...up, categoryId: up.category_id, availabilityStatus: up.availability_status } : prod));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `branch_id=eq.${branchId}` }, async () => {
+        const catRes = await CategoryController.getCategories(currentUser);
+        if (catRes.success) setCategories(catRes.categories || []);
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
         const item = (payload.new || payload.old) as any;
         // Logic to update the items inside the specific order
@@ -131,9 +135,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addProduct = async (p: any) => ProductController.addProduct(p, currentUser!);
   const deleteProduct = async (id: string) => ProductController.deleteProduct(id, currentUser!);
   const importProducts = async (data: any[]) => ProductController.importProducts(data, currentUser!);
-  const addCategory = async (c: any) => CategoryController.addCategory(c, currentUser!);
-  const updateCategory = async (id: string, up: any) => CategoryController.updateCategory(id, up, currentUser!);
-  const deleteCategory = async (id: string) => CategoryController.deleteCategory(id, currentUser!);
+  const addCategory = async (c: any) => {
+    const res = await CategoryController.addCategory(c, currentUser!);
+    if (res.success) await syncFullSystem();
+    return res;
+  };
+  const updateCategory = async (id: string, up: any) => {
+    const res = await CategoryController.updateCategory(id, up, currentUser!);
+    if (res.success) {
+      setCategories(prev =>
+        prev
+          .map(category => category.id === id ? { ...category, ...up } : category)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+      );
+    }
+    return res;
+  };
+  const deleteCategory = async (id: string) => {
+    const res = await CategoryController.deleteCategory(id, currentUser!);
+    if (res.success) {
+      setCategories(prev => prev.filter(category => category.id !== id));
+    }
+    return res;
+  };
   const updateTable = async (id: string, up: any) => TableController.updateTable(id, up, currentUser!);
   const addTable = async (t: any) => TableController.addTable(t, currentUser!);
   const deleteTable = async (id: string) => TableController.deleteTable(id, currentUser!);

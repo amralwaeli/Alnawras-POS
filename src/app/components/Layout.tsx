@@ -38,7 +38,7 @@ export function Layout() {
     { path: '/attendance',          label: 'Attendance',      icon: Clock,           permission: 'canViewAttendance' as const },
     { path: '/table-management',    label: 'Manage Tables',   icon: Settings,        permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/product-management',  label: 'Products',        icon: Package,         permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/category-management', label: 'Categories',      icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/manage-menu',         label: 'Manage Menu',     icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/table-qr',            label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
   ];
 

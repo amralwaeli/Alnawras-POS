@@ -10,36 +10,38 @@ function ProtectedRoute({ children, permission, adminOnly }: {
   adminOnly?: boolean;
 }) {
   const { currentUser } = usePOS();
-  
+
   // If no user, send back to login (Check-in)
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  
+
   // If admin permission required and user is not admin
   if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
-  
+
   // If specific permission required and user doesn't have it
   if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) {
     return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
 // Lazy load views
-const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
-const TablesView = lazy(() => import('./views/TablesView').then(m => ({ default: m.TablesView })));
-const KitchenView = lazy(() => import('./views/KitchenView').then(m => ({ default: m.KitchenView })));
-const InventoryView = lazy(() => import('./views/InventoryView').then(m => ({ default: m.InventoryView })));
-const ReportsView = lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
-const AccountingView = lazy(() => import('./views/AccountingView').then(m => ({ default: m.AccountingView })));
-const StaffView = lazy(() => import('./views/StaffView').then(m => ({ default: m.StaffView })));
-const AttendanceView = lazy(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })));
-const TableQRView = lazy(() => import('./views/TableQRView').then(m => ({ default: m.TableQRView })));
-const CheckInView = lazy(() => import('./views/CheckInView').then(m => ({ default: m.CheckInView })));
-const CustomerMenuView = lazy(() => import('./views/CustomerMenuView').then(m => ({ default: m.CustomerMenuView })));
-const TableManagementView = lazy(() => import('./views/TableManagementView').then(m => ({ default: m.TableManagementView })));
-const ProductManagementView = lazy(() => import('./views/ProductManagementView').then(m => ({ default: m.ProductManagementView })));
-const CategoryManagementView = lazy(() => import('./views/CategoryManagementView').then(m => ({ default: m.CategoryManagementView })));
+const DashboardView           = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
+const TablesView              = lazy(() => import('./views/TablesView').then(m => ({ default: m.TablesView })));
+const KitchenView             = lazy(() => import('./views/KitchenView').then(m => ({ default: m.KitchenView })));
+const InventoryView           = lazy(() => import('./views/InventoryView').then(m => ({ default: m.InventoryView })));
+const ReportsView             = lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
+const AccountingView          = lazy(() => import('./views/AccountingView').then(m => ({ default: m.AccountingView })));
+const StaffView               = lazy(() => import('./views/StaffView').then(m => ({ default: m.StaffView })));
+const AttendanceView          = lazy(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })));
+const TableQRView             = lazy(() => import('./views/TableQRView').then(m => ({ default: m.TableQRView })));
+const CheckInView             = lazy(() => import('./views/CheckInView').then(m => ({ default: m.CheckInView })));
+const CustomerMenuView        = lazy(() => import('./views/CustomerMenuView').then(m => ({ default: m.CustomerMenuView })));
+const TableManagementView     = lazy(() => import('./views/TableManagementView').then(m => ({ default: m.TableManagementView })));
+const ProductManagementView   = lazy(() => import('./views/ProductManagementView').then(m => ({ default: m.ProductManagementView })));
+const CategoryManagementView  = lazy(() => import('./views/CategoryManagementView').then(m => ({ default: m.CategoryManagementView })));
+const HRPanelView             = lazy(() => import('./views/HRPanelView').then(m => ({ default: m.HRPanelView })));
+const FingerprintCheckInView  = lazy(() => import('./views/FingerprintCheckInView').then(m => ({ default: m.FingerprintCheckInView })));
 
 function PageLoader() {
   return (
@@ -61,10 +63,10 @@ export const router = createHashRouter([
     path: '/',
     Component: Layout,
     children: [
-      // ─── THE NEW DEFAULT LANDING PAGE (DASHBOARD) ───
+      // ─── THE DEFAULT LANDING PAGE ───
       { index: true, element: <Lazy><CustomerMenuView /></Lazy> },
       { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
-      
+
       // ─── OTHER ROUTES ───
       { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><DashboardView /></ProtectedRoute></Lazy> },
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
@@ -76,6 +78,7 @@ export const router = createHashRouter([
       { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports"><ReportsView /></ProtectedRoute></Lazy> },
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
+      { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
       { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
       { path: 'table-qr',            element: <Lazy><ProtectedRoute permission="canViewReports"><TableQRView /></ProtectedRoute></Lazy> },
     ],
@@ -84,7 +87,10 @@ export const router = createHashRouter([
     path: '/check-in',
     element: <Lazy><CheckInView /></Lazy>,
   },
-  // Supporting legacy links but pointing them to the new unified Menu
+  {
+    path: '/fingerprint-checkin',
+    element: <Lazy><FingerprintCheckInView /></Lazy>,
+  },
   {
     path: '/table/:tableId',
     element: <Lazy><CustomerMenuView /></Lazy>,

@@ -98,7 +98,8 @@ export function CustomerMenuView() {
           (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
         : false;
       const searchMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return catMatch && searchMatch && p.isActive && (p.availabilityStatus || 'available') === 'available';
+      // Show all products but mark unavailable ones
+      return catMatch && searchMatch && p.isActive;
     });
   }, [products, menuCategories, selectedCategory, searchQuery]);
 
@@ -226,17 +227,42 @@ export function CustomerMenuView() {
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {filteredProducts.map(p => (
-              <div key={p.id} onClick={() => addToCart(p)} className="bg-white rounded-[24px] shadow-sm hover:shadow-md transition-all cursor-pointer border-2 border-transparent active:scale-95 group flex flex-col min-h-[120px]">
-                <div className="p-4 flex flex-col flex-1 justify-between gap-3">
-                  <h3 className="text-sm font-bold text-gray-800 leading-snug tracking-tight break-words">{p.name}</h3>
-                  <div className="mt-auto flex items-center justify-between gap-2">
-                    <span className="text-orange-600 font-black">RM {p.price.toFixed(2)}</span>
-                    <div className="bg-orange-500 text-white p-2 rounded-xl"><Plus className="size-4" strokeWidth={4} /></div>
+            {filteredProducts.map(p => {
+              const isAvailable = (p.kitchenStatus || 'available') === 'available';
+              
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => isAvailable && addToCart(p)}
+                  className={`rounded-[24px] shadow-sm transition-all border-2 active:scale-95 group flex flex-col min-h-[120px] ${
+                    isAvailable
+                      ? 'bg-white border-transparent hover:shadow-md cursor-pointer'
+                      : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <div className="p-4 flex flex-col flex-1 justify-between gap-3 relative">
+                    {!isAvailable && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <span className="bg-red-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">
+                          Not Available
+                        </span>
+                      </div>
+                    )}
+                    <h3 className={`text-sm font-bold leading-snug tracking-tight break-words ${
+                      isAvailable ? 'text-gray-800' : 'text-red-400'
+                    }`}>{p.name}</h3>
+                    <div className="mt-auto flex items-center justify-between gap-2">
+                      <span className={`font-black ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>
+                        RM {p.price.toFixed(2)}
+                      </span>
+                      {isAvailable && (
+                        <div className="bg-orange-500 text-white p-2 rounded-xl"><Plus className="size-4" strokeWidth={4} /></div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

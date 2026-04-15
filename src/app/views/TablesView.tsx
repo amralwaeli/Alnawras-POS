@@ -353,6 +353,7 @@ export function TablesView() {
         cashierId: data.cashier_id,
         cashierName: data.cashier_name,
         orderType: data.order_type || 'dine-in',
+        billNumber: data.bill_number,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -449,6 +450,7 @@ export function TablesView() {
         cashierId: data.cashier_id,
         cashierName: data.cashier_name,
         orderType: data.order_type || 'takeaway',
+        billNumber: data.bill_number,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -520,12 +522,12 @@ export function TablesView() {
 
   const handlePayment = async () => {
     if (!selectedOrder || !paymentMode) return;
-    
+
     if (selectedOrder.status === 'completed') {
       toast.error('This bill has already been paid');
       return;
     }
-    
+
     if (paymentMode === 'mix') {
       if (!splitExact) {
         toast.error(`Split amounts must total exactly ${fmt(totals.total)}`);
@@ -538,21 +540,33 @@ export function TablesView() {
         }
       }
     }
-    
+
     setProcessing(true);
     try {
       const now = new Date().toISOString();
-      
+
+      // Get the count of ALL completed orders (both dine-in and takeaway) for sequential billing
       const { count } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('branch_id', currentUser.branchId)
         .eq('status', 'completed');
 
-      const billNo = String((count || 0) + 1).padStart(5, '0');
+      // Sequential bill number starting from 0001 for ALL orders
+      const billNo = String((count || 0) + 1).padStart(4, '0');
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
+
+      await supabase
+        .from('orders')
+        .update({
+          status: 'completed',
+          completed_at: now,
+          payment_method: summary,
+          bill_number: billNo,
+        })
+        .eq('id', selectedOrder.id);
 
       await supabase
         .from('orders')
@@ -666,10 +680,14 @@ export function TablesView() {
                         )}
                       </div>
                     </div>
-                    <p className="font-bold text-gray-900 text-lg">Takeaway #{order.id.slice(-4)}</p>
-                    <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
-                      <Clock className="size-3" /> {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
-                    </p>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">
+                        {order.billNumber ? `Bill #${order.billNumber}` : `Takeaway #${order.id.slice(-4)}`}
+                      </p>
+                      <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                        <Clock className="size-3" /> {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <div className="bg-white/80 rounded-xl p-2.5 space-y-1.5 border border-black/5">
                         <div className="flex justify-between text-xs">
@@ -805,6 +823,7 @@ export function TablesView() {
                 </h2>
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <Clock className="size-3" />
+                  {selectedOrder.billNumber ? `Bill #${selectedOrder.billNumber} • ` : ''}
                   {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleTimeString() : '—'}
                 </p>
               </div>

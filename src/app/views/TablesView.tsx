@@ -295,7 +295,7 @@ export function TablesView() {
             subtotal,
             status,
             added_by_name,
-            added_at
+            created_at
           )
         `)
         .eq('id', table.currentOrderId)
@@ -341,7 +341,7 @@ export function TablesView() {
           subtotal: Number(item.subtotal || 0),
           status: item.status || 'pending',
           addedByName: item.added_by_name || 'Unknown',
-          addedAt: item.added_at ? new Date(item.added_at) : new Date(),
+          addedAt: item.created_at ? new Date(item.created_at) : new Date(),
         })),
       };
 

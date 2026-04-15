@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { usePOS } from '../context/POSContext';
 import { OrderController } from '../controllers/OrderController';
-import { 
-  Plus, Minus, ShoppingCart, Layers, X, 
+import {
+  Plus, Minus, ShoppingCart, Layers, X,
   Search, CheckCircle2, ShoppingBag, Utensils
 } from 'lucide-react';
 import { Product, ROLE_PERMISSIONS } from '../models/types';
+import { toast } from 'sonner';
 
 interface CartItem {
   id: string;
@@ -126,26 +127,54 @@ export function CustomerMenuView() {
 
       if (!orderId) {
         orderId = `order-${Date.now()}`;
-        await supabase.from('orders').insert([{ 
-          id: orderId, 
+        console.log('[handleSendToKitchen] Creating new order:', orderId);
+        
+        const { error: orderError } = await supabase.from('orders').insert([{
+          id: orderId,
           table_id: orderType === 'dine-in' ? finalTableId : null,
           table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
-          status: 'open', 
-          branch_id: currentUser.branchId,
-          order_type: orderType
-        }]);
-        if (orderType === 'dine-in') await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', finalTableId);
+          status: 'open',
+          branch_id: currentUser.branchId
+        }]).select();
+        
+        if (orderError) {
+          console.error('[handleSendToKitchen] Failed to create order:', orderError);
+          throw new Error('Failed to create order: ' + orderError.message);
+        }
+        
+        console.log('[handleSendToKitchen] Order created successfully');
+        
+        if (orderType === 'dine-in') {
+          const { error: tableError } = await supabase
+            .from('tables')
+            .update({ status: 'occupied', current_order_id: orderId })
+            .eq('id', finalTableId);
+          
+          if (tableError) {
+            console.error('[handleSendToKitchen] Failed to update table:', tableError);
+            throw new Error('Failed to update table: ' + tableError.message);
+          }
+        }
       }
 
       const payload = newItemsOnly.map(i => ({
         id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         order_id: orderId, product_id: i.productId, product_name: i.productName,
         quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity,
-        station: i.station, status: 'pending', added_by: currentUser.id,
-        added_by_name: currentUser.name, branch_id: currentUser.branchId
+        status: 'pending', added_by: currentUser.id,
+        added_by_name: currentUser.name
       }));
 
-      await supabase.from('order_items').insert(payload);
+      console.log('[handleSendToKitchen] Inserting order items:', payload.length, 'items');
+      
+      const { error: itemsError } = await supabase.from('order_items').insert(payload);
+      
+      if (itemsError) {
+        console.error('[handleSendToKitchen] Failed to insert order items:', itemsError);
+        throw new Error('Failed to insert order items: ' + itemsError.message);
+      }
+      
+      console.log('[handleSendToKitchen] Order items inserted successfully');
 
       setShowSuccess(true);
       setTimeout(async () => {
@@ -155,8 +184,12 @@ export function CustomerMenuView() {
         setOrderType('dine-in');  
         await refreshData();      
       }, 2000);
-    } catch (e: any) { console.error(e.message); } 
-    finally { setIsSending(false); }
+    } catch (e: any) { 
+      console.error('[handleSendToKitchen] Error:', e);
+      toast.error('Failed to send order: ' + (e.message || 'Unknown error'));
+    } finally { 
+      setIsSending(false); 
+    }
   };
 
   return (

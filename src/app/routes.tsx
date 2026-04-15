@@ -3,6 +3,7 @@ import { createHashRouter, Navigate } from 'react-router';
 import { Layout } from './components/Layout';
 import { usePOS } from './context/POSContext';
 import { ROLE_PERMISSIONS } from './models/types';
+import { ProductManagementView } from './views/ProductManagementView';
 
 function ProtectedRoute({ children, permission, adminOnly }: {
   children: React.ReactNode;
@@ -38,7 +39,6 @@ const TableQRView             = lazy(() => import('./views/TableQRView').then(m 
 const CheckInView             = lazy(() => import('./views/CheckInView').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView        = lazy(() => import('./views/CustomerMenuView').then(m => ({ default: m.CustomerMenuView })));
 const TableManagementView     = lazy(() => import('./views/TableManagementView').then(m => ({ default: m.TableManagementView })));
-const ProductManagementView   = lazy(() => import('./views/ProductManagementView').then(m => ({ default: m.ProductManagementView })));
 const CategoryManagementView  = lazy(() => import('./views/CategoryManagementView').then(m => ({ default: m.CategoryManagementView })));
 const HRPanelView             = lazy(() => import('./views/HRPanelView').then(m => ({ default: m.HRPanelView })));
 const FingerprintCheckInView  = lazy(() => import('./views/FingerprintCheckInView').then(m => ({ default: m.FingerprintCheckInView })));

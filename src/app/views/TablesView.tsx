@@ -257,10 +257,16 @@ export function TablesView() {
 
   const openOrderModal = async (tableId: string) => {
     try {
+      console.log('[openOrderModal] Opening bill for table:', tableId);
+      
       const table = tables.find(t => t.id === tableId);
+      console.log('[openOrderModal] Table found:', table);
+      
       const localOrder = getOrder(tableId);
+      console.log('[openOrderModal] Local order:', localOrder);
 
       if (localOrder && localOrder.items?.length > 0) {
+        console.log('[openOrderModal] Using local order with items');
         setSelectedOrder({ ...localOrder, tableId, tableNumber: table?.number });
         setPaymentMode(null);
         setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
@@ -268,10 +274,13 @@ export function TablesView() {
       }
 
       if (!table?.currentOrderId) {
+        console.warn('[openOrderModal] No currentOrderId on table');
         toast.error('No active bill found for this table');
         return;
       }
 
+      console.log('[openOrderModal] Fetching from Supabase, orderId:', table.currentOrderId);
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -290,18 +299,23 @@ export function TablesView() {
           )
         `)
         .eq('id', table.currentOrderId)
+        .eq('branch_id', currentUser.branchId)
         .single();
 
       if (error) {
-        console.error('Supabase fetch error:', error);
+        console.error('[openOrderModal] Supabase fetch error:', error);
         toast.error('Failed to load bill: ' + error.message);
         return;
       }
 
       if (!data) {
+        console.warn('[openOrderModal] No data returned from Supabase');
         toast.error('Bill not found for this table');
         return;
       }
+
+      console.log('[openOrderModal] Order data from Supabase:', data);
+      console.log('[openOrderModal] Order items count:', data.order_items?.length || 0);
 
       const normalizedOrder = {
         id: data.id,
@@ -313,7 +327,10 @@ export function TablesView() {
         discount: Number(data.discount || 0),
         total: Number(data.total || 0),
         createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+        completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
         paymentMethod: data.payment_method,
+        cashierId: data.cashier_id,
+        cashierName: data.cashier_name,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -328,10 +345,12 @@ export function TablesView() {
         })),
       };
 
+      console.log('[openOrderModal] Normalized order:', normalizedOrder);
+
       setOrders(prev => {
         const exists = prev.some(o => o.id === normalizedOrder.id);
-        return exists 
-          ? prev.map(o => o.id === normalizedOrder.id ? normalizedOrder : o) 
+        return exists
+          ? prev.map(o => o.id === normalizedOrder.id ? normalizedOrder : o)
           : [...prev, normalizedOrder];
       });
 
@@ -339,8 +358,10 @@ export function TablesView() {
       setPaymentMode(null);
       setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
       
+      console.log('[openOrderModal] Successfully opened bill');
+
     } catch (err: any) {
-      console.error('Error in openOrderModal:', err);
+      console.error('[openOrderModal] Unexpected error:', err);
       toast.error('Unable to open bill. Please try again.');
     }
   };

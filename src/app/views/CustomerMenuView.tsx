@@ -33,7 +33,7 @@ export function CustomerMenuView() {
 
   // ─── DASHBOARD STATE ────────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTableOverlay, setShowTableOverlay] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -70,6 +70,18 @@ export function CustomerMenuView() {
     setCartItems(prev => [...existingItems, ...prev.filter(i => i.source === 'new')]);
   }, [selectedTableId, orders, tables]);
 
+  useEffect(() => {
+    if (!menuCategories.length) {
+      setSelectedCategory('');
+      return;
+    }
+
+    const hasSelectedCategory = menuCategories.some(category => category.id === selectedCategory);
+    if (!hasSelectedCategory) {
+      setSelectedCategory(menuCategories[0].id);
+    }
+  }, [menuCategories, selectedCategory]);
+
   if (!currentUser) return null;
 
   // ─── COMPUTED ───────────────────────────────────────────────────────────────
@@ -77,12 +89,17 @@ export function CustomerMenuView() {
   const availableTables = useMemo(() => tables.filter(t => t.status === 'available'), [tables]);
   
   const filteredProducts = useMemo(() => {
+    const activeCategory = menuCategories.find(category => category.id === selectedCategory);
+
     return products.filter(p => {
-      const catMatch = selectedCategory === 'All' || p.categoryId === selectedCategory;
+      const catMatch = selectedCategory
+        ? p.categoryId === selectedCategory ||
+          (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
+        : false;
       const searchMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       return catMatch && searchMatch && p.isActive && (p.availabilityStatus || 'available') === 'available';
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, menuCategories, selectedCategory, searchQuery]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   const newItemsOnly = cartItems.filter(i => i.source === 'new');

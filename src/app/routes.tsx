@@ -33,6 +33,7 @@ const KitchenView             = lazy(() => import('./views/KitchenView').then(m 
 const InventoryView           = lazy(() => import('./views/InventoryView').then(m => ({ default: m.InventoryView })));
 const ReportsView             = lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
 const AccountingView          = lazy(() => import('./views/AccountingView').then(m => ({ default: m.AccountingView })));
+const BillFormatView          = lazy(() => import('./views/BillFormatView').then(m => ({ default: m.BillFormatView })));
 const StaffView               = lazy(() => import('./views/StaffView').then(m => ({ default: m.StaffView })));
 const AttendanceView          = lazy(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })));
 const TableQRView             = lazy(() => import('./views/TableQRView').then(m => ({ default: m.TableQRView })));
@@ -78,6 +79,7 @@ export const router = createHashRouter([
       { path: 'inventory',           element: <Lazy><ProtectedRoute permission="canManageInventory"><InventoryView /></ProtectedRoute></Lazy> },
       { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports"><ReportsView /></ProtectedRoute></Lazy> },
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
+      { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
       { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
       { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },

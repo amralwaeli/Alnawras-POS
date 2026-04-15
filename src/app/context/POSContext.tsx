@@ -56,6 +56,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const mapOrderItem = useCallback((item: any) => ({
+    ...item,
+    productName: item.product_name,
+    addedAt: item.added_at ? new Date(item.added_at) : new Date(),
+  }), []);
+
+  const mapOrder = useCallback((order: any) => ({
+    ...order,
+    tableId: order.table_id,
+    createdAt: order.created_at ? new Date(order.created_at) : new Date(),
+    items: (order.order_items || []).map(mapOrderItem),
+  }), [mapOrderItem]);
+
   const syncFullSystem = useCallback(async () => {
     if (!currentUser) return;
     const branch = currentUser.branchId;
@@ -71,15 +84,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (catRes.success) setCategories(catRes.categories || []);
       if (tableRes.success) setTables(tableRes.tables || []);
       if (ordersRes.data) {
-        setOrders(ordersRes.data.map((o: any) => ({
-          ...o, tableId: o.table_id, createdAt: new Date(o.created_at),
-          items: (o.order_items || []).map((i: any) => ({
-            ...i, productName: i.product_name, addedAt: new Date(i.added_at)
-          }))
-        })));
+        setOrders(ordersRes.data.map(mapOrder));
       }
     } catch (err) { console.error("Sync Error:", err); }
-  }, [currentUser]);
+  }, [currentUser, mapOrder]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -93,26 +101,61 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const up = p.new as any;
         setProducts(prev => prev.map(prod => prod.id === up.id ? { ...prod, ...up, categoryId: up.category_id, availabilityStatus: up.availability_status } : prod));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, async (payload) => {
+        const orderRow = (payload.new || payload.old) as any;
+        if (!orderRow?.id) return;
+
+        if (payload.eventType === 'DELETE' || orderRow.status !== 'open') {
+          setOrders(prev => prev.filter(order => order.id !== orderRow.id));
+          return;
+        }
+
+        const { data } = await supabase
+          .from('orders')
+          .select('*, order_items(*)')
+          .eq('id', orderRow.id)
+          .single();
+
+        if (!data) return;
+
+        const mappedOrder = mapOrder(data);
+        setOrders(prev => {
+          const existing = prev.some(order => order.id === mappedOrder.id);
+          if (existing) {
+            return prev.map(order => order.id === mappedOrder.id ? mappedOrder : order);
+          }
+          return [...prev, mappedOrder];
+        });
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `branch_id=eq.${branchId}` }, async () => {
         const catRes = await CategoryController.getCategories(currentUser);
         if (catRes.success) setCategories(catRes.categories || []);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
         const item = (payload.new || payload.old) as any;
-        // Logic to update the items inside the specific order
-        setOrders(prev => prev.map(order => {
-          if (order.id !== item.order_id) return order;
-          const mappedItem = { ...item, productName: item.product_name, addedAt: new Date(item.added_at) };
-          const otherItems = (order.items || []).filter(i => i.id !== item.id);
-          return {
-            ...order,
-            items: payload.eventType === 'DELETE' ? otherItems : [...otherItems, mappedItem]
-          };
-        }));
+        if (!item?.order_id) return;
+
+        setOrders(prev => {
+          const hasOrder = prev.some(order => order.id === item.order_id);
+          if (!hasOrder) {
+            void syncFullSystem();
+            return prev;
+          }
+
+          return prev.map(order => {
+            if (order.id !== item.order_id) return order;
+            const mappedItem = mapOrderItem(item);
+            const otherItems = (order.items || []).filter(i => i.id !== item.id);
+            return {
+              ...order,
+              items: payload.eventType === 'DELETE' ? otherItems : [...otherItems, mappedItem]
+            };
+          });
+        });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentUser]);
+  }, [currentUser, mapOrder, mapOrderItem, syncFullSystem]);
 
   useEffect(() => {
     if (!currentUser) return;

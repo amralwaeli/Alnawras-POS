@@ -3,6 +3,7 @@ import { usePOS } from '../context/POSContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../lib/supabase';
 import { CURRENCY, fmt } from '../../lib/currency';
+import { loadBillFormatSettings } from '../../lib/billFormat';
 import {
   UtensilsCrossed, Users, DollarSign, X, Clock, CheckCircle,
   CreditCard, Banknote, QrCode, SplitSquareHorizontal, Plus, Minus,
@@ -38,6 +39,141 @@ function calcOrderTotals(order: any) {
   const dbTotal  = Number(order?.total ?? 0);
   const total    = dbTotal > 0 ? dbTotal : Math.max(0, subtotal + tax - discount);
   return { subtotal: subtotal > 0 ? subtotal : Number(order?.subtotal ?? 0), tax, discount, total };
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function printReceipt(order: any, paymentSummary: string, billNo: string) {
+  const settings = loadBillFormatSettings();
+  const totals = calcOrderTotals(order);
+  const items = order?.items ?? [];
+
+  const rows = items.map((item: any) => {
+    const name = escapeHtml(item.productName || item.product_name || 'Item');
+    const price = Number(item.price ?? 0).toFixed(2);
+    const qty = Number(item.quantity ?? 1);
+    const amount = Number(item.subtotal ?? Number(item.price ?? 0) * Number(item.quantity ?? 1)).toFixed(2);
+
+    return `
+      <div class="item-block">
+        <div class="item-name">${name}</div>
+        <div class="item-row">
+          <span></span>
+          <span class="right">${price}</span>
+          <span class="right">${qty}</span>
+          <span class="right">0.00</span>
+          <span class="right">${amount}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const printWindow = window.open('', '', 'width=420,height=900');
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Receipt ${billNo}</title>
+        <style>
+          body { margin: 0; background: #fff; font-family: "Courier New", monospace; }
+          .receipt { width: 290px; margin: 0 auto; padding: 24px 20px; color: #3f3a33; }
+          .center { text-align: center; }
+          .logo { width: 58px; height: 58px; border: 3px solid #7b7368; border-radius: 999px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; }
+          .tagline { font-family: Georgia, serif; font-style: italic; font-size: 20px; }
+          .restaurant { margin-top: 8px; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+          .table-note { margin-top: 12px; font-size: 13px; }
+          .table-no { font-size: 34px; font-weight: 700; line-height: 1; }
+          .divider { border-top: 1px dashed #bcb6aa; margin: 14px 0; }
+          .meta { font-size: 11px; line-height: 1.5; }
+          .meta-row { display: flex; justify-content: space-between; gap: 12px; }
+          .header-row, .item-row, .total-row { display: grid; grid-template-columns: 1.6fr .7fr .45fr .75fr .8fr; gap: 8px; }
+          .header-row { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+          .item-block { margin-top: 10px; font-size: 11px; }
+          .item-name { font-weight: 700; line-height: 1.3; margin-bottom: 2px; }
+          .right { text-align: right; }
+          .totals { font-size: 11px; line-height: 1.8; }
+          .totals-line { display: flex; justify-content: space-between; gap: 12px; }
+          .grand-total { font-size: 14px; font-weight: 700; margin-top: 4px; }
+          .thanks { text-align: center; margin-top: 14px; font-size: 12px; font-weight: 700; }
+          .footer { text-align: center; margin-top: 14px; font-size: 10px; text-transform: uppercase; }
+          .payment { margin-top: 8px; font-size: 10px; text-align: center; }
+          @media print {
+            body { margin: 0; }
+            .receipt { width: auto; }
+          }
+        </style>
+      </head>
+      <body onload="window.print(); window.close();">
+        <div class="receipt">
+          <div class="center">
+            <div class="logo">S</div>
+            <div class="tagline">${escapeHtml(settings.branchTagline)}</div>
+            <div class="restaurant">${escapeHtml(settings.restaurantName)}</div>
+            <div class="table-note">${escapeHtml(settings.headerNote)}</div>
+            <div class="table-no">${escapeHtml(String(order.tableNumber || '-'))}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="meta">
+            <div>${escapeHtml(settings.cashierLabel)}</div>
+            <div class="meta-row">
+              <span>${escapeHtml(settings.registerLabel)}</span>
+              <span>Bill No: ${escapeHtml(billNo)}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="header-row">
+            <span>Item</span>
+            <span class="right">Price</span>
+            <span class="right">Qty</span>
+            <span class="right">Disc</span>
+            <span class="right">Amt</span>
+          </div>
+          ${rows}
+
+          <div class="divider"></div>
+
+          <div class="totals">
+            <div class="totals-line">
+              <span>${escapeHtml(settings.subtotalLabel)}</span>
+              <span>${CURRENCY} ${totals.subtotal.toFixed(2)}</span>
+            </div>
+            <div class="totals-line">
+              <span>${escapeHtml(settings.discountLabel)}</span>
+              <span>${CURRENCY} ${totals.discount.toFixed(2)}</span>
+            </div>
+            <div class="totals-line">
+              <span>${escapeHtml(settings.taxLabel)}</span>
+              <span>${CURRENCY} ${totals.tax.toFixed(2)}</span>
+            </div>
+            <div class="totals-line grand-total">
+              <span>${escapeHtml(settings.totalLabel)}</span>
+              <span>${CURRENCY} ${totals.total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="payment">Payment: ${escapeHtml(paymentSummary)}</div>
+
+          <div class="divider"></div>
+
+          <div class="thanks">${escapeHtml(settings.thankYouMessage)}</div>
+          <div class="footer">${escapeHtml(settings.footerNote)}</div>
+        </div>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 // ─── Cash Change Row ──────────────────────────────────────────────────────────
@@ -95,13 +231,53 @@ export function TablesView() {
   const available = tables.filter(t => t.status === 'available').length;
   const occupied  = tables.filter(t => t.status === 'occupied').length;
 
-  const openOrderModal = (tableId: string) => {
+  const openOrderModal = async (tableId: string) => {
+    const table = tables.find(t => t.id === tableId);
     const order = getOrder(tableId);
+
     if (order) {
       setSelectedOrder({ ...order, tableId });
       setPaymentMode(null);
       setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
+      return;
     }
+
+    if (!table?.currentOrderId) {
+      toast.error('No active bill found for this table yet');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', table.currentOrderId)
+      .single();
+
+    if (error || !data) {
+      toast.error('Failed to load bill details');
+      return;
+    }
+
+    const fetchedOrder = {
+      ...data,
+      tableId: data.table_id,
+      tableNumber: data.table_number,
+      createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+      items: (data.order_items || []).map((item: any) => ({
+        ...item,
+        productName: item.product_name,
+        addedByName: item.added_by_name,
+        addedAt: item.added_at ? new Date(item.added_at) : new Date(),
+      })),
+    };
+
+    setOrders(prev => {
+      const exists = prev.some(o => o.id === fetchedOrder.id);
+      return exists ? prev.map(o => o.id === fetchedOrder.id ? fetchedOrder : o) : [...prev, fetchedOrder];
+    });
+    setSelectedOrder({ ...fetchedOrder, tableId });
+    setPaymentMode(null);
+    setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,13 +320,29 @@ export function TablesView() {
     setProcessing(true);
     try {
       const now = new Date().toISOString();
-      await supabase.from('orders').update({ status: 'completed', completed_at: now }).eq('id', selectedOrder.id);
-      await supabase.from('tables').update({ status: 'available', current_order_id: null }).eq('id', selectedOrder.tableId);
-      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: 'completed' } : o));
-      setTables(prev => prev.map(t => t.id === selectedOrder.tableId ? { ...t, status: 'available', currentOrderId: undefined } : t));
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('branch_id', currentUser.branchId)
+        .eq('status', 'completed');
+
+      const billNo = String((count || 0) + 1).padStart(5, '0');
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
+
+      await supabase
+        .from('orders')
+        .update({
+          status: 'completed',
+          completed_at: now,
+          payment_method: summary,
+        })
+        .eq('id', selectedOrder.id);
+      await supabase.from('tables').update({ status: 'available', current_order_id: null }).eq('id', selectedOrder.tableId);
+      printReceipt(selectedOrder, summary, billNo);
+      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: 'completed', paymentMethod: summary } : o));
+      setTables(prev => prev.map(t => t.id === selectedOrder.tableId ? { ...t, status: 'available', currentOrderId: undefined } : t));
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
       setSelectedOrder(null);
       setPaymentMode(null);
@@ -228,7 +420,7 @@ export function TablesView() {
                       </div>
                     </div>
                     {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
-                      <button onClick={() => openOrderModal(table.id)} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
+                      <button onClick={() => void openOrderModal(table.id)} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
                         Process Payment
                       </button>
                     )}
@@ -244,11 +436,18 @@ export function TablesView() {
                     )}
                   </div>
                 ) : (
-                  (currentUser.role === 'waiter' || currentUser.role === 'admin') && (
+                  <>
+                    {currentUser.role === 'cashier' && table.status === 'occupied' && (
+                      <button onClick={() => void openOrderModal(table.id)} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors mt-1">
+                        Open Bill
+                      </button>
+                    )}
+                    {(currentUser.role === 'waiter' || currentUser.role === 'admin') && (
                     <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
                       Start Order
                     </button>
-                  )
+                    )}
+                  </>
                 )}
               </div>
             );

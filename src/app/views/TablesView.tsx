@@ -231,6 +231,9 @@ export function TablesView() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [paymentMode,   setPaymentMode]   = useState<PaymentMode | null>(null);
   const [processing,    setProcessing]    = useState(false);
+  const [showPrintPrompt, setShowPrintPrompt] = useState(false);
+  const [lastBillNo, setLastBillNo] = useState('');
+  const [lastPaymentSummary, setLastPaymentSummary] = useState('');
   const [splits, setSplits] = useState<SplitEntry[]>([
     { method: 'cash', amount: '' },
     { method: 'card', amount: '' },
@@ -401,6 +404,19 @@ export function TablesView() {
   const fillRemaining = (idx: number) =>
     updateSplit(idx, 'amount', splitRemain > 0 ? splitRemain.toFixed(2) : splits[idx].amount);
 
+  const handlePrintReceipt = () => {
+    printReceipt(selectedOrder, lastPaymentSummary, lastBillNo);
+    setShowPrintPrompt(false);
+    setSelectedOrder(null);
+    setPaymentMode(null);
+  };
+
+  const handleSkipPrint = () => {
+    setShowPrintPrompt(false);
+    setSelectedOrder(null);
+    setPaymentMode(null);
+  };
+
   const handlePayment = async () => {
     if (!selectedOrder || !paymentMode) return;
     
@@ -448,29 +464,32 @@ export function TablesView() {
       
       await supabase
         .from('tables')
-        .update({ 
-          status: 'available', 
+        .update({
+          status: 'available',
           current_order_id: null,
-          updated_at: now 
+          updated_at: now
         })
         .eq('id', selectedOrder.tableId);
-      
-      printReceipt(selectedOrder, summary, billNo);
-      
-      setOrders(prev => prev.map(o => 
-        o.id === selectedOrder.id 
-          ? { ...o, status: 'completed', paymentMethod: summary } 
+
+      // Store bill info for optional printing
+      setLastBillNo(billNo);
+      setLastPaymentSummary(summary);
+
+      setOrders(prev => prev.map(o =>
+        o.id === selectedOrder.id
+          ? { ...o, status: 'completed', paymentMethod: summary }
           : o
       ));
-      setTables(prev => prev.map(t => 
-        t.id === selectedOrder.tableId 
-          ? { ...t, status: 'available', currentOrderId: undefined } 
+      setTables(prev => prev.map(t =>
+        t.id === selectedOrder.tableId
+          ? { ...t, status: 'available', currentOrderId: undefined }
           : t
       ));
-      
+
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
-      setSelectedOrder(null);
-      setPaymentMode(null);
+      
+      // Show print prompt instead of auto-printing
+      setShowPrintPrompt(true);
       
     } catch (err: any) {
       console.error('Payment error:', err);
@@ -796,6 +815,59 @@ export function TablesView() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Print Prompt Modal ─────────────────────────────────────────────── */}
+      {showPrintPrompt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="font-bold text-lg">Payment Completed</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Bill #{lastBillNo}</p>
+              </div>
+              <button
+                onClick={handleSkipPrint}
+                className="p-2 rounded-xl hover:bg-gray-100"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-8 text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="size-8 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-gray-900">Payment Successful!</p>
+                <p className="text-sm text-gray-500 mt-1">Would you like to print a receipt?</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t space-y-3">
+              <button
+                onClick={handlePrintReceipt}
+                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print Receipt
+              </button>
+              <button
+                onClick={handleSkipPrint}
+                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              >
+                Skip Printing
+              </button>
+            </div>
           </div>
         </div>
       )}

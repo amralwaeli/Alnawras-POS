@@ -29,11 +29,13 @@ export function KitchenView() {
   const loadTickets = useCallback(async () => {
     if (!currentUser) return;
 
+    console.log('[Kitchen] Loading tickets from database...');
+    
     const { data: orders, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
       .eq('status', 'open')
-      .eq('branch_id', currentUser.branchId) // FIX: Use dynamic branch ID
+      .eq('branch_id', currentUser.branchId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -42,12 +44,13 @@ export function KitchenView() {
     }
 
     if (orders) {
-      // Map and filter out tickets that have no pending/preparing items
+      // Filter out tickets where ALL items are served or order has no unserved items
       const activeTickets = orders.map(o => ({
         ...o,
         items: (o.order_items || []).filter((i: any) => i.status !== 'served'),
-      })).filter(o => o.items.length > 0);
-      
+      })).filter(o => o.items.length > 0 && o.items.some((i: any) => i.status !== 'served'));
+
+      console.log('[Kitchen] Loaded', activeTickets.length, 'active tickets');
       setTickets(activeTickets);
     }
   }, [currentUser]);
@@ -58,41 +61,47 @@ export function KitchenView() {
 
     loadTickets();
 
-    // Listen for changes in the specific branch
-    const branchId = currentUser.branchId;
+    // Listen for changes in order_items (no branch filter since column doesn't exist)
     const channel = supabase.channel('kitchen-ultra-sync')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'order_items',
-        filter: `branch_id=eq.${branchId}` 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'order_items'
       }, (payload) => {
+        console.log('[Kitchen] Order item change:', payload.eventType, payload.new?.id, 'Status:', payload.new?.status);
         loadTickets();
         if (payload.eventType === 'INSERT') {
           setNewOrderAlert(true);
-          const audio = new Audio('/notification.mp3'); // Optional: Add a notification sound
-          audio.play().catch(() => {}); 
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(() => {});
           setTimeout(() => setNewOrderAlert(false), 5000);
         }
       })
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'orders',
-        filter: `branch_id=eq.${branchId}` 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'orders'
       }, () => {
         loadTickets();
-        toast('🔔 New Order Received!', { 
-          style: { background: '#f97316', color: '#fff', fontWeight: 'bold' } 
+        toast('🔔 New Order Received!', {
+          style: { background: '#f97316', color: '#fff', fontWeight: 'bold' }
         });
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders'
+      }, (payload) => {
+        console.log('[Kitchen] Order status changed:', payload.new?.id, 'Status:', payload.new?.status);
+        loadTickets();
       })
       .subscribe();
 
-    // Heartbeat: Refresh every 30s as a backup
-    const heartbeat = setInterval(loadTickets, 30000);
+    // Ultra-fast heartbeat: Refresh every 300ms for real-time sync
+    const heartbeat = setInterval(loadTickets, 300);
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    return () => {
+      supabase.removeChannel(channel);
       clearInterval(heartbeat);
     };
   }, [currentUser, loadTickets]);
@@ -102,19 +111,34 @@ export function KitchenView() {
     const next = itemStatusFlow[currentStatus];
     if (!next) return;
 
-    // Optimistic Update
-    setTickets(prev => prev.map(t => ({
-      ...t,
-      items: t.items.map((i: any) => i.id === itemId ? { ...i, status: next } : i)
-    })));
+    // If marking as served, immediately remove from UI for instant feedback
+    if (next === 'served') {
+      setTickets(prev => {
+        const updated = prev.map(t => ({
+          ...t,
+          items: t.items.filter((i: any) => i.id !== itemId)
+        })).filter(t => t.items.length > 0);
+        
+        console.log('[Kitchen] Item served, removing from display. Remaining tickets:', updated.length);
+        return updated;
+      });
+    } else {
+      // Optimistic update for other status changes
+      setTickets(prev => prev.map(t => ({
+        ...t,
+        items: t.items.map((i: any) => i.id === itemId ? { ...i, status: next } : i)
+      })));
+    }
 
     const { error } = await supabase.from('order_items').update({ status: next }).eq('id', itemId);
-    
+
     if (error) {
       toast.error("Failed to update status");
       loadTickets(); // Rollback
     } else if (next === 'ready') {
       toast.success('Order ready for pickup!');
+    } else if (next === 'served') {
+      console.log('[Kitchen] Item served successfully in database');
     }
   };
 
@@ -185,16 +209,19 @@ export function KitchenView() {
               {tickets.map(ticket => {
                 const age = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 60000);
                 const isUrgent = age >= 15;
-                
+                const isTakeaway = ticket.order_type === 'takeaway';
+
                 return (
-                  <div key={ticket.id} className={`flex flex-col rounded-[35px] border-b-8 overflow-hidden shadow-2xl transition-all ${isUrgent ? 'bg-red-950/20 border-red-600' : 'bg-[#161B22] border-orange-500'}`}>
+                  <div key={ticket.id} className={`flex flex-col rounded-[35px] border-b-8 overflow-hidden shadow-2xl transition-all ${isUrgent ? 'bg-red-950/20 border-red-600' : isTakeaway ? 'bg-[#161B22] border-purple-500' : 'bg-[#161B22] border-orange-500'}`}>
                     {/* Ticket Header */}
                     <div className="p-5 flex items-center justify-between border-b border-white/5 bg-white/5">
                       <div className="flex items-center gap-3">
-                        <div className={`size-10 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${isUrgent ? 'bg-red-600' : 'bg-orange-500'}`}>
-                          {ticket.table_number || 'T'}
+                        <div className={`size-10 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${isTakeaway ? 'bg-purple-500' : isUrgent ? 'bg-red-600' : 'bg-orange-500'}`}>
+                          {isTakeaway ? '🛍️' : ticket.table_number}
                         </div>
-                        <span className="font-black text-xl tracking-tighter italic uppercase">Table {ticket.table_number}</span>
+                        <span className="font-black text-xl tracking-tighter italic uppercase">
+                          {isTakeaway ? 'Takeaway Order' : `Table ${ticket.table_number}`}
+                        </span>
                       </div>
                       <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black ${isUrgent ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-800 text-gray-400'}`}>
                         <Clock4 className="size-3" /> {age}M

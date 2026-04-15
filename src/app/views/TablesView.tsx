@@ -737,6 +737,11 @@ export function TablesView() {
                         {pendingItems} new
                       </span>
                     )}
+                    {table.needsWaiter && (
+                      <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-bold">
+                        Waiter call
+                      </span>
+                    )}
                   </div>
                 </div>
                 <p className="font-bold text-gray-900 text-lg">Table {table.number}</p>

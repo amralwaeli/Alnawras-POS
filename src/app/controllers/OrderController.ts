@@ -40,6 +40,8 @@ export class OrderController {
       discount: 0,
       total: 0,
       status: 'open',
+      paymentStatus: 'unpaid',
+      orderType: 'dine-in',
       createdAt: new Date(),
       waiters: [user.id],
     };

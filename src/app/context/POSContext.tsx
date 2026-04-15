@@ -65,6 +65,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const mapOrder = useCallback((order: any) => ({
     ...order,
     tableId: order.table_id,
+    orderType: order.order_type ?? order.orderType ?? 'dine-in',
+    paymentStatus: order.payment_status ?? order.paymentStatus ?? 'unpaid',
     createdAt: order.created_at ? new Date(order.created_at) : new Date(),
     items: (order.order_items || []).map(mapOrderItem),
   }), [mapOrderItem]);

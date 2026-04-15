@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS tables (
   branch_id TEXT NOT NULL,
   current_order_id TEXT,
   assigned_cashier_id TEXT,
+  needs_waiter BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(branch_id, number)
 );
@@ -67,6 +68,9 @@ CREATE TABLE IF NOT EXISTS orders (
   discount DECIMAL(10,2) DEFAULT 0,
   total DECIMAL(10,2) DEFAULT 0,
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
+  payment_status TEXT DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'paid')),
+  payment_method TEXT,
+  order_type TEXT DEFAULT 'dine-in' CHECK (order_type IN ('dine-in', 'takeaway')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE,
   branch_id TEXT NOT NULL
@@ -85,7 +89,30 @@ CREATE TABLE IF NOT EXISTS order_items (
   added_by_name TEXT NOT NULL, -- User name
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'preparing', 'ready', 'served')),
   notes TEXT,
+  sent_to_kitchen BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS qr_sessions (
+  id TEXT PRIMARY KEY,
+  table_id TEXT REFERENCES tables(id) ON DELETE CASCADE,
+  active BOOLEAN DEFAULT true,
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  branch_id TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (table_id)
+);
+
+CREATE TABLE IF NOT EXISTS qr_sessions (
+  id TEXT PRIMARY KEY,
+  table_id TEXT REFERENCES tables(id) ON DELETE CASCADE,
+  active BOOLEAN DEFAULT true,
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  branch_id TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (table_id)
 );
 
 -- Insert initial data

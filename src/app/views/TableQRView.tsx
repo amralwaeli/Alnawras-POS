@@ -3,6 +3,8 @@ import { usePOS } from '../context/POSContext';
 import QRCode from 'qrcode';
 import { QrCode, Printer } from 'lucide-react';
 
+const hashPath = (path: string) => `${window.location.origin}/#${path}`;
+
 export function TableQRView() {
   const { tables, currentUser } = usePOS();
 

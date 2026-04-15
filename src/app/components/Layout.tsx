@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
-  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings
+  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings, Fingerprint
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
@@ -23,22 +23,23 @@ export function Layout() {
     );
   }
 
-  // Otherwise, render sidebar layout for admin/manager
+  // Otherwise, render sidebar layout for admin/hr/manager
   const permissions = ROLE_PERMISSIONS[currentUser.role];
 
   const allNavItems = [
-    { path: '/dashboard',          label: 'Dashboard',       icon: LayoutDashboard, permission: 'canViewReports' as const },
-    { path: '/tables',             label: 'Tables',          icon: ShoppingCart,    permission: 'canViewTables' as const },
-    { path: '/kitchen',            label: 'Kitchen',         icon: ChefHat,         permission: 'canManageInventory' as const },
-    { path: '/inventory',          label: 'Inventory',       icon: Package,         permission: 'canManageInventory' as const },
-    { path: '/reports',            label: 'Reports',         icon: BarChart3,       permission: 'canViewReports' as const },
-    { path: '/accounting',         label: 'Accounting',      icon: DollarSign,      permission: 'canManageAccounting' as const },
-    { path: '/staff',              label: 'Staff',           icon: Users,           permission: 'canManageStaff' as const },
-    { path: '/attendance',         label: 'Attendance',      icon: Clock,           permission: 'canViewAttendance' as const },
-    { path: '/table-management',   label: 'Manage Tables',   icon: Settings,        permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/product-management', label: 'Products',        icon: Package,         permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/category-management',label: 'Categories',      icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/table-qr',           label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
+    { path: '/dashboard',           label: 'Dashboard',       icon: LayoutDashboard, permission: 'canViewReports' as const },
+    { path: '/tables',              label: 'Tables',          icon: ShoppingCart,    permission: 'canViewTables' as const },
+    { path: '/kitchen',             label: 'Kitchen',         icon: ChefHat,         permission: 'canManageInventory' as const },
+    { path: '/inventory',           label: 'Inventory',       icon: Package,         permission: 'canManageInventory' as const },
+    { path: '/reports',             label: 'Reports',         icon: BarChart3,       permission: 'canViewReports' as const },
+    { path: '/accounting',          label: 'Accounting',      icon: DollarSign,      permission: 'canManageAccounting' as const },
+    { path: '/staff',               label: 'Staff',           icon: Users,           permission: 'canManageStaff' as const },
+    { path: '/hr-panel',            label: 'HR Panel',        icon: Fingerprint,     permission: 'canManageStaff' as const },
+    { path: '/attendance',          label: 'Attendance',      icon: Clock,           permission: 'canViewAttendance' as const },
+    { path: '/table-management',    label: 'Manage Tables',   icon: Settings,        permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/product-management',  label: 'Products',        icon: Package,         permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/category-management', label: 'Categories',      icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/table-qr',            label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
   ];
 
   const navItems = allNavItems.filter(item => {
@@ -53,6 +54,7 @@ export function Layout() {
     waiter:  'from-emerald-500 to-green-600',
     kitchen: 'from-orange-500 to-amber-600',
     hr:      'from-pink-500 to-rose-600',
+    juice:   'from-yellow-500 to-amber-500',
   };
   const avatarGradient = roleColors[currentUser.role] ?? 'from-gray-500 to-gray-600';
 

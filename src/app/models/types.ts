@@ -5,9 +5,9 @@ export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juic
 export interface User {
   id: string;
   name: string;
-  employmentNumber: string; 
+  employmentNumber: string;
   role: UserRole;
-  pin: string; 
+  pin: string;
   email: string;
   status: 'active' | 'inactive';
   branchId: string;
@@ -30,7 +30,7 @@ export interface Table {
   status: 'available' | 'occupied' | 'reserved';
   branchId: string;
   currentOrderId?: string;
-  assignedCashierId?: string; 
+  assignedCashierId?: string;
 }
 
 export interface OrderItem {
@@ -40,10 +40,10 @@ export interface OrderItem {
   quantity: number;
   price: number;
   subtotal: number;
-  addedBy: string; 
-  addedByName: string; 
+  addedBy: string;
+  addedByName: string;
   addedAt: Date;
-  station: 'kitchen' | 'juice' | 'none'; 
+  station: 'kitchen' | 'juice' | 'none';
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
 }
@@ -60,7 +60,10 @@ export interface Order {
   status: 'open' | 'completed' | 'cancelled';
   createdAt: Date;
   completedAt?: Date;
-  waiters: string[]; 
+  waiters: string[];
+  cashierId?: string;
+  cashierName?: string;
+  paymentMethod?: string;
 }
 
 // ==================== Products & Inventory ====================
@@ -105,6 +108,81 @@ export interface ProductImportData {
   sku?: string;
   taxRate?: number;
   reorderPoint?: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  productId: string;
+  productName: string;
+  branchId: string;
+  currentStock: number;
+  reorderPoint: number;
+  lastUpdated: Date;
+  notes?: string;
+}
+
+// ==================== Attendance & Expenses ====================
+
+export interface Attendance {
+  id: string;
+  userId: string;
+  userName: string;
+  branchId: string;
+  checkIn: Date;
+  checkOut?: Date;
+  hoursWorked?: number;
+  status: 'present' | 'absent' | 'late' | 'half-day';
+  notes?: string;
+}
+
+export interface Expense {
+  id: string;
+  branchId: string;
+  category: string;
+  description: string;
+  amount: number;
+  date: Date;
+  createdBy: string;
+  createdByName: string;
+  receipt?: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+// ==================== Branch ====================
+
+export interface Branch {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// ==================== Analytics ====================
+
+export interface SalesAnalytics {
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  topProducts: {
+    productId: string;
+    productName: string;
+    quantitySold: number;
+    revenue: number;
+  }[];
+  revenueByDay: {
+    date: string;
+    revenue: number;
+    orders: number;
+  }[];
+  paymentMethodBreakdown: {
+    method: string;
+    count: number;
+    totalAmount: number;
+    percentage: number;
+  }[];
 }
 
 // ==================== Permissions ====================

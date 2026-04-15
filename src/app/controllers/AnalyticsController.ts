@@ -1,182 +1,190 @@
-import { Order, Product, SalesAnalytics } from '../models/types';
-import { calculateSalesAnalytics } from '../models/businessLogic';
+import { useState, useEffect, useCallback } from 'react';
+import { usePOS } from '../context/POSContext';
+import { UtensilsCrossed } from 'lucide-react';
 
-export class AnalyticsController {
-  /**
-   * Get comprehensive sales report
-   */
-  static getSalesReport(
-    orders: Order[],
-    products: Product[],
-    startDate?: Date,
-    endDate?: Date
-  ): SalesAnalytics {
-    let filteredOrders = orders;
+interface LoginViewProps {
+  onLoginSuccess: () => void;
+}
 
-    if (startDate || endDate) {
-      filteredOrders = orders.filter(order => {
-        const orderDate = order.createdAt;
-        if (startDate && orderDate < startDate) return false;
-        if (endDate && orderDate > endDate) return false;
-        return true;
-      });
+export function LoginView({ onLoginSuccess }: LoginViewProps) {
+  const { login } = usePOS();
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  const handleSubmit = useCallback(async (currentPin: string) => {
+    if (currentPin.length !== 4 || loading) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await login(currentPin);
+      if (result.success) {
+        onLoginSuccess();
+      } else {
+        setError(result.error || 'Invalid PIN');
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+        setPin('');
+      }
+    } catch {
+      setError('Connection error. Try again.');
+    } finally {
+      setLoading(false);
     }
+  }, [loading, login, onLoginSuccess]);
 
-    return calculateSalesAnalytics(filteredOrders, products);
-  }
+  // Keyboard support for faster entry
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        setPin(p => p.length < 4 ? p + e.key : p);
+      } else if (e.key === 'Backspace') {
+        setPin(p => p.slice(0, -1));
+        setError('');
+      } else if (e.key === 'Enter') {
+        setPin(p => { if (p.length === 4) handleSubmit(p); return p; });
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleSubmit]);
 
-  /**
-   * Get top selling products
-   */
-  static getTopProducts(orders: Order[], limit: number = 5): {
-    productId: string;
-    productName: string;
-    quantitySold: number;
-    revenue: number;
-  }[] {
-    const productSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
+  // Auto-submit when 4 digits are entered
+  useEffect(() => {
+    if (pin.length === 4) {
+      handleSubmit(pin);
+    }
+  }, [pin, handleSubmit]);
 
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        if (!productSales[item.productId]) {
-          productSales[item.productId] = {
-            name: item.productName,
-            quantity: 0,
-            revenue: 0,
-          };
+  const demoRoles = [
+    { label: 'Admin', pin: '1234', color: 'bg-violet-100 text-violet-700' },
+    { label: 'Cashier', pin: '2345', color: 'bg-blue-100 text-blue-700' },
+    { label: 'Waiter', pin: '3456', color: 'bg-emerald-100 text-emerald-700' },
+  ];
+
+  return (
+    <div className="h-screen flex bg-[#0B0E14]">
+      {/* Left panel - Branding */}
+      <div className="hidden lg:flex flex-col justify-between w-1/2 bg-[#161B22] p-12 border-r border-gray-800">
+        <div className="flex items-center gap-4">
+          <div className="size-12 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <UtensilsCrossed className="size-6 text-white" />
+          </div>
+          <div>
+            <p className="font-black text-white text-2xl tracking-tighter uppercase italic leading-none">Alnawras</p>
+            <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">Smart POS System</p>
+          </div>
+        </div>
+
+        <div>
+          <h1 className="text-6xl font-black text-white leading-none tracking-tighter uppercase italic mb-6">
+            Ready for<br />the shift?
+          </h1>
+          <p className="text-gray-500 text-xl font-medium">Enter your credentials to access the dashboard.</p>
+        </div>
+
+        <p className="text-gray-600 text-xs font-bold uppercase tracking-widest">© 2025 Alnawras Restaurant Group</p>
+      </div>
+
+      {/* Right panel - Keypad */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-sm">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex flex-col items-center gap-3 mb-12">
+            <div className="size-14 rounded-[22px] bg-orange-500 flex items-center justify-center shadow-xl">
+              <UtensilsCrossed className="size-7 text-white" />
+            </div>
+            <p className="font-black text-white text-2xl uppercase italic tracking-tighter">Alnawras POS</p>
+          </div>
+
+          <div className="text-center lg:text-left mb-10">
+            <h2 className="text-3xl font-black text-white tracking-tight uppercase italic">Staff Check-in</h2>
+            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest mt-2">Enter your 4-digit security PIN</p>
+          </div>
+
+          {/* PIN Display (Dots) */}
+          <div className={`flex justify-center lg:justify-start gap-5 mb-10 ${shake ? 'animate-shake' : ''}`}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className={`size-5 rounded-full border-2 transition-all duration-200 ${
+                pin.length > i
+                  ? 'bg-orange-500 border-orange-500 scale-125 shadow-lg shadow-orange-500/40'
+                  : 'bg-transparent border-gray-700'
+              }`} />
+            ))}
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 py-3 rounded-xl mb-6 animate-in fade-in slide-in-from-top-2">
+              <p className="text-center text-red-500 text-xs font-bold uppercase tracking-widest">{error}</p>
+            </div>
+          )}
+
+          {/* Keypad Grid */}
+          <div className="grid grid-cols-3 gap-4 mb-10">
+            {[1,2,3,4,5,6,7,8,9].map(n => (
+              <button
+                key={n}
+                onClick={() => setPin(p => p.length < 4 ? p + n : p)}
+                disabled={loading}
+                className="h-20 rounded-[24px] bg-gray-800/40 text-white text-2xl font-black hover:bg-gray-800 hover:scale-105 active:scale-95 transition-all border border-gray-800"
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              onClick={() => { setPin(p => p.slice(0, -1)); setError(''); }}
+              disabled={loading || pin.length === 0}
+              className="h-20 rounded-[24px] bg-gray-800/20 text-gray-500 text-xl flex items-center justify-center hover:text-white transition-colors"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+            </button>
+            <button
+              onClick={() => setPin(p => p.length < 4 ? p + '0' : p)}
+              disabled={loading}
+              className="h-20 rounded-[24px] bg-gray-800/40 text-white text-2xl font-black hover:bg-gray-800 hover:scale-105 transition-all border border-gray-800"
+            >
+              0
+            </button>
+            <button
+              onClick={() => handleSubmit(pin)}
+              disabled={loading || pin.length !== 4}
+              className="h-20 rounded-[24px] bg-orange-500 text-white shadow-xl shadow-orange-500/20 hover:bg-orange-600 active:scale-95 transition-all flex items-center justify-center"
+            >
+              {loading
+                ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>}
+            </button>
+          </div>
+
+          {/* Quick Demo Access */}
+          <div className="pt-6 border-t border-gray-800/50">
+            <p className="text-[10px] font-bold text-gray-600 text-center mb-4 uppercase tracking-[0.2em]">Quick Access</p>
+            <div className="flex justify-center gap-3">
+              {demoRoles.map(r => (
+                <button
+                  key={r.label}
+                  onClick={() => setPin(r.pin)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.color} transition-all hover:-translate-y-1 shadow-sm`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-8px); }
+          75% { transform: translateX(8px); }
         }
-        productSales[item.productId].quantity += item.quantity;
-        productSales[item.productId].revenue += item.subtotal;
-      });
-    });
-
-    return Object.entries(productSales)
-      .map(([productId, data]) => ({
-        productId,
-        productName: data.name,
-        quantitySold: data.quantity,
-        revenue: Math.round(data.revenue * 100) / 100,
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, limit);
-  }
-
-  /**
-   * Get cashier performance
-   */
-  static getCashierPerformance(orders: Order[]): {
-    cashierId: string;
-    cashierName: string;
-    totalSales: number;
-    orderCount: number;
-    averageOrderValue: number;
-  }[] {
-    const cashierStats: Record<string, {
-      name: string;
-      totalSales: number;
-      orderCount: number;
-    }> = {};
-
-    orders.forEach(order => {
-      if (!cashierStats[order.cashierId]) {
-        cashierStats[order.cashierId] = {
-          name: order.cashierName,
-          totalSales: 0,
-          orderCount: 0,
-        };
-      }
-      cashierStats[order.cashierId].totalSales += order.total;
-      cashierStats[order.cashierId].orderCount += 1;
-    });
-
-    return Object.entries(cashierStats)
-      .map(([cashierId, stats]) => ({
-        cashierId,
-        cashierName: stats.name,
-        totalSales: Math.round(stats.totalSales * 100) / 100,
-        orderCount: stats.orderCount,
-        averageOrderValue: Math.round((stats.totalSales / stats.orderCount) * 100) / 100,
-      }))
-      .sort((a, b) => b.totalSales - a.totalSales);
-  }
-
-  /**
-   * Get revenue by time period
-   */
-  static getRevenueByPeriod(
-    orders: Order[],
-    period: 'hour' | 'day' | 'week' | 'month'
-  ): {
-    period: string;
-    revenue: number;
-    orders: number;
-  }[] {
-    const revenueMap: Record<string, { revenue: number; orders: number }> = {};
-
-    orders.forEach(order => {
-      let key: string;
-      const date = order.createdAt;
-
-      switch (period) {
-        case 'hour':
-          key = `${date.toLocaleDateString()} ${date.getHours()}:00`;
-          break;
-        case 'day':
-          key = date.toLocaleDateString();
-          break;
-        case 'week':
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          key = `Week of ${weekStart.toLocaleDateString()}`;
-          break;
-        case 'month':
-          key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          break;
-      }
-
-      if (!revenueMap[key]) {
-        revenueMap[key] = { revenue: 0, orders: 0 };
-      }
-      revenueMap[key].revenue += order.total;
-      revenueMap[key].orders += 1;
-    });
-
-    return Object.entries(revenueMap)
-      .map(([period, data]) => ({
-        period,
-        revenue: Math.round(data.revenue * 100) / 100,
-        orders: data.orders,
-      }))
-      .sort((a, b) => a.period.localeCompare(b.period));
-  }
-
-  /**
-   * Get payment method breakdown
-   */
-  static getPaymentMethodBreakdown(orders: Order[]): {
-    method: string;
-    count: number;
-    totalAmount: number;
-    percentage: number;
-  }[] {
-    const methodStats: Record<string, { count: number; totalAmount: number }> = {};
-    const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
-
-    orders.forEach(order => {
-      if (!methodStats[order.paymentMethod]) {
-        methodStats[order.paymentMethod] = { count: 0, totalAmount: 0 };
-      }
-      methodStats[order.paymentMethod].count += 1;
-      methodStats[order.paymentMethod].totalAmount += order.total;
-    });
-
-    return Object.entries(methodStats)
-      .map(([method, stats]) => ({
-        method,
-        count: stats.count,
-        totalAmount: Math.round(stats.totalAmount * 100) / 100,
-        percentage: totalRevenue > 0 ? Math.round((stats.totalAmount / totalRevenue) * 100 * 100) / 100 : 0,
-      }))
-      .sort((a, b) => b.totalAmount - a.totalAmount);
-  }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
+    </div>
+  );
 }

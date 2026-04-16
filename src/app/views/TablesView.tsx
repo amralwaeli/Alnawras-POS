@@ -135,11 +135,17 @@ function printReceipt(order: any, paymentSummary: string, billNo: string) {
       <body onload="window.print(); window.close();">
         <div class="receipt">
           <div class="center">
-            <div class="logo">S</div>
+            ${settings.logoUrl
+              ? `<img src="${escapeHtml(settings.logoUrl)}" alt="Logo" style="width:58px;height:58px;border-radius:999px;border:3px solid #7b7368;object-fit:cover;margin:0 auto 10px;display:block;" />`
+              : `<div class="logo">S</div>`
+            }
             <div class="tagline">${escapeHtml(settings.branchTagline)}</div>
             <div class="restaurant">${escapeHtml(settings.restaurantName)}</div>
-            <div class="table-note">${escapeHtml(settings.headerNote)}</div>
-            <div class="table-no">${escapeHtml(String(order.tableNumber || order.table_number || '-'))}</div>
+            <div class="table-note">${getOrderType(order) === 'takeaway' ? 'Takeaway Order' : escapeHtml(settings.headerNote)}</div>
+            <div class="table-no">${getOrderType(order) === 'takeaway'
+              ? escapeHtml(`#${order.billNumber || order.bill_number || '—'}`)
+              : escapeHtml(String(order.tableNumber || order.table_number || '-'))
+            }</div>
           </div>
 
           <div class="divider"></div>

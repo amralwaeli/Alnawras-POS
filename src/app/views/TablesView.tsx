@@ -255,14 +255,16 @@ export function TablesView() {
     return tables;
   };
 
-  const getTakeawayOrders = () => {
-    return orders.filter(o => o.order_type === 'takeaway' && o.status === 'open');
-  };
+  // Memoize takeOrders to ensure it updates when orders change
+  const takeawayOrders = useMemo(() => 
+    orders.filter(o => o.order_type === 'takeaway' && o.status === 'open'), 
+    [orders]
+  );
 
   const filteredTables = getFilteredTables();
-  const takeawayOrders = getTakeawayOrders();
   const available = filteredTables.filter(t => t.status === 'available').length;
-  const occupied  = filteredTables.filter(t => t.status === 'occupied').length;
+  // Ready to Bill includes both occupied tables AND open takeaway orders
+  const occupied  = filteredTables.filter(t => t.status === 'occupied').length + takeawayOrders.length;
 
   const openOrderModal = async (tableId: string) => {
     try {

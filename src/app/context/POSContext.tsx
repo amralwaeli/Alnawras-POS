@@ -68,6 +68,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     orderType: order.order_type ?? order.orderType ?? 'dine-in',
     paymentStatus: order.payment_status ?? order.paymentStatus ?? 'unpaid',
     createdAt: order.created_at ? new Date(order.created_at) : new Date(),
+    billNumber: order.bill_number,
     items: (order.order_items || []).map(mapOrderItem),
   }), [mapOrderItem]);
 

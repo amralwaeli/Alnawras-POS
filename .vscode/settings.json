@@ -8,5 +8,6 @@
         "proc.stderr": true,
         "0:": true,
         "raise": true
-    }
+    },
+    "deepscan.enable": true
 }

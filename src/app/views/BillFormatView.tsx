@@ -14,6 +14,7 @@ import {
 } from '../../lib/billFormat';
 import { CURRENCY, orderTotal } from '../../lib/currency';
 import { supabase } from '../../lib/supabase';
+import { useRef } from 'react';
 
 const sampleItems = [
   { name: 'Mixed Grilled Al-Nawras + Bread', price: 30, qty: 1, discount: 0, amount: 30 },
@@ -50,6 +51,16 @@ export function BillFormatView() {
     if (!orders.length) return null;
     return [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
   }, [orders]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) { toast.error('Logo must be under 200 KB'); return; }
+    const reader = new FileReader();
+    reader.onload = () => updateField('logoUrl', reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const previewTableNumber = useMemo(() => {
     if (!previewOrder) return 7;
@@ -148,6 +159,27 @@ export function BillFormatView() {
                   value={settings.restaurantName}
                   onChange={(e) => updateField('restaurantName', e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Logo Image</Label>
+                <div className="flex items-center gap-3">
+                  {settings.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo" className="size-12 rounded-full object-cover border border-gray-200" />
+                  ) : (
+                    <div className="size-12 rounded-full bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-xl font-bold text-gray-400">S</div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} type="button">
+                      {settings.logoUrl ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    {settings.logoUrl && (
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => updateField('logoUrl', '')} type="button">
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="branch-tagline">Logo / Tagline Text</Label>

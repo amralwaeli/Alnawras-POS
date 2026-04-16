@@ -1,6 +1,7 @@
 // lib/billFormat.ts
 
 export interface BillFormatSettings {
+  logoUrl: string;
   restaurantName: string;
   branchTagline: string;
   headerNote: string;
@@ -18,6 +19,7 @@ export interface BillFormatSettings {
 }
 
 export const defaultBillFormatSettings: BillFormatSettings = {
+  logoUrl: '',
   restaurantName: 'Your Restaurant',
   branchTagline: 'Fresh • Fast • Friendly',
   headerNote: 'Dine-in Order',

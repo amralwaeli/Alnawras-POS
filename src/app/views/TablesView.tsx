@@ -567,7 +567,7 @@ export function TablesView() {
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
 
-      await supabase
+      const { error: orderUpdateError } = await supabase
         .from('orders')
         .update({
           status: 'completed',
@@ -576,17 +576,29 @@ export function TablesView() {
           bill_number: billNo,
           payment_status: 'paid',
         })
-        .eq('id', selectedOrder.id);
+        .eq('id', selectedOrder.id)
+        .eq('branch_id', currentUser.branchId);
+
+      if (orderUpdateError) {
+        console.error('[handlePayment] Order update failed:', orderUpdateError);
+        throw orderUpdateError;
+      }
 
       // Update table only if it's a dine-in order (has tableId)
       if (selectedOrder.tableId) {
-        await supabase
+        const { error: tableUpdateError } = await supabase
           .from('tables')
           .update({
             status: 'available',
             current_order_id: null
           })
-          .eq('id', selectedOrder.tableId);
+          .eq('id', selectedOrder.tableId)
+          .eq('branch_id', currentUser.branchId);
+
+        if (tableUpdateError) {
+          console.error('[handlePayment] Table update failed:', tableUpdateError);
+          throw tableUpdateError;
+        }
       }
 
       console.log('[handlePayment] Database updated. Table set to available, order cleared.');

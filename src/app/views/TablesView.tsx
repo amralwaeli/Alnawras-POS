@@ -552,15 +552,16 @@ export function TablesView() {
     setProcessing(true);
     try {
       const now = new Date().toISOString();
+      const orderType = getOrderType(selectedOrder);
 
-      // Get the count of ALL completed orders (both dine-in and takeaway) for sequential billing
+      // Get the count of completed orders for this order type so takeaway bills are sequential
       const { count } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('branch_id', currentUser.branchId)
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .eq('order_type', orderType);
 
-      // Sequential bill number starting from 0001 for ALL orders
       const billNo = String((count || 0) + 1).padStart(4, '0');
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
@@ -573,6 +574,7 @@ export function TablesView() {
           completed_at: now,
           payment_method: summary,
           bill_number: billNo,
+          payment_status: 'paid',
         })
         .eq('id', selectedOrder.id);
 
@@ -593,7 +595,8 @@ export function TablesView() {
       setLastBillNo(billNo);
       setLastPaymentSummary(summary);
 
-      // Remove completed orders from open orders state so takeaway orders disappear like table bills
+      // Store bill info for printing and update local state before removing the order from open state
+      setSelectedOrder(prev => prev ? { ...prev, status: 'completed', paymentMethod: summary, billNumber: billNo } : prev);
       setOrders(prev => prev.filter(o => o.id !== selectedOrder.id));
       
       // Update table state only if it's a dine-in order

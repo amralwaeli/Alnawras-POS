@@ -593,12 +593,8 @@ export function TablesView() {
       setLastBillNo(billNo);
       setLastPaymentSummary(summary);
 
-      // Update local state immediately for responsive UI
-      setOrders(prev => prev.map(o =>
-        o.id === selectedOrder.id
-          ? { ...o, status: 'completed', paymentMethod: summary }
-          : o
-      ));
+      // Remove completed orders from open orders state so takeaway orders disappear like table bills
+      setOrders(prev => prev.filter(o => o.id !== selectedOrder.id));
       
       // Update table state only if it's a dine-in order
       if (selectedOrder.tableId) {

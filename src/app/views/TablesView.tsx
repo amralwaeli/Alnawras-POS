@@ -554,15 +554,21 @@ export function TablesView() {
       const now = new Date().toISOString();
       const orderType = getOrderType(selectedOrder);
 
-      // Get the count of completed orders for this order type so takeaway bills are sequential
-      const { count } = await supabase
+      // ── Bill numbering: find the highest existing bill_number for this
+      //    branch + order_type and increment by 1. Starts at 0001.
+      const { data: lastBill } = await supabase
         .from('orders')
-        .select('*', { count: 'exact', head: true })
+        .select('bill_number')
         .eq('branch_id', currentUser.branchId)
-        .eq('status', 'completed')
-        .eq('order_type', orderType);
+        .eq('order_type', orderType)
+        .not('bill_number', 'is', null)
+        .order('bill_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      const billNo = String((count || 0) + 1).padStart(4, '0');
+      const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
+      const billNo  = String(lastNum + 1).padStart(4, '0');
+
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
@@ -607,8 +613,8 @@ export function TablesView() {
       setLastBillNo(billNo);
       setLastPaymentSummary(summary);
 
-      // Store bill info for printing and update local state before removing the order from open state
-      setSelectedOrder(prev => prev ? { ...prev, status: 'completed', paymentMethod: summary, billNumber: billNo } : prev);
+      // Update local state before removing the order from open state
+      setSelectedOrder((prev: any) => prev ? { ...prev, status: 'completed', paymentMethod: summary, billNumber: billNo } : prev);
       setOrders(prev => prev.filter(o => o.id !== selectedOrder.id));
       
       // Update table state only if it's a dine-in order

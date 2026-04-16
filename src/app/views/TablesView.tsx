@@ -55,6 +55,10 @@ function calcOrderTotals(order: any) {
   };
 }
 
+function getOrderType(order: any) {
+  return order?.order_type ?? order?.orderType ?? 'dine-in';
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -255,9 +259,9 @@ export function TablesView() {
     return tables;
   };
 
-  // Memoize takeOrders to ensure it updates when orders change
+  // Memoize takeaway orders to ensure it updates when orders change
   const takeawayOrders = useMemo(() => 
-    orders.filter(o => o.order_type === 'takeaway' && o.status === 'open'), 
+    orders.filter(o => getOrderType(o) === 'takeaway' && o.status === 'open'), 
     [orders]
   );
 
@@ -354,7 +358,8 @@ export function TablesView() {
         paymentMethod: data.payment_method,
         cashierId: data.cashier_id,
         cashierName: data.cashier_name,
-        orderType: data.order_type || 'dine-in',
+        orderType: getOrderType(data),
+        order_type: getOrderType(data),
         billNumber: data.bill_number,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
@@ -451,7 +456,8 @@ export function TablesView() {
         paymentMethod: data.payment_method,
         cashierId: data.cashier_id,
         cashierName: data.cashier_name,
-        orderType: data.order_type || 'takeaway',
+        orderType: getOrderType(data),
+        order_type: getOrderType(data),
         billNumber: data.bill_number,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,

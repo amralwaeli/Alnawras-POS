@@ -65,6 +65,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const mapOrder = useCallback((order: any) => ({
     ...order,
     tableId: order.table_id,
+    tableNumber: order.table_number,
     orderType: order.order_type ?? order.orderType ?? 'dine-in',
     paymentStatus: order.payment_status ?? order.paymentStatus ?? 'unpaid',
     createdAt: order.created_at ? new Date(order.created_at) : new Date(),
@@ -80,7 +81,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         ProductController.getProducts(currentUser),
         CategoryController.getCategories(currentUser),
         TableController.getTables(currentUser),
-        supabase.from('orders').select('*, order_items(*)').eq('branch_id', branch).eq('status', 'open')
+        supabase.from('orders')
+          .select('*, order_items(*)')
+          .eq('branch_id', branch)
+          .or(`status.eq.open,and(status.eq.completed,created_at.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()})`)
       ]);
 
       if (prodRes.success) setProducts(prodRes.products || []);
@@ -126,7 +130,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const orderRow = (payload.new || payload.old) as any;
         if (!orderRow?.id) return;
 
-        if (payload.eventType === 'DELETE' || orderRow.status !== 'open') {
+        if (payload.eventType === 'DELETE') {
+          setOrders(prev => prev.filter(order => order.id !== orderRow.id));
+          return;
+        }
+        
+        // Keep completed orders from today in context for dashboard stats
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const isCompletedToday =
+          orderRow.status === 'completed' &&
+          new Date(orderRow.created_at) >= todayStart;
+        
+        if (orderRow.status !== 'open' && !isCompletedToday) {
           setOrders(prev => prev.filter(order => order.id !== orderRow.id));
           return;
         }

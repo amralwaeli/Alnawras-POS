@@ -130,13 +130,30 @@ export function CustomerMenuView() {
         orderId = `order-${Date.now()}`;
         console.log('[handleSendToKitchen] Creating new order:', orderId, 'Type:', orderType);
 
+        // Generate bill number for takeaway at creation
+        let billNo: string | null = null;
+        if (orderType === 'takeaway') {
+          const { data: lastBill } = await supabase
+            .from('orders')
+            .select('bill_number')
+            .eq('branch_id', currentUser.branchId)
+            .eq('order_type', 'takeaway')
+            .not('bill_number', 'is', null)
+            .order('bill_number', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
+          billNo = String(lastNum + 1).padStart(4, '0');
+        }
+
         const { error: orderError } = await supabase.from('orders').insert([{
           id: orderId,
           table_id: orderType === 'dine-in' ? finalTableId : null,
           table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
           status: 'open',
           branch_id: currentUser.branchId,
-          order_type: orderType
+          order_type: orderType,
+          ...(billNo ? { bill_number: billNo } : {}),
         }]).select();
         
         if (orderError) {

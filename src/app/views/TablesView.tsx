@@ -705,7 +705,7 @@ export function TablesView() {
                     </div>
                     <div>
                       <p className="font-bold text-gray-900 text-lg">
-                        {order.billNumber ? `Bill #${order.billNumber}` : `Takeaway #${order.id.slice(-4)}`}
+                        {Takeaway #${order.billNumber ?? '—'}}
                       </p>
                       <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
                         <Clock className="size-3" /> {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}

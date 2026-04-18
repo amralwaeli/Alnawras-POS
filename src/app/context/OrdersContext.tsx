@@ -5,6 +5,8 @@ import { Order } from '../models/types';
 export const mapOrderItem = (item: any) => ({
   ...item,
   productName: item.product_name,
+  addedBy: item.added_by ?? item.addedBy,
+  addedByName: item.added_by_name ?? item.addedByName,
   addedAt: item.created_at ? new Date(item.created_at) : new Date(),
 });
 

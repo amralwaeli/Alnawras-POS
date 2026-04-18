@@ -40,14 +40,15 @@ export function CategoryManagementView() {
   );
 
   const allFilteredSelected = filteredProducts.length > 0 && filteredProducts.every(p => categoryProducts.has(p.id));
-  const someFilteredSelected = filteredProducts.some(p => categoryProducts.has(p.id));
 
   const handleSelectAll = () => {
     setCategoryProducts(prev => {
       const next = new Set(prev);
       if (allFilteredSelected) {
+        // Only unselect if ALL are already selected
         filteredProducts.forEach(p => next.delete(p.id));
       } else {
+        // Select all that aren't selected yet
         filteredProducts.forEach(p => next.add(p.id));
       }
       return next;
@@ -456,7 +457,11 @@ export function CategoryManagementView() {
                   onClick={handleSelectAll}
                   className="shrink-0 px-4 py-2 text-sm font-semibold rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors whitespace-nowrap"
                 >
-                  {allFilteredSelected ? 'Unselect All' : 'Select All'}
+                  {allFilteredSelected
+                    ? 'Unselect All'
+                    : filteredProducts.some(p => categoryProducts.has(p.id))
+                      ? 'Select Remaining'
+                      : 'Select All'}
                 </button>
               </div>
 

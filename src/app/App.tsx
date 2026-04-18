@@ -2,16 +2,12 @@ import { useEffect, useState } from 'react';
 import { RouterProvider } from 'react-router';
 import { POSProvider, usePOS } from './context/POSContext';
 import { router } from './routes';
-import { LoginView } from './views/LoginView';
-import { checkSupabaseConnection } from '@/lib/supabase';
+import { LoginView } from './modules/auth';
+import { checkSupabaseConnection } from '../lib/supabase';
 
 function AppContent() {
   const { currentUser } = usePOS();
-
-  if (!currentUser) {
-    return <LoginView onLoginSuccess={() => {}} />;
-  }
-
+  if (!currentUser) return <LoginView onLoginSuccess={() => {}} />;
   return <RouterProvider router={router} />;
 }
 

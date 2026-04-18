@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { Product, Category, Table, Order, OrderItem } from '../../models/types';
 import { toast } from 'sonner';
 import {
@@ -69,6 +70,7 @@ function formatCurrency(value: number) {
 
 export function TableOrderingView() {
   const { tableId } = useParams();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [table, setTable] = useState<Table | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
@@ -289,6 +291,7 @@ export function TableOrderingView() {
           payment_status: 'unpaid',
           order_type: 'dine-in',
           branch_id: table.branchId,
+          waiters: currentUser?.id ? [currentUser.id] : [],
         }]);
 
         if (createError) {
@@ -306,8 +309,8 @@ export function TableOrderingView() {
         subtotal: item.price * item.quantity,
         status: 'pending',
         notes: item.notes || null,
-        added_by: 'guest',
-        added_by_name: 'Guest',
+        added_by: currentUser?.id ?? 'guest',
+        added_by_name: currentUser?.name ?? 'Guest',
         sent_to_kitchen: true,
       }));
 

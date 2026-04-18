@@ -24,6 +24,7 @@ const DashboardView          = lazy(() => import('./modules/dashboard').then(m =
 const TablesView             = lazy(() => import('./modules/tables').then(m => ({ default: m.TablesView })));
 const TableManagementView    = lazy(() => import('./modules/tables').then(m => ({ default: m.TableManagementView })));
 const TableOrderingView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableOrderingView })));
+const QROrderingView         = lazy(() => import('./modules/tables').then(m => ({ default: m.QROrderingView })));
 const TableQRView            = lazy(() => import('./modules/tables').then(m => ({ default: m.TableQRView })));
 const TableRedirectView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableRedirectView })));
 
@@ -118,7 +119,7 @@ export const router = createHashRouter([
   },
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
-  { path: '/table/:tableId',      element: <Lazy><TableOrderingView /></Lazy> },
+  { path: '/table/:tableId',      element: <Lazy><QROrderingView /></Lazy> },
   { path: '/order/table-:tableNumber', element: <Lazy><TableRedirectView /></Lazy> },
   { path: '/order/:tableSlug',    element: <Lazy><TableRedirectView /></Lazy> },
 ]);

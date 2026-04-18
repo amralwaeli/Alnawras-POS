@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit, Trash2, Tag, Palette, Save, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Palette, Save, GripVertical, Search } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -19,6 +19,7 @@ export function CategoryManagementView() {
   const [categoryProducts, setCategoryProducts] = useState<Set<string>>(new Set());
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -32,6 +33,26 @@ export function CategoryManagementView() {
     () => [...categories].sort((a, b) => a.displayOrder - b.displayOrder),
     [categories]
   );
+
+  const filteredProducts = useMemo(
+    () => products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())),
+    [products, productSearch]
+  );
+
+  const allFilteredSelected = filteredProducts.length > 0 && filteredProducts.every(p => categoryProducts.has(p.id));
+  const someFilteredSelected = filteredProducts.some(p => categoryProducts.has(p.id));
+
+  const handleSelectAll = () => {
+    setCategoryProducts(prev => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredProducts.forEach(p => next.delete(p.id));
+      } else {
+        filteredProducts.forEach(p => next.add(p.id));
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!sortedCategories.length) {
@@ -315,7 +336,7 @@ export function CategoryManagementView() {
                   onDragEnd={() => setDraggedCategoryId(null)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => void handleDrop(category.id)}
-                  onClick={() => setSelectedCategory(category.id)}
+                  onClick={() => { setSelectedCategory(category.id); setProductSearch(''); }}
                   className={`cursor-pointer border transition-all ${
                     selectedCategory === category.id ? 'border-orange-300 ring-2 ring-orange-200' : 'border-gray-200'
                   } ${draggedCategoryId === category.id ? 'opacity-60' : ''}`}
@@ -417,34 +438,68 @@ export function CategoryManagementView() {
           </div>
 
           {selectedCategory ? (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {products.map(product => (
-                <label
-                  key={product.id}
-                  htmlFor={product.id}
-                  className="flex items-center gap-3 rounded-2xl border border-gray-200 p-4 cursor-pointer hover:border-orange-200 hover:bg-orange-50/40 transition-colors"
-                >
-                  <Checkbox
-                    id={product.id}
-                    checked={categoryProducts.has(product.id)}
-                    onCheckedChange={(checked) => handleProductToggle(product.id, checked as boolean)}
+            <>
+              {/* Search + Select All toolbar */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
                   />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      RM {product.price.toFixed(2)} | Current: {product.category || 'Uncategorized'}
-                    </p>
-                  </div>
-                </label>
-              ))}
-
-              {products.length === 0 && (
-                <div className="col-span-full py-10 text-center text-gray-500">
-                  <p>No products available.</p>
-                  <p className="text-sm text-gray-400">Add products first in Product Management.</p>
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="shrink-0 px-4 py-2 text-sm font-semibold rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors whitespace-nowrap"
+                >
+                  {allFilteredSelected ? 'Unselect All' : 'Select All'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-400 mb-3">
+                {categoryProducts.size} selected · {filteredProducts.length} shown{productSearch ? ` for "${productSearch}"` : ''}
+              </p>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {filteredProducts.map(product => (
+                  <label
+                    key={product.id}
+                    htmlFor={product.id}
+                    className="flex items-center gap-3 rounded-2xl border border-gray-200 p-4 cursor-pointer hover:border-orange-200 hover:bg-orange-50/40 transition-colors"
+                  >
+                    <Checkbox
+                      id={product.id}
+                      checked={categoryProducts.has(product.id)}
+                      onCheckedChange={(checked) => handleProductToggle(product.id, checked as boolean)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                      <p className="text-sm text-gray-500 truncate">
+                        RM {product.price.toFixed(2)} | Current: {product.category || 'Uncategorized'}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+
+                {filteredProducts.length === 0 && productSearch && (
+                  <div className="col-span-full py-10 text-center text-gray-500">
+                    <Search className="size-8 mx-auto mb-3 text-gray-300" />
+                    <p>No products match "{productSearch}"</p>
+                  </div>
+                )}
+
+                {products.length === 0 && (
+                  <div className="col-span-full py-10 text-center text-gray-500">
+                    <p>No products available.</p>
+                    <p className="text-sm text-gray-400">Add products first in Product Management.</p>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <div className="py-16 text-center text-gray-500">
               <Palette className="size-10 mx-auto mb-3 text-gray-300" />

@@ -40,15 +40,15 @@ export function CategoryManagementView() {
   );
 
   const allFilteredSelected = filteredProducts.length > 0 && filteredProducts.every(p => categoryProducts.has(p.id));
+  const someFilteredSelected = filteredProducts.some(p => categoryProducts.has(p.id));
 
   const handleSelectAll = () => {
+    const currentlyAllSelected = filteredProducts.every(p => categoryProducts.has(p.id));
     setCategoryProducts(prev => {
       const next = new Set(prev);
-      if (allFilteredSelected) {
-        // Only unselect if ALL are already selected
+      if (currentlyAllSelected) {
         filteredProducts.forEach(p => next.delete(p.id));
       } else {
-        // Select all that aren't selected yet
         filteredProducts.forEach(p => next.add(p.id));
       }
       return next;
@@ -459,7 +459,7 @@ export function CategoryManagementView() {
                 >
                   {allFilteredSelected
                     ? 'Unselect All'
-                    : filteredProducts.some(p => categoryProducts.has(p.id))
+                    : someFilteredSelected
                       ? 'Select Remaining'
                       : 'Select All'}
                 </button>

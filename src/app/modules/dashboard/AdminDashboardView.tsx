@@ -233,6 +233,7 @@ function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
     open:      'bg-blue-50 text-blue-700',
   };
   const items: any[] = order.items ?? order.order_items ?? [];
+  console.log(`[OrderRow] Table ${order.tableNumber} items:`, items.map(i => ({ addedBy: i.addedBy, added_by: i.added_by, name: i.addedByName })));
   const waiterNames = [...new Set(
     items.filter(i => i.addedBy && i.addedBy !== 'guest').map(i => i.addedByName || i.added_by_name).filter(Boolean)
   )];

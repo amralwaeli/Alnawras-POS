@@ -99,8 +99,8 @@ export function RealtimeSyncEngine() {
         const res = await CategoryController.getCategories(currentUser);
         if (res.success) setCategories(res.categories || []);
       })
-      // Order items
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
+      // Order items — filtered by branch via order_id membership in state
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `branch_id=eq.${branchId}` }, (payload) => {
         const item = (payload.new || payload.old) as any;
         if (!item?.order_id) return;
 
@@ -121,12 +121,10 @@ export function RealtimeSyncEngine() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser, setOrders, setTables, setProducts, setCategories, syncAll]);
 
-  // ── Initial load + polling heartbeat ─────────────────────────────────────
+  // ── Initial load only — realtime subscriptions handle all subsequent updates ──
   useEffect(() => {
     if (!currentUser) return;
     void syncAll();
-    const interval = setInterval(syncAll, 300);
-    return () => clearInterval(interval);
   }, [currentUser, syncAll]);
 
   return null; // pure side-effect component

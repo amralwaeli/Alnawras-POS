@@ -66,7 +66,7 @@ export function KitchenView() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => void loadTickets())
       .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
 
-    const poll = setInterval(loadTickets, 250);
+    const poll = setInterval(loadTickets, 30_000); // Safety fallback every 30s (was 250ms — caused massive egress)
     return () => { supabase.removeChannel(channel); clearInterval(poll); };
   }, [currentUser, loadTickets]);
 

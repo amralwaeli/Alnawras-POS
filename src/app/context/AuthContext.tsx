@@ -5,6 +5,7 @@ import { StaffController } from '../controllers/StaffController';
 
 interface AuthContextType {
   currentUser: User | null;
+  authLoading: boolean;
   users: User[];
   setCurrentUser: (u: User | null) => void;
   setUsers: (u: User[]) => void;
@@ -20,10 +21,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  // authLoading stays true until the initial user list is fetched from Supabase.
+  // While true, App.tsx shows a neutral spinner instead of the login screen,
+  // preventing a flash of the PIN pad on QR / public routes.
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     StaffController.getStaff().then(res => {
       if (res.success && res.data) setUsers(res.data);
+    }).finally(() => {
+      setAuthLoading(false);
     });
   }, []);
 
@@ -49,7 +56,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
 
   return (
     <AuthContext.Provider value={{
-      currentUser, users, setCurrentUser, setUsers,
+      currentUser, authLoading, users, setCurrentUser, setUsers,
       login, logout, addUser, updateUser, deleteUser,
     }}>
       {children}

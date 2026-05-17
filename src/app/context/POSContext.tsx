@@ -76,6 +76,7 @@ export function usePOS() {
     supabase,
     // auth
     currentUser:    auth.currentUser,
+    authLoading:    auth.authLoading,
     users:          auth.users,
     setCurrentUser: auth.setCurrentUser,
     setUsers:       auth.setUsers,

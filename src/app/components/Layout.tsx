@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
-  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings, Fingerprint, ReceiptText
+  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings, Fingerprint, ReceiptText, FileText
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
@@ -43,6 +43,7 @@ export function Layout() {
     { path: '/product-management',  label: 'Products',        icon: Package,         permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',         label: 'Manage Menu',     icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',         label: 'Bill Format',     icon: ReceiptText,     permission: 'canManageAccounting' as const, adminOnly: true },
+    { path: '/quotations',          label: 'Quotations',      icon: FileText,        permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/table-qr',            label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
   ];
 

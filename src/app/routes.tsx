@@ -43,6 +43,7 @@ const ReportsView            = lazy(() => import('./modules/reports').then(m => 
 
 const AccountingView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.AccountingView })));
 const BillFormatView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.BillFormatView })));
+const QuotationsView         = lazy(() => import('./modules/quotations').then(m => ({ default: m.QuotationsView })));
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
@@ -107,6 +108,7 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
+      { path: 'quotations',          element: <Lazy><ProtectedRoute adminOnly><QuotationsView /></ProtectedRoute></Lazy> },
 
       // ── Staff ──
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },

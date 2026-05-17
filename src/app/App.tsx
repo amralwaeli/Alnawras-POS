@@ -9,15 +9,38 @@ import { checkSupabaseConnection } from '../lib/supabase';
 const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/'];
 
 function isPublicRoute(): boolean {
-  const hash = window.location.hash;
-  return PUBLIC_HASH_PREFIXES.some(prefix => hash.startsWith(prefix));
+  return PUBLIC_HASH_PREFIXES.some(prefix => window.location.hash.startsWith(prefix));
 }
 
 function AppContent() {
-  const { currentUser } = usePOS();
-  // If the visitor is on a public QR/customer route, skip the staff login gate
-  // entirely and go straight to the router so the customer sees the menu.
+  const { currentUser, authLoading } = usePOS();
+
+  // While auth is initializing (fetching staff list from Supabase), show a
+  // neutral loading screen. This prevents the PIN pad from flashing on screen
+  // for a moment when a customer scans a QR code.
+  if (authLoading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: '#f8fafc',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, border: '3px solid #f59e0b',
+            borderTopColor: 'transparent', borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: '#64748b', fontSize: 14, fontWeight: 600 }}>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no staff is logged in AND this is not a public QR/customer route,
+  // show the staff PIN login screen.
   if (!currentUser && !isPublicRoute()) return <LoginView onLoginSuccess={() => {}} />;
+
   return <RouterProvider router={router} />;
 }
 

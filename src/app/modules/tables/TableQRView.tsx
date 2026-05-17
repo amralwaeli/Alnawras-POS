@@ -3,7 +3,15 @@ import { usePOS } from '../../context/POSContext';
 import QRCode from 'qrcode';
 import { QrCode, Printer } from 'lucide-react';
 
-const hashPath = (path: string) => `${window.location.origin}/#${path}`;
+// Build the full absolute URL including the app base path (important on GitHub Pages
+// where the app lives at /Alnawras-POS/ not at the root).
+function hashPath(route: string): string {
+  const origin = window.location.origin;
+  // pathname is e.g. "/Alnawras-POS/" on GitHub Pages, or "/" locally.
+  // We take everything up to (but not including) the hash.
+  const base = window.location.pathname.replace(/\/$/, '');
+  return `${origin}${base}/#${route}`;
+}
 
 export function TableQRView() {
   const { tables, currentUser } = usePOS();
@@ -19,8 +27,6 @@ export function TableQRView() {
   const handlePrintAll = () => {
     window.print();
   };
-
-  const hashPath = (path: string) => `${window.location.origin}/#${path}`;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">

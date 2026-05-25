@@ -43,7 +43,7 @@ export function QuotationsView() {
   };
 
   const updateItem = (id: string, field: keyof QuotationItem, value: string | number) => {
-    setItems(items.map(item => {
+    setItems((prevItems) => prevItems.map(item => {
       if (item.id === id) {
         return { ...item, [field]: value };
       }

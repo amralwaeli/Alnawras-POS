@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef } from 'react';
 
 export interface QuotationItem {
   id: string;
@@ -84,12 +84,7 @@ export const QuotationTemplate = forwardRef<HTMLDivElement, Props>(({ data }, re
           <p style={{ margin: 0 }}>E-Mail: alnawrasrestaurant23@gmail.com</p>
         </div>
         <div>
-          <img
-            src={logoSrc}
-            alt="Alnawras Logo"
-            onError={() => { if (logoSrc !== fallback) setLogoSrc(fallback); }}
-            style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
-          />
+          {renderLogo()}
         </div>
       </div>
 

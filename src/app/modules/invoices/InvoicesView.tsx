@@ -43,7 +43,7 @@ export function InvoicesView() {
   };
 
   const updateItem = (id: string, field: keyof InvoiceItem, value: string | number) => {
-    setItems(items.map(item => {
+    setItems((prevItems) => prevItems.map(item => {
       if (item.id === id) {
         return { ...item, [field]: value };
       }

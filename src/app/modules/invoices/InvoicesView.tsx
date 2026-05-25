@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
-import { useCatalog } from '../../../context/CatalogContext';
+import { useCatalog } from '../../context/CatalogContext';
 
 export function InvoicesView() {
   

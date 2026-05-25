@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
-import { useCatalog } from '../../../context/CatalogContext';
+import { useCatalog } from '../../context/CatalogContext';
 
 export function QuotationsView() {
   

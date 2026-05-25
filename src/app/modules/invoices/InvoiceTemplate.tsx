@@ -1,5 +1,4 @@
 import React, { forwardRef } from 'react';
-import { loadBillFormatSettings } from '../../../lib/billFormat';
 
 export interface InvoiceItem {
   id: string;
@@ -27,8 +26,7 @@ interface Props {
 }
 
 export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
-  const settings = loadBillFormatSettings();
-  const logoUrl = settings.logoUrl;
+  const logoUrl = '/alnawras-logo.png';
 
   return (
     <div
@@ -73,20 +71,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
           <p style={{ margin: 0 }}>E-Mail: alnawrasrestaurant23@gmail.com</p>
         </div>
         <div>
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Alnawras Logo"
-              style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
-            />
-          ) : (
-            <div style={{
-              width: 80, height: 80, borderRadius: 8,
-              background: '#f59e0b', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 700, fontSize: 20,
-            }}>AN</div>
-          )}
+          <img
+            src={logoUrl}
+            alt="Alnawras Logo"
+            style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
+          />
         </div>
       </div>
 

@@ -44,6 +44,7 @@ export function Layout() {
     { path: '/manage-menu',         label: 'Manage Menu',     icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',         label: 'Bill Format',     icon: ReceiptText,     permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/quotations',          label: 'Quotations',      icon: FileText,        permission: 'canManageAccounting' as const, adminOnly: true },
+    { path: '/invoices',            label: 'Invoices',        icon: FileText,        permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/table-qr',            label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
   ];
 

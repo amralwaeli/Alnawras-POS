@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
+import { useCatalog } from '../../../context/CatalogContext';
 
 export function QuotationsView() {
   
@@ -16,6 +17,15 @@ export function QuotationsView() {
   const [items, setItems] = useState<QuotationItem[]>([
     { id: '1', name: '', qty: 1, unitPrice: 0 }
   ]);
+
+  const { products } = useCatalog();
+  const [activeSuggest, setActiveSuggest] = useState<string | null>(null);
+
+  const selectProduct = (itemId: string, product: { id: string; name: string; price: number }) => {
+    updateItem(itemId, 'name', product.name);
+    updateItem(itemId, 'unitPrice', product.price);
+    setActiveSuggest(null);
+  };
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -155,13 +165,30 @@ export function QuotationsView() {
               {/* Rows */}
               {items.map((item) => (
                 <div key={item.id} className="flex gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={(e) => updateItem(item.id, 'name', e.target.value)}
-                    placeholder="Item description"
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-amber-500 bg-white"
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => { updateItem(item.id, 'name', e.target.value); setActiveSuggest(item.id); }}
+                      onFocus={() => setActiveSuggest(item.id)}
+                      placeholder="Item description"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-amber-500 bg-white"
+                    />
+                    {activeSuggest === item.id && item.name.trim() !== '' && (
+                      <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-40 max-h-44 overflow-auto">
+                        {products.filter(p => p.name.toLowerCase().includes(item.name.toLowerCase())).slice(0,8).map(p => (
+                          <div
+                            key={p.id}
+                            onMouseDown={(e) => { e.preventDefault(); selectProduct(item.id, p); }}
+                            className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                          >
+                            <div className="font-medium">{p.name}</div>
+                            <div className="text-xs text-gray-500">RM{p.price.toFixed(2)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <input
                     type="number"
                     min="1"

@@ -1,13 +1,16 @@
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router';
+import { useState } from 'react';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
-  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings, Fingerprint, ReceiptText, FileText
+  DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed, Settings, Fingerprint, ReceiptText, FileText,
+  ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
+  const [collapsed, setCollapsed] = useState(false);
 
   if (!currentUser) return <Navigate to="/check-in" replace />;
 
@@ -67,26 +70,37 @@ export function Layout() {
   return (
     <div className="h-screen flex bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-60 flex flex-col bg-gray-900 text-white shrink-0">
+      <aside className={`${collapsed ? 'w-16' : 'w-60'} flex flex-col bg-gray-900 text-white shrink-0 transition-all duration-150`}>
         {/* Brand */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="size-9 rounded-xl bg-amber-500 flex items-center justify-center">
+        <div className="flex items-center gap-3 px-3 py-4 border-b border-white/10">
+          <div className="size-9 rounded-xl bg-amber-500 flex items-center justify-center ml-2">
             <UtensilsCrossed className="size-5 text-white" />
           </div>
-          <div>
-            <p className="font-bold text-base leading-tight">Alnawras</p>
-            <p className="text-[11px] text-gray-400 uppercase tracking-wider">Point of Sale</p>
-          </div>
+          {!collapsed && (
+            <div className="ml-2">
+              <p className="font-bold text-base leading-tight">Alnawras</p>
+              <p className="text-[11px] text-gray-400 uppercase tracking-wider">Point of Sale</p>
+            </div>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="p-2 rounded-md text-gray-300 hover:text-white hover:bg-white/6 transition-colors mr-2"
+          >
+            {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+          </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className={`flex-1 px-1 py-4 space-y-0.5 overflow-y-auto ${collapsed ? 'text-center' : ''}`}>
           {navItems.map(item => (
             <NavLink
               key={item.path}
               to={item.path}
+              title={item.label}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                `flex items-center gap-3 ${collapsed ? 'justify-center' : 'px-3 py-2.5'} rounded-lg text-sm transition-all ${
                   isActive
                     ? 'bg-amber-500 text-white font-medium'
                     : 'text-gray-400 hover:bg-white/8 hover:text-white'
@@ -94,29 +108,40 @@ export function Layout() {
               }
             >
               <item.icon className="size-4 shrink-0" />
-              <span>{item.label}</span>
+              {!collapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
 
         {/* User section */}
         <div className="px-3 py-4 border-t border-white/10">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">
-            <div className={`size-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-              {initials}
+          {!collapsed ? (
+            <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">
+              <div className={`size-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
+                <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>
+              </div>
+              <button
+                onClick={logout}
+                title="Logout"
+                className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <LogOut className="size-4" />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
-              <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <div className={`size-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold shrink-0`}> 
+                {initials}
+              </div>
+              <button onClick={logout} title="Logout" className="p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/6">
+                <LogOut className="size-4" />
+              </button>
             </div>
-            <button
-              onClick={logout}
-              title="Logout"
-              className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
+          )}
         </div>
       </aside>
 

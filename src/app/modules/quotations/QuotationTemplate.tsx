@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState } from 'react';
 
 export interface QuotationItem {
   id: string;
@@ -25,8 +25,18 @@ interface Props {
   data: QuotationData;
 }
 
+const DEFAULT_LOGO = '/alnawras-logo.png';
+function makeFallbackDataUrl() {
+  const svg = `
+  <svg xmlns='http://www.w3.org/2000/svg' width='260' height='90'>
+    <rect width='100%' height='100%' fill='%23f5af19' rx='8' />
+    <text x='50%' y='55%' font-family='Arial, Helvetica, sans-serif' font-size='28' fill='%23ffffff' font-weight='700' text-anchor='middle'>AL-NAWRAS</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 export const QuotationTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
-  const logoUrl = '/alnawras-logo.png';
+  const [logoSrc, setLogoSrc] = useState<string>(DEFAULT_LOGO);
+  const fallback = makeFallbackDataUrl();
 
   return (
     <div
@@ -75,8 +85,9 @@ export const QuotationTemplate = forwardRef<HTMLDivElement, Props>(({ data }, re
         </div>
         <div>
           <img
-            src={logoUrl}
+            src={logoSrc}
             alt="Alnawras Logo"
+            onError={() => { if (logoSrc !== fallback) setLogoSrc(fallback); }}
             style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
           />
         </div>

@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { loadBillFormatSettings } from '../../../lib/billFormat';
 
 export interface InvoiceItem {
   id: string;
@@ -53,6 +54,9 @@ function renderLogo() {
 }
 
 export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
+  const billFormatSettings = typeof window !== 'undefined' ? loadBillFormatSettings() : null;
+  const logoUrl = billFormatSettings?.logoUrl || '';
+
   return (
     <div
       ref={ref}
@@ -96,7 +100,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
           <p style={{ margin: 0 }}>E-Mail: alnawrasrestaurant23@gmail.com</p>
         </div>
         <div>
-          {renderLogo()}
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Alnawras Logo"
+              style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
+            />
+          ) : renderLogo()}
         </div>
       </div>
 

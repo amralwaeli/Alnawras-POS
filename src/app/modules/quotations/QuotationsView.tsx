@@ -1,12 +1,10 @@
 import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import { Plus, Trash2, Printer, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
-import { loadBillFormatSettings } from '../../../lib/billFormat';
 
 export function QuotationsView() {
-  const settings = loadBillFormatSettings();
-  const hasLogo = !!settings.logoUrl;
+  
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -80,17 +78,7 @@ export function QuotationsView() {
         </button>
       </div>
 
-      {/* No-logo warning */}
-      {!hasLogo && (
-        <div className="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          <AlertCircle className="size-4 mt-0.5 shrink-0 text-amber-500" />
-          <span>
-            No logo detected. Upload your logo via{' '}
-            <a href="#/bill-format" className="underline font-medium hover:text-amber-900">Bill Format settings</a>{' '}
-            and it will automatically appear on the quotation.
-          </span>
-        </div>
-      )}
+      
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form Controls */}

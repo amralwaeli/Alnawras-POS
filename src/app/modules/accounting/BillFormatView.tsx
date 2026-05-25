@@ -96,7 +96,11 @@ export function BillFormatView() {
   );
 
   const updateField = (key: keyof BillFormatSettings, value: string) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value };
+      saveBillFormatSettings(next);
+      return next;
+    });
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,6 +123,7 @@ export function BillFormatView() {
   const handleReset = () => {
     resetBillFormatSettings();
     setSettings(defaultBillFormatSettings);
+    saveBillFormatSettings(defaultBillFormatSettings);
     toast.success('Bill format reset to default');
   };
 

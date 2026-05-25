@@ -25,19 +25,34 @@ interface Props {
   data: InvoiceData;
 }
 
-const DEFAULT_LOGO = '/alnawras-logo.png';
-function makeFallbackDataUrl() {
-  const svg = `
-  <svg xmlns='http://www.w3.org/2000/svg' width='260' height='90'>
-    <rect width='100%' height='100%' fill='%23f5af19' rx='8' />
-    <text x='50%' y='55%' font-family='Arial, Helvetica, sans-serif' font-size='28' fill='%23ffffff' font-weight='700' text-anchor='middle'>AL-NAWRAS</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+function renderLogo() {
+  return (
+    <div style={{
+      width: 130,
+      height: 90,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#121212',
+      color: '#fff',
+      borderRadius: 10,
+      fontSize: 16,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      padding: '8px',
+      textAlign: 'center',
+      boxSizing: 'border-box',
+    }}>
+      <div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>AL-NAWRAS</div>
+        <div style={{ fontSize: 24, fontWeight: 900 }}>RESTAURANT</div>
+      </div>
+    </div>
+  );
 }
-export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
-  const [logoSrc, setLogoSrc] = useState<string>(DEFAULT_LOGO);
-  const fallback = makeFallbackDataUrl();
 
+export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
   return (
     <div
       ref={ref}

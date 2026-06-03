@@ -1,34 +1,27 @@
 import { usePOS } from '../../context/POSContext';
-import { Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Package, CheckCircle2, XCircle } from 'lucide-react';
 import { fmt } from '../../../lib/currency';
 
 export function InventoryView() {
   const { products, currentUser } = usePOS();
   if (!currentUser) return null;
 
-  const low  = products.filter(p => p.stock > 0 && p.stock <= p.reorderPoint);
-  const out  = products.filter(p => p.stock === 0);
-  const ok   = products.filter(p => p.stock > p.reorderPoint);
-
-  const getStatus = (p: typeof products[0]) => {
-    if (p.stock === 0) return { label: 'Out of Stock', cls: 'bg-red-50 text-red-700' };
-    if (p.stock <= p.reorderPoint) return { label: 'Low Stock', cls: 'bg-amber-50 text-amber-700' };
-    return { label: 'In Stock', cls: 'bg-emerald-50 text-emerald-700' };
-  };
+  const available   = products.filter(p => (p.kitchenStatus || 'available') === 'available');
+  const unavailable = products.filter(p => (p.kitchenStatus || 'available') !== 'available');
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Monitor stock levels across all products</p>
+          <p className="text-gray-500 text-sm mt-0.5">Product availability across the menu</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'In Stock', value: ok.length, icon: CheckCircle2, bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
-            { label: 'Low Stock', value: low.length, icon: AlertTriangle, bg: 'bg-amber-50', ic: 'bg-amber-100 text-amber-600', vc: 'text-amber-700' },
-            { label: 'Out of Stock', value: out.length, icon: Package, bg: 'bg-red-50', ic: 'bg-red-100 text-red-600', vc: 'text-red-700' },
+            { label: 'Total Products',  value: products.length,     icon: Package,       bg: 'bg-blue-50',    ic: 'bg-blue-100 text-blue-600',      vc: 'text-blue-700' },
+            { label: 'Available',       value: available.length,    icon: CheckCircle2,  bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
+            { label: 'Not Available',   value: unavailable.length,  icon: XCircle,       bg: 'bg-red-50',     ic: 'bg-red-100 text-red-600',         vc: 'text-red-700' },
           ].map(s => (
             <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-black/5`}>
               <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}>
@@ -40,10 +33,10 @@ export function InventoryView() {
           ))}
         </div>
 
-        {(low.length > 0 || out.length > 0) && (
+        {unavailable.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
-            <strong>{out.length + low.length} item{out.length + low.length !== 1 ? 's' : ''} need attention.</strong>
-            {' '}{out.length > 0 && `${out.length} out of stock.`} {low.length > 0 && `${low.length} running low.`}
+            <strong>{unavailable.length} item{unavailable.length !== 1 ? 's' : ''} currently unavailable.</strong>
+            {' '}Switch them back to available from the Kitchen screen.
           </div>
         )}
 
@@ -57,15 +50,13 @@ export function InventoryView() {
                 <tr className="bg-gray-50 text-left">
                   <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</th>
                   <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Category</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Stock</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Reorder At</th>
                   <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Price</th>
-                  <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Status</th>
+                  <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Availability</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {products.map(p => {
-                  const st = getStatus(p);
+                  const isAvailable = (p.kitchenStatus || 'available') === 'available';
                   return (
                     <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3.5">
@@ -78,15 +69,11 @@ export function InventoryView() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-sm text-gray-500">{p.category}</td>
-                      <td className="px-5 py-3.5 text-right">
-                        <span className={`font-bold text-sm ${p.stock === 0 ? 'text-red-600' : p.stock <= p.reorderPoint ? 'text-amber-600' : 'text-gray-900'}`}>
-                          {p.stock}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-400 text-right">{p.reorderPoint}</td>
                       <td className="px-5 py-3.5 text-sm font-medium text-right">{fmt(p.price)}</td>
                       <td className="px-5 py-3.5 text-center">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.cls}`}>{st.label}</span>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isAvailable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                          {isAvailable ? 'Available' : 'Not Available'}
+                        </span>
                       </td>
                     </tr>
                   );

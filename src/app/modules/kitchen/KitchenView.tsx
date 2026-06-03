@@ -20,7 +20,7 @@ const STATUS_STYLE: Record<string, { badge: string; btn: string; label: string }
 };
 
 export function KitchenView() {
-  const { products, currentUser, updateProduct } = usePOS();
+  const { products, currentUser, updateProduct, setProducts } = usePOS();
   const [tickets, setTickets]     = useState<any[]>([]);
   const [tab, setTab]             = useState<'orders' | 'products'>('orders');
   const [newAlert, setNewAlert]   = useState(false);
@@ -88,9 +88,14 @@ export function KitchenView() {
     else if (next === 'ready') toast.success('Item ready for pickup!');
   };
 
-  const toggleAvailability = (id: string, isAvailable: boolean) => {
-    updateProduct(id, { availabilityStatus: isAvailable ? 'out-of-stock' : 'available' });
-    toast.success(`Marked as ${isAvailable ? 'unavailable' : 'available'}`);
+  const toggleAvailability = async (id: string, isAvailable: boolean) => {
+    const newStatus = isAvailable ? 'out-of-stock' : 'available';
+    // Optimistic update — both fields so waiter & QR menus reflect change immediately
+    setProducts(prev => prev.map(p =>
+      p.id === id ? { ...p, kitchenStatus: newStatus as any, availabilityStatus: newStatus as any } : p
+    ));
+    await updateProduct(id, { availabilityStatus: newStatus as any });
+    toast.success(`Product marked as ${isAvailable ? 'unavailable' : 'available'}`);
   };
 
   const filteredProducts = useMemo(() => {

@@ -5,15 +5,17 @@ import { usePOS } from './context/POSContext';
 import { ROLE_PERMISSIONS } from './models/types';
 import { ProductManagementView } from './modules/staff';
 
-function ProtectedRoute({ children, permission, adminOnly }: {
+function ProtectedRoute({ children, permission, adminOnly, allowedRoles }: {
   children: React.ReactNode;
   permission?: keyof typeof ROLE_PERMISSIONS['admin'];
   adminOnly?: boolean;
+  allowedRoles?: string[]; // roles that bypass adminOnly / permission checks
 }) {
   const { currentUser } = usePOS();
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
-  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/" replace />;
+  const isAllowed = allowedRoles?.includes(currentUser.role) ?? false;
+  if (adminOnly && currentUser.role !== 'admin' && !isAllowed) return <Navigate to="/" replace />;
+  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission] && !isAllowed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -111,8 +113,8 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
-      { path: 'quotations',          element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><QuotationsView /></ProtectedRoute></Lazy> },
-      { path: 'invoices',            element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><InvoicesView /></ProtectedRoute></Lazy> },
+      { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><QuotationsView /></ProtectedRoute></Lazy> },
+      { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><InvoicesView /></ProtectedRoute></Lazy> },
 
       // ── Staff ──
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },

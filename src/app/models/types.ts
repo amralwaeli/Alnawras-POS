@@ -306,7 +306,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canCheckIn: true,
     canManageInvoicesQuotations: true,
   },
-  // Accounting: invoices, quotations, and accounting page
+  // Accounting: accounting page + invoices/quotations (via explicit role check, not this permission)
   accounting: {
     canViewTables: false,
     canAddOrders: false,
@@ -319,7 +319,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
-    canManageInvoicesQuotations: true,
+    canManageInvoicesQuotations: false,
   },
 };
 

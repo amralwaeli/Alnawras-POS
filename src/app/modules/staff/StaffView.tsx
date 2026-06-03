@@ -4,21 +4,36 @@ import { Users, UserCheck, Plus, X } from 'lucide-react';
 import { UserRole } from '../../models/types';
 
 const roleColors: Record<string, string> = {
-  admin:   'bg-violet-100 text-violet-700',
-  cashier: 'bg-blue-100 text-blue-700',
-  waiter:  'bg-emerald-100 text-emerald-700',
-  kitchen: 'bg-orange-100 text-orange-700',
-  juice:   'bg-amber-100 text-amber-700',
-  hr:      'bg-pink-100 text-pink-700',
+  admin:      'bg-violet-100 text-violet-700',
+  cashier:    'bg-blue-100 text-blue-700',
+  waiter:     'bg-emerald-100 text-emerald-700',
+  kitchen:    'bg-orange-100 text-orange-700',
+  juice:      'bg-amber-100 text-amber-700',
+  hr:         'bg-pink-100 text-pink-700',
+  staff:      'bg-teal-100 text-teal-700',
+  accounting: 'bg-indigo-100 text-indigo-700',
 };
 
 const avatarColors: Record<string, string> = {
-  admin:   'from-violet-500 to-purple-600',
-  cashier: 'from-blue-500 to-cyan-600',
-  waiter:  'from-emerald-500 to-green-600',
-  kitchen: 'from-orange-500 to-amber-600',
-  juice:   'from-yellow-400 to-amber-500',
-  hr:      'from-pink-500 to-rose-600',
+  admin:      'from-violet-500 to-purple-600',
+  cashier:    'from-blue-500 to-cyan-600',
+  waiter:     'from-emerald-500 to-green-600',
+  kitchen:    'from-orange-500 to-amber-600',
+  juice:      'from-yellow-400 to-amber-500',
+  hr:         'from-pink-500 to-rose-600',
+  staff:      'from-teal-500 to-cyan-600',
+  accounting: 'from-indigo-500 to-blue-600',
+};
+
+const roleLabels: Record<string, string> = {
+  admin:      'Admin',
+  cashier:    'Cashier',
+  waiter:     'Waiter',
+  kitchen:    'Kitchen',
+  juice:      'Juice',
+  hr:         'HR',
+  staff:      'Special Waiter',
+  accounting: 'Accounting',
 };
 
 export function StaffView() {
@@ -109,7 +124,7 @@ export function StaffView() {
                     </td>
                     <td className="px-5 py-3.5 font-mono text-sm text-gray-500">{u.employmentNumber}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${roleColors[u.role] ?? 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${roleColors[u.role] ?? 'bg-gray-100 text-gray-600'}`}>{roleLabels[u.role] ?? u.role}</span>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-500">{u.email}</td>
                     <td className="px-5 py-3.5">
@@ -151,8 +166,8 @@ export function StaffView() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Role *</label>
                 <select value={formData.role} onChange={e => setFormData(f => ({ ...f, role: e.target.value as UserRole }))}
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
-                  {['cashier', 'waiter', 'kitchen', 'juice', 'hr', 'admin'].map(r => (
-                    <option key={r} value={r} className="capitalize">{r}</option>
+                  {(['cashier', 'waiter', 'kitchen', 'juice', 'hr', 'staff', 'accounting', 'admin'] as const).map(r => (
+                    <option key={r} value={r}>{roleLabels[r]}</option>
                   ))}
                 </select>
               </div>

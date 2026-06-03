@@ -1,20 +1,11 @@
-// QROrderingView — identical to TableOrderingView.
-// Only differences: no staff auth required (customers scan QR),
-// order items attributed to 'guest', and QR session is tracked.
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { Product, Category, Table, Order, OrderItem } from '../../models/types';
+import { Product, Category, Table } from '../../models/types';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
-  Search,
-  ShoppingCart,
-  Plus,
-  Minus,
-  CheckCircle2,
-  Bell,
-  X,
+  Plus, Minus, ShoppingCart, X, Search,
+  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed,
 } from 'lucide-react';
 
 interface CartItem {
@@ -23,100 +14,52 @@ interface CartItem {
   productName: string;
   price: number;
   quantity: number;
+  station: string;
   notes: string;
 }
 
-function mapOrderItem(row: any): OrderItem {
-  return {
-    id: row.id,
-    productId: row.product_id,
-    productName: row.product_name,
-    quantity: Number(row.quantity),
-    price: Number(row.price),
-    subtotal: Number(row.subtotal),
-    addedBy: row.added_by ?? 'guest',
-    addedByName: row.added_by_name ?? 'Guest',
-    addedAt: row.created_at ? new Date(row.created_at) : new Date(),
-    station: row.station ?? 'kitchen',
-    status: row.status,
-    notes: row.notes ?? '',
-    sentToKitchen: row.sent_to_kitchen ?? true,
-  };
-}
-
-function mapOrder(row: any): Order {
-  return {
-    id: row.id,
-    tableId: row.table_id,
-    tableNumber: row.table_number,
-    items: (row.order_items || []).map(mapOrderItem),
-    subtotal: Number(row.subtotal),
-    tax: Number(row.tax || 0),
-    discount: Number(row.discount || 0),
-    total: Number(row.total),
-    status: row.status,
-    paymentStatus: row.payment_status ?? 'unpaid',
-    orderType: row.order_type ?? 'dine-in',
-    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-    completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-    waiters: row.waiters || [],
-    cashierId: row.cashier_id,
-    cashierName: row.cashier_name,
-    paymentMethod: row.payment_method,
-  };
-}
-
-function formatCurrency(value: number) {
-  return `RM ${value.toFixed(2)}`;
+interface ExistingItem {
+  id: string;
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+  status: string;
 }
 
 export function QROrderingView() {
   const { tableId } = useParams();
-  const navigate = useNavigate();
-  const [table, setTable] = useState<Table | null>(null);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+
+  const [table, setTable]               = useState<Table | null>(null);
+  const [orderId, setOrderId]           = useState<string | null>(null);
+  const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
+  const [products, setProducts]         = useState<Product[]>([]);
+  const [categories, setCategories]     = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [cartItems, setCartItems]       = useState<CartItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [submitting, setSubmitting]     = useState(false);
+  const [success, setSuccess]           = useState(false);
   const [invalidTable, setInvalidTable] = useState(false);
   const [callingWaiter, setCallingWaiter] = useState(false);
+  const [mobileView, setMobileView]     = useState<'menu' | 'cart'>('menu');
+  const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
 
+  // ── Load table, products, categories, open order ──────────────────────────
   useEffect(() => {
     const load = async () => {
-      if (!tableId) {
-        setInvalidTable(true);
-        setLoading(false);
-        return;
-      }
-
+      if (!tableId) { setInvalidTable(true); setLoading(false); return; }
       setLoading(true);
-      setInvalidTable(false);
 
-      const { data: tableRow, error: tableError } = await supabase
-        .from('tables')
-        .select('*')
-        .eq('id', tableId)
-        .single();
-
-      if (tableError || !tableRow) {
-        setInvalidTable(true);
-        setLoading(false);
-        return;
-      }
+      const { data: tableRow, error } = await supabase
+        .from('tables').select('*').eq('id', tableId).single();
+      if (error || !tableRow) { setInvalidTable(true); setLoading(false); return; }
 
       const branchId = tableRow.branch_id;
       setTable({
-        id: tableRow.id,
-        number: tableRow.number,
-        capacity: tableRow.capacity,
-        status: tableRow.status,
-        branchId,
-        currentOrderId: tableRow.current_order_id,
+        id: tableRow.id, number: tableRow.number, capacity: tableRow.capacity,
+        status: tableRow.status, branchId, currentOrderId: tableRow.current_order_id,
         assignedCashierId: tableRow.assigned_cashier_id,
         needsWaiter: tableRow.needs_waiter ?? false,
       });
@@ -126,418 +69,537 @@ export function QROrderingView() {
         supabase.from('categories').select('*').eq('branch_id', branchId).order('display_order'),
       ]);
 
-      if (productsRes.error || !productsRes.data) {
-        toast.error('Failed to load menu. Please try again.');
-      } else {
-        setProducts(productsRes.data.map((product: any) => ({
-          ...product,
-          price: Number(product.price),
-          taxRate: Number(product.tax_rate ?? 0),
-          categoryId: product.category_id,
-        })));
+      const prods: Product[] = (productsRes.data || []).map((p: any) => ({
+        id: p.id, name: p.name, category: p.category ?? '', categoryId: p.category_id,
+        price: Number(p.price), stock: p.stock ?? 0, image: p.image,
+        sku: p.sku, taxRate: Number(p.tax_rate ?? 0), reorderPoint: p.reorder_point ?? 0,
+        branchId: p.branch_id, station: p.station ?? 'kitchen',
+        kitchenStatus: p.kitchen_status ?? 'available',
+        availabilityStatus: p.availability_status ?? 'available',
+        isActive: p.is_active ?? true, createdAt: new Date(p.created_at),
+      }));
+      setProducts(prods);
+
+      const cats: Category[] = (categoriesRes.data || []).map((c: any) => ({
+        id: c.id, name: c.name, description: c.description,
+        color: c.color ?? '#f97316', icon: c.icon,
+        displayOrder: Number(c.display_order ?? 0), isActive: c.is_active ?? true,
+        branchId: c.branch_id, createdAt: new Date(c.created_at),
+      }));
+      setCategories(cats);
+      if (cats.length) setSelectedCategory(cats[0].id);
+
+      // Load open order if exists
+      if (tableRow.current_order_id) {
+        const { data: orderData } = await supabase
+          .from('orders').select('*, order_items(*)').eq('id', tableRow.current_order_id).single();
+        if (orderData) {
+          setOrderId(orderData.id);
+          setExistingItems((orderData.order_items || []).map((item: any) => ({
+            id: item.id, productId: item.product_id, productName: item.product_name,
+            price: Number(item.price), quantity: Number(item.quantity), status: item.status,
+          })));
+        }
       }
-
-      if (categoriesRes.error || !categoriesRes.data) {
-        setCategories([]);
-      } else {
-        setCategories(categoriesRes.data.map((category: any) => ({
-          ...category,
-          displayOrder: Number(category.display_order ?? 0),
-        })));
-      }
-
-      const orderQuery = tableRow.current_order_id
-        ? supabase.from('orders').select('*, order_items(*)').eq('id', tableRow.current_order_id).single()
-        : supabase.from('orders').select('*, order_items(*)').eq('table_id', tableId).eq('status', 'open').maybeSingle();
-
-      const { data: orderData } = await orderQuery;
-      if (orderData) setOrder(mapOrder(orderData));
 
       // Track QR session
       try {
         const { data: existing } = await supabase.from('qr_sessions').select('*').eq('table_id', tableId).single();
+        const now = new Date().toISOString();
         if (existing) {
-          await supabase.from('qr_sessions').update({ active: true, last_activity_at: new Date().toISOString() }).eq('table_id', tableId);
+          await supabase.from('qr_sessions').update({ active: true, last_activity_at: now }).eq('table_id', tableId);
         } else {
-          await supabase.from('qr_sessions').insert([{ id: `qr-session-${tableId}`, table_id: tableId, active: true, started_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), branch_id: branchId }]);
+          await supabase.from('qr_sessions').insert([{
+            id: `qr-session-${tableId}`, table_id: tableId, active: true,
+            started_at: now, last_activity_at: now, branch_id: branchId,
+          }]);
         }
-      } catch (err) {
-        console.warn('[QR Session] Could not create session', err);
-      }
+      } catch { /* silent — qr_sessions table may not exist yet */ }
 
       setLoading(false);
     };
-
     void load();
   }, [tableId]);
 
+  // ── Filtered products ────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
     const activeCategory = categories.find(c => c.id === selectedCategory);
     return products.filter(p => {
-      const categoryMatch = selectedCategory
-        ? p.categoryId === selectedCategory || (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
-        : true;
-      const searchMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return categoryMatch && searchMatch;
+      const catMatch = selectedCategory
+        ? p.categoryId === selectedCategory ||
+          (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
+        : false;
+      return catMatch && p.name.toLowerCase().includes(searchQuery.toLowerCase());
     });
   }, [products, categories, selectedCategory, searchQuery]);
 
-  const existingItems = order?.items || [];
-  const newItems = cartItems;
-  const combinedItems = [...existingItems, ...newItems.map(item => ({
-    ...item,
-    status: 'pending',
-  }))];
+  const totalItems    = cartItems.reduce((s, i) => s + i.quantity, 0);
+  const cartTotal     = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const existingTotal = existingItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const billSubtotal = combinedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const billTax = 0;
-  const billTotal = billSubtotal + billTax;
-
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {
     setCartItems(prev => {
-      const existing = prev.find(item => item.productId === product.id);
-      if (existing) {
-        return prev.map(item => item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prev, { id: `cart-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, notes: '' }];
+      const ex = prev.find(i => i.productId === product.id);
+      if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, {
+        id: `new-${Date.now()}`, productId: product.id, productName: product.name,
+        price: product.price, quantity: 1, station: product.station || 'kitchen', notes: '',
+      }];
     });
-  };
-
-  const updateCartItem = (itemId: string, quantity: number) => {
-    setCartItems(prev => prev
-      .map(item => item.id === itemId ? { ...item, quantity: Math.max(1, quantity) } : item)
-      .filter(item => item.quantity > 0)
-    );
-  };
-
-  const updateCartNotes = (itemId: string, notes: string) => {
-    setCartItems(prev => prev.map(item => item.id === itemId ? { ...item, notes } : item));
-  };
-
-  const handleRemoveCartItem = (itemId: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
   };
 
   const handleCallWaiter = async () => {
     if (!table) return;
     setCallingWaiter(true);
     const { error } = await supabase.from('tables').update({ needs_waiter: true }).eq('id', table.id);
-    if (error) {
-      toast.error('Unable to request a waiter. Please try again.');
-    } else {
-      setTable(prev => prev ? { ...prev, needsWaiter: true } : prev);
-      toast.success('A waiter has been notified.');
-    }
+    if (error) toast.error('Could not call waiter. Try again.');
+    else { setTable(prev => prev ? { ...prev, needsWaiter: true } : prev); toast.success('Waiter has been notified!'); }
     setCallingWaiter(false);
   };
 
-  const handleCheckout = async () => {
-    if (!table || cartItems.length === 0) {
-      toast.error('Add items before submitting the order.');
-      return;
-    }
-
+  const handleSubmitOrder = async () => {
+    if (!table || cartItems.length === 0) { toast.error('Add items to your order first.'); return; }
     setSubmitting(true);
-
     try {
-      let orderId = order?.id || table.currentOrderId;
-      let shouldCreateOrder = false;
+      let oid = orderId || table.currentOrderId;
 
-      if (!orderId) {
-        orderId = `order-${Date.now()}`;
-        shouldCreateOrder = true;
-      }
-
-      if (shouldCreateOrder) {
-        const { data: tableResponse, error: updateError } = await supabase
-          .from('tables')
-          .update({ status: 'occupied', current_order_id: orderId })
-          .eq('id', table.id)
-          .is('current_order_id', null)
-          .select('current_order_id, status')
-          .single();
-
-        if (updateError && updateError.details) {
-          const refreshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          if (refreshTable.data?.current_order_id) {
-            orderId = refreshTable.data.current_order_id;
-          } else {
-            throw new Error(updateError.message || 'Could not reserve table');
-          }
-        }
-
-        if (!tableResponse?.current_order_id) {
-          const freshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          orderId = freshTable.data?.current_order_id || orderId;
-        }
-
-        const { error: createError } = await supabase.from('orders').insert([{
-          id: orderId,
-          table_id: table.id,
-          table_number: table.number,
-          subtotal: 0,
-          tax: 0,
-          discount: 0,
-          total: 0,
-          status: 'open',
-          payment_status: 'unpaid',
-          order_type: 'dine-in',
-          branch_id: table.branchId,
-          waiters: [],
+      if (!oid) {
+        oid = `order-${Date.now()}`;
+        await supabase.from('tables')
+          .update({ status: 'occupied', current_order_id: oid })
+          .eq('id', table.id).is('current_order_id', null);
+        await supabase.from('orders').insert([{
+          id: oid, table_id: table.id, table_number: table.number,
+          subtotal: 0, tax: 0, discount: 0, total: 0,
+          status: 'open', payment_status: 'unpaid', order_type: 'dine-in',
+          branch_id: table.branchId, waiters: [],
         }]);
-
-        if (createError) {
-          throw new Error(createError.message || 'Could not create order');
-        }
+        setOrderId(oid);
+        setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: oid! } : prev);
       }
 
-      const newOrderItems = cartItems.map(item => ({
+      const payload = cartItems.map(item => ({
         id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        order_id: orderId,
-        product_id: item.productId,
-        product_name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.price * item.quantity,
-        status: 'pending',
-        notes: item.notes || null,
-        added_by: 'guest',        // no staff login — customer via QR
-        added_by_name: 'Guest',
-        sent_to_kitchen: true,
+        order_id: oid, product_id: item.productId, product_name: item.productName,
+        quantity: item.quantity, price: item.price, subtotal: item.price * item.quantity,
+        status: 'pending', notes: item.notes || null,
+        added_by: 'guest', added_by_name: 'Guest', sent_to_kitchen: true,
       }));
 
-      const { error: itemsError } = await supabase.from('order_items').insert(newOrderItems);
-      if (itemsError) {
-        throw new Error(itemsError.message || 'Could not send items to kitchen');
-      }
+      const { error } = await supabase.from('order_items').insert(payload);
+      if (error) throw new Error(error.message);
 
-      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-      const subtotal = (allItems || []).reduce((sum, item: any) => sum + Number(item.subtotal), 0);
-      const tax = 0;
-      const total = subtotal + tax;
+      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', oid);
+      const subtotal = (allItems || []).reduce((s: number, i: any) => s + Number(i.subtotal), 0);
+      await supabase.from('orders').update({ subtotal, total: subtotal }).eq('id', oid);
 
-      const { error: orderUpdateError } = await supabase.from('orders').update({ subtotal, tax, total }).eq('id', orderId);
-      if (orderUpdateError) {
-        throw new Error(orderUpdateError.message || 'Could not update order totals');
-      }
-
-      const { data: savedOrder } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
-      if (savedOrder) {
-        setOrder(mapOrder(savedOrder));
-        setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: orderId } : prev);
+      // Refresh existing items
+      const { data: orderData } = await supabase.from('orders').select('*, order_items(*)').eq('id', oid).single();
+      if (orderData) {
+        setExistingItems((orderData.order_items || []).map((item: any) => ({
+          id: item.id, productId: item.product_id, productName: item.product_name,
+          price: Number(item.price), quantity: Number(item.quantity), status: item.status,
+        })));
       }
 
       setCartItems([]);
+      setExpandedNotes(null);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
-      console.error('[QROrderingView]', error);
-      toast.error(error?.message || 'Failed to submit order.');
+      setTimeout(() => { setSuccess(false); setMobileView('menu'); }, 2500);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to submit order.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const orderNumber = order?.id ? order.id.split('-').pop() : 'NEW';
-
-  if (invalidTable) {
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-10">
-        <div className="max-w-xl w-full bg-white rounded-3xl shadow-xl p-10 text-center">
-          <p className="text-sm uppercase tracking-[0.3em] text-orange-500 font-black mb-4">Invalid QR link</p>
-          <h1 className="text-3xl font-extrabold text-slate-900 mb-4">Sorry, this table code isn't valid.</h1>
-          <p className="text-sm text-slate-500 mb-8">Please ask a team member for a fresh QR code or scan the correct table QR.</p>
-          <button onClick={() => navigate('/')} className="px-6 py-3 rounded-full bg-orange-500 text-white font-bold hover:bg-orange-600 transition">Go to Home</button>
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3]">
+        <div className="flex flex-col items-center gap-5">
+          <div className="bg-orange-500 rounded-[28px] p-5 shadow-2xl shadow-orange-200">
+            <UtensilsCrossed className="size-10 text-white" />
+          </div>
+          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Loading menu…</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-slate-700 hover:text-orange-600">
-            <ArrowLeft className="size-5" /> Back
-          </button>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Table</p>
-            <p className="text-3xl font-extrabold text-slate-900">{table ? `T-${table.number}` : 'Loading...'}</p>
+  // ── Invalid table ─────────────────────────────────────────────────────────
+  if (invalidTable) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5">
+            <X className="size-10 text-red-500" />
           </div>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
-          <div className="space-y-6">
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Welcome to our table ordering</p>
-                  <h2 className="text-2xl font-extrabold text-slate-900">Scan. Tap. Order.</h2>
-                </div>
-                <button onClick={handleCallWaiter} disabled={callingWaiter} className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-3 text-sm font-bold text-white hover:bg-orange-600 transition disabled:opacity-60">
-                  <Bell className="size-4" /> {table?.needsWaiter ? 'Waiter Requested' : 'Call Waiter'}
-                </button>
-              </div>
-              {table?.needsWaiter && <p className="mt-4 text-sm text-orange-700">A waiter has been notified for this table.</p>}
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-[1fr_2fr]">
-              <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Order</p>
-                <p className="text-lg font-bold text-slate-900">{order ? 'Open bill' : 'New order'}</p>
-                <p className="text-sm text-slate-500 mt-2">Bill #: <span className="font-semibold text-slate-900">{orderNumber}</span></p>
-              </div>
-              <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Status</p>
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${order ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {order ? 'Open and active' : 'Ready to order'}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm text-slate-500">You can add items anytime until the bill is closed.</p>
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-4 shadow-sm border border-slate-200">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-slate-100 p-3 text-orange-500"><ShoppingCart className="size-5" /></div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Menu</p>
-                    <p className="text-xl font-bold text-slate-900">Choose items to add to your bill</p>
-                  </div>
-                </div>
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search menu..."
-                    className="w-full rounded-full border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 outline-none focus:border-orange-300"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
-                <button onClick={() => setSelectedCategory('')} className={`rounded-full border px-4 py-2 text-xs font-bold transition ${selectedCategory === '' ? 'bg-orange-500 text-white' : 'bg-white text-slate-700 border-slate-200'}`}>All</button>
-                {categories.map(category => (
-                  <button key={category.id} onClick={() => setSelectedCategory(category.id)} className={`rounded-full border px-4 py-2 text-xs font-bold transition ${selectedCategory === category.id ? 'bg-orange-500 text-white' : 'bg-white text-slate-700 border-slate-200'}`}>
-                    {category.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredProducts.map(product => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => addToCart(product)}
-                  className="group rounded-[32px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{product.name}</p>
-                      <p className="mt-3 text-sm text-slate-500 line-clamp-2">{product.image ? 'Tap to add' : 'Add to cart'}</p>
-                    </div>
-                    <span className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{formatCurrency(product.price)}</span>
-                  </div>
-                  <div className="mt-5 flex items-center justify-between text-xs text-slate-400">
-                    <span>{product.kitchen_status === 'available' ? 'Available' : 'Unavailable'}</span>
-                    <span>{product.category}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <aside className="space-y-6">
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Current bill</p>
-                  <p className="text-2xl font-extrabold text-slate-900">{formatCurrency(billTotal)}</p>
-                </div>
-                <div className="rounded-3xl bg-slate-100 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-700">{table?.status === 'occupied' ? 'Occupied' : 'Available'}</div>
-              </div>
-              <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2">
-                {existingItems.length === 0 && newItems.length === 0 && (
-                  <p className="text-sm text-slate-500">Your order is empty. Add items from the menu.</p>
-                )}
-                {existingItems.map(item => (
-                  <div key={item.id} className="rounded-3xl bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-slate-900">{item.productName}</p>
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mt-1">Status: {item.status}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.subtotal)}</span>
-                    </div>
-                    <p className="mt-3 text-xs text-slate-500">Qty: {item.quantity}</p>
-                  </div>
-                ))}
-                {newItems.map(item => (
-                  <div key={item.id} className="rounded-3xl bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-slate-900">{item.productName}</p>
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mt-1">New item</p>
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-                    <div className="mt-4 flex items-center gap-2">
-                      <button onClick={() => updateCartItem(item.id, item.quantity - 1)} className="rounded-full border border-slate-300 p-2 text-slate-600"><Minus className="size-4" /></button>
-                      <span className="font-bold text-slate-900">{item.quantity}</span>
-                      <button onClick={() => updateCartItem(item.id, item.quantity + 1)} className="rounded-full border border-slate-300 p-2 text-slate-600"><Plus className="size-4" /></button>
-                      <button onClick={() => handleRemoveCartItem(item.id)} className="ml-auto text-xs uppercase text-slate-400 hover:text-orange-600">Remove</button>
-                    </div>
-                    <textarea
-                      value={item.notes}
-                      onChange={e => updateCartNotes(item.id, e.target.value)}
-                      placeholder="Add notes for kitchen"
-                      className="mt-4 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-orange-300"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>Subtotal</span><span>{formatCurrency(billSubtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>Tax</span><span>{formatCurrency(billTax)}</span>
-              </div>
-              <div className="flex items-center justify-between text-lg font-bold text-slate-900 border-t border-slate-200 pt-4">
-                <span>Total</span><span>{formatCurrency(billTotal)}</span>
-              </div>
-              <button
-                onClick={handleCheckout}
-                disabled={submitting || cartItems.length === 0}
-                className={`w-full rounded-3xl px-5 py-4 text-sm font-black uppercase tracking-[0.2em] transition ${cartItems.length > 0 ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
-              >
-                {submitting ? 'Sending...' : order ? 'Add more items' : 'Submit order'}
-              </button>
-            </div>
-          </aside>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Invalid QR Code</h2>
+          <p className="text-sm text-gray-400">Please ask a team member for a valid QR code or scan the correct table.</p>
         </div>
       </div>
+    );
+  }
 
-      {success && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-2xl border border-slate-200 text-center">
-            <div className="mx-auto mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="size-10" />
+  // ── Product card (shared by mobile + desktop) ────────────────────────────
+  const ProductCard = ({ p, compact = false }: { p: Product; compact?: boolean }) => {
+    const isAvailable = (p.kitchenStatus || 'available') === 'available';
+    return (
+      <div
+        onClick={() => isAvailable && addToCart(p)}
+        className={`rounded-[20px] shadow-sm transition-all border-2 active:scale-95 flex flex-col ${compact ? 'min-h-[100px]' : 'min-h-[120px]'} ${
+          isAvailable ? 'bg-white border-transparent cursor-pointer hover:shadow-md' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
+        }`}
+      >
+        <div className={`${compact ? 'p-3' : 'p-4'} flex flex-col flex-1 justify-between gap-2 relative`}>
+          {!isAvailable && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 rounded-[20px] bg-red-50/80">
+              <span className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">N/A</span>
             </div>
-            <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Order submitted</h2>
-            <p className="text-sm text-slate-500 mb-6">Your order is on its way to the kitchen. You can continue adding items if needed.</p>
-            <button onClick={() => setSuccess(false)} className="rounded-full bg-orange-500 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-orange-600 transition">Add more items</button>
+          )}
+          <h3 className={`font-bold leading-snug break-words ${compact ? 'text-xs' : 'text-sm'} ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
+          <div className="mt-auto flex items-center justify-between gap-1">
+            <span className={`font-black ${compact ? 'text-sm' : ''} ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
+            {isAvailable && <div className={`bg-orange-500 text-white rounded-xl ${compact ? 'p-1.5' : 'p-2'}`}><Plus className={compact ? 'size-3.5' : 'size-4'} strokeWidth={4} /></div>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Cart item (shared by mobile + desktop) ────────────────────────────────
+  const CartItemRow = ({ item, compact = false }: { item: CartItem; compact?: boolean }) => (
+    <div className={`bg-orange-50/50 rounded-${compact ? '2xl' : '3xl'} p-${compact ? '4' : '5'} border border-orange-100 shadow-sm space-y-3 animate-in slide-in-from-right-4`}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>
+          <p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p>
+        </div>
+        <div className={`flex items-center bg-white border-2 border-orange-100 shadow-sm rounded-${compact ? 'xl p-1 gap-3' : '2xl p-1.5 gap-4'}`}>
+          <button
+            onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0))}
+            className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"
+          ><Minus className="size-4" strokeWidth={3} /></button>
+          <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
+          <button
+            onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))}
+            className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"
+          ><Plus className="size-4" strokeWidth={3} /></button>
+        </div>
+      </div>
+      <button
+        onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)}
+        className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest"
+      >
+        <ChevronDown className={`size-3 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} />
+        {item.notes ? 'Edit kitchen note' : 'Add kitchen note'}
+      </button>
+      {expandedNotes === item.id && (
+        <input
+          type="text"
+          value={item.notes}
+          onChange={e => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, notes: e.target.value } : i))}
+          placeholder="e.g. No onions, extra sauce…"
+          className="w-full px-3 py-2 bg-white border border-orange-100 rounded-xl text-xs focus:outline-none focus:border-orange-400"
+          autoFocus
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex h-[100dvh] w-full bg-[#EAEEF3] overflow-hidden relative">
+
+      {/* ── SUCCESS OVERLAY ── */}
+      {success && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white/10 backdrop-blur-[2px] animate-in fade-in duration-300">
+          <div className="bg-orange-500 text-white px-8 py-8 sm:px-12 sm:py-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-4 border-4 border-white animate-in zoom-in">
+            <div className="bg-white rounded-full p-4"><CheckCircle2 className="size-12 sm:size-14 text-orange-500" strokeWidth={3} /></div>
+            <div className="text-center font-black uppercase tracking-tighter">
+              <h2 className="text-2xl sm:text-3xl leading-none">Order Sent!</h2>
+              <p className="text-orange-100 text-xs mt-1">Kitchen is on it</p>
+            </div>
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════
+          MOBILE LAYOUT  (hidden on lg+)
+      ═══════════════════════════════════════════════════════ */}
+
+      {/* ── MOBILE: MENU PANEL ── */}
+      <div className={`lg:hidden absolute inset-0 flex flex-col bg-[#EAEEF3] transition-transform duration-300 ${mobileView === 'menu' ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Top bar */}
+        <div className="bg-white px-3 py-2.5 flex items-center gap-2 shadow-sm border-b">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="bg-orange-500 rounded-xl p-1.5 shadow-sm">
+              <UtensilsCrossed className="size-3.5 text-white" />
+            </div>
+          </div>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+            <input
+              type="text" placeholder="Search menu…" inputMode="search"
+              className="w-full pl-9 pr-3 py-2.5 bg-gray-100 rounded-xl text-sm focus:outline-none ring-1 ring-gray-200"
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={handleCallWaiter}
+            disabled={callingWaiter || !!table?.needsWaiter}
+            className={`flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-black shadow-sm whitespace-nowrap transition-all active:scale-95 ${table?.needsWaiter ? 'bg-orange-100 text-orange-600' : 'bg-white border text-gray-700'}`}
+          >
+            <Bell className="size-3.5 text-orange-500" />
+            <span>{table?.needsWaiter ? 'Called' : 'Waiter'}</span>
+          </button>
+          <div className="text-right border-l pl-2 border-gray-100 shrink-0">
+            <p className="text-[9px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-0.5">Table</p>
+            <p className="text-xs font-black text-gray-900 leading-none">{table ? `T-${table.number}` : '…'}</p>
+          </div>
+        </div>
+
+        {/* Product grid */}
+        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          {filteredProducts.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-3">
+              <ShoppingBag className="size-12 opacity-20" />
+              <span className="text-xs font-black uppercase tracking-widest opacity-40">No items found</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {filteredProducts.map(p => <ProductCard key={p.id} p={p} compact />)}
+            </div>
+          )}
+        </div>
+
+        {/* Category tabs */}
+        <div className="bg-white border-t px-2 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+          {categories.map(cat => (
+            <button
+              key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+              className={`px-5 py-3 rounded-[16px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}
+            >{cat.name}</button>
+          ))}
+        </div>
+
+        {/* Floating cart FAB */}
+        <button
+          onClick={() => setMobileView('cart')}
+          className="absolute bottom-20 right-4 bg-orange-500 text-white rounded-full shadow-2xl shadow-orange-300 flex items-center gap-2 px-5 py-3.5 font-black text-sm transition-all active:scale-95"
+        >
+          <ShoppingCart className="size-5" />
+          {totalItems > 0 && (
+            <span className="bg-white text-orange-500 rounded-full text-xs font-black px-2 py-0.5 leading-none">{totalItems}</span>
+          )}
+          <span>Order{totalItems > 0 ? ` · RM ${cartTotal.toFixed(2)}` : ''}</span>
+        </button>
+      </div>
+
+      {/* ── MOBILE: CART PANEL ── */}
+      <div className={`lg:hidden absolute inset-0 flex flex-col bg-white transition-transform duration-300 ${mobileView === 'cart' ? 'translate-x-0' : 'translate-x-full'}`}>
+        {/* Orange header */}
+        <div className="bg-orange-500 p-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setMobileView('menu')} className="bg-white/20 text-white p-2 rounded-xl active:bg-white/30 transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="text-white font-black text-sm uppercase tracking-widest flex-1">Your Order</span>
+            <span className="text-white font-black italic text-base uppercase opacity-90">Table {table?.number}</span>
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+          {existingItems.length > 0 && (
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-1 italic">Already Ordered</p>
+              {existingItems.map(item => (
+                <div key={item.id} className="bg-gray-50/80 rounded-2xl p-4 border border-dashed border-gray-200 flex items-center gap-3 opacity-70">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>
+                    <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider capitalize">{item.status}</p>
+                  </div>
+                  <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
+                  <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] px-1 italic">New Items</p>
+            {cartItems.length === 0
+              ? (
+                <div className="h-44 border-4 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center justify-center text-gray-300">
+                  <ShoppingCart className="size-10 mb-2 opacity-10" />
+                  <span className="text-xs font-bold opacity-30 uppercase tracking-widest">Nothing added yet</span>
+                </div>
+              )
+              : cartItems.map(item => <CartItemRow key={item.id} item={item} compact />)
+            }
+          </div>
+        </div>
+
+        {/* Total + CTA */}
+        <div className="p-4 border-t bg-gray-50 pb-safe">
+          {existingItems.length > 0 && (
+            <div className="flex justify-between text-xs text-gray-400 mb-1.5 px-1">
+              <span className="font-bold uppercase tracking-widest">Already ordered</span>
+              <span className="font-black">RM {existingTotal.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-end mb-4">
+            <span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic">New items total</span>
+            <span className="text-2xl font-black text-gray-900 tracking-tighter">RM {cartTotal.toFixed(2)}</span>
+          </div>
+          <button
+            onClick={handleSubmitOrder}
+            disabled={submitting || cartItems.length === 0}
+            className={`w-full font-black py-4 rounded-[20px] shadow-xl transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 ${cartItems.length > 0 ? 'bg-orange-500 text-white shadow-orange-200 active:scale-[0.98]' : 'bg-gray-200 text-gray-400'}`}
+          >
+            <ShoppingBag className="size-5" />
+            {submitting ? 'Sending…' : cartItems.length > 0 ? 'Send to Kitchen' : 'Add items first'}
+          </button>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════
+          DESKTOP LAYOUT  (hidden below lg)
+      ═══════════════════════════════════════════════════════ */}
+
+      {/* ── DESKTOP: LEFT MENU ── */}
+      <div className="hidden lg:flex flex-1 flex-col min-w-0">
+        {/* Top bar */}
+        <div className="bg-white p-4 flex items-center justify-between shadow-sm border-b gap-4">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="bg-orange-500 rounded-2xl p-2.5 shadow-sm">
+              <UtensilsCrossed className="size-5 text-white" />
+            </div>
+            <div>
+              <p className="font-black text-gray-900 leading-none text-sm uppercase tracking-wide">AL-NAWRAS</p>
+              <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest leading-none mt-0.5">Restaurant</p>
+            </div>
+          </div>
+          <div className="relative w-72 xl:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+            <input
+              type="text" placeholder="Search menu…"
+              className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-2xl text-sm focus:outline-none ring-1 ring-gray-200"
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleCallWaiter}
+              disabled={callingWaiter || !!table?.needsWaiter}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-black shadow-sm transition-all ${table?.needsWaiter ? 'bg-orange-100 text-orange-600' : 'bg-white border text-gray-700 hover:bg-gray-50'}`}
+            >
+              <Bell className="size-4 text-orange-500" />
+              {table?.needsWaiter ? 'Waiter Called' : 'Call Waiter'}
+            </button>
+            <div className="text-right border-l pl-4 border-gray-100">
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-1">Table</p>
+              <p className="text-2xl font-black text-gray-900 leading-none italic">{table ? `T-${table.number}` : '…'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Product grid */}
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {filteredProducts.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4">
+              <ShoppingBag className="size-16 opacity-20" />
+              <span className="text-sm font-black uppercase tracking-widest opacity-40">No items found</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+              {filteredProducts.map(p => <ProductCard key={p.id} p={p} />)}
+            </div>
+          )}
+        </div>
+
+        {/* Category tabs */}
+        <div className="bg-white border-t p-3 flex gap-2 overflow-x-auto no-scrollbar">
+          {categories.map(cat => (
+            <button
+              key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+              className={`px-10 py-5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}
+            >{cat.name}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── DESKTOP: RIGHT SIDEBAR ── */}
+      <aside className="hidden lg:flex w-[380px] xl:w-[400px] bg-white border-l flex-col shadow-2xl z-10">
+        <div className="p-5 bg-orange-500">
+          <div className="flex items-center justify-between">
+            <span className="text-white font-black text-sm uppercase tracking-widest">Your Order</span>
+            <span className="text-white font-black italic text-xl uppercase">T-{table?.number}</span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+          {existingItems.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-2 italic">Already Ordered</p>
+              {existingItems.map(item => (
+                <div key={item.id} className="bg-gray-50/80 rounded-3xl p-5 border border-dashed border-gray-200 flex items-center gap-4 opacity-70">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>
+                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider capitalize">{item.status}</p>
+                  </div>
+                  <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
+                  <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] px-2 italic">New Items</p>
+            {cartItems.length === 0
+              ? (
+                <div className="h-48 border-4 border-dashed border-gray-50 rounded-[40px] flex flex-col items-center justify-center text-gray-300 italic">
+                  <ShoppingCart className="size-12 mb-3 opacity-10" />
+                  <span className="text-sm font-bold opacity-30 uppercase tracking-widest">Nothing added</span>
+                </div>
+              )
+              : cartItems.map(item => <CartItemRow key={item.id} item={item} />)
+            }
+          </div>
+        </div>
+
+        <div className="p-8 border-t bg-gray-50 space-y-3">
+          {existingItems.length > 0 && (
+            <div className="flex justify-between text-xs text-gray-400 px-1">
+              <span className="font-bold uppercase tracking-widest">Already ordered</span>
+              <span className="font-black">RM {existingTotal.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-end">
+            <span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic leading-none">New items total</span>
+            <span className="text-3xl font-black text-gray-900 leading-none tracking-tighter">RM {cartTotal.toFixed(2)}</span>
+          </div>
+          <button
+            onClick={handleSubmitOrder}
+            disabled={submitting || cartItems.length === 0}
+            className={`w-full font-black py-5 rounded-[24px] shadow-2xl transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 mt-2 ${cartItems.length > 0 ? 'bg-orange-500 text-white hover:scale-[1.02] shadow-orange-200' : 'bg-gray-200 text-gray-400'}`}
+          >
+            <ShoppingBag className="size-5" />
+            {submitting ? 'Sending…' : cartItems.length > 0 ? 'Send to Kitchen' : 'Add items first'}
+          </button>
+        </div>
+      </aside>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #F97316; border-radius: 10px; }
+        .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+      `}</style>
     </div>
   );
 }

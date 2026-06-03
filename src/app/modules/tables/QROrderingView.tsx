@@ -66,7 +66,7 @@ export function QROrderingView() {
 
       const [productsRes, categoriesRes] = await Promise.all([
         supabase.from('products').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
-        supabase.from('categories').select('*').eq('branch_id', branchId).order('display_order'),
+        supabase.from('categories').select('*').eq('branch_id', branchId).eq('is_active', true).order('display_order'),
       ]);
 
       const prods: Product[] = (productsRes.data || []).map((p: any) => ({
@@ -80,12 +80,14 @@ export function QROrderingView() {
       }));
       setProducts(prods);
 
-      const cats: Category[] = (categoriesRes.data || []).map((c: any) => ({
-        id: c.id, name: c.name, description: c.description,
-        color: c.color ?? '#f97316', icon: c.icon,
-        displayOrder: Number(c.display_order ?? 0), isActive: c.is_active ?? true,
-        branchId: c.branch_id, createdAt: new Date(c.created_at),
-      }));
+      const cats: Category[] = (categoriesRes.data || [])
+        .map((c: any) => ({
+          id: c.id, name: c.name, description: c.description,
+          color: c.color ?? '#f97316', icon: c.icon,
+          displayOrder: Number(c.display_order ?? 0), isActive: c.is_active ?? true,
+          branchId: c.branch_id, createdAt: new Date(c.created_at),
+        }))
+        .filter(c => c.isActive);
       setCategories(cats);
       if (cats.length) setSelectedCategory(cats[0].id);
 
@@ -120,6 +122,23 @@ export function QROrderingView() {
     };
     void load();
   }, [tableId]);
+
+  // ── Realtime: keep product availability in sync ──────────────────────────
+  useEffect(() => {
+    if (!table?.branchId) return;
+    const channel = supabase
+      .channel(`qr-products-${table.branchId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${table.branchId}` }, (payload) => {
+        const up = payload.new as any;
+        setProducts(prev => prev.map(p =>
+          p.id === up.id
+            ? { ...p, kitchenStatus: up.kitchen_status ?? 'available', availabilityStatus: up.availability_status ?? 'available' }
+            : p
+        ));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [table?.branchId]);
 
   // ── Filtered products ────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
@@ -249,7 +268,7 @@ export function QROrderingView() {
 
   // ── Product card (shared by mobile + desktop) ────────────────────────────
   const ProductCard = ({ p, compact = false }: { p: Product; compact?: boolean }) => {
-    const isAvailable = (p.kitchenStatus || 'available') === 'available';
+    const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
     return (
       <div
         onClick={() => isAvailable && addToCart(p)}

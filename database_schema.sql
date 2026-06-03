@@ -162,3 +162,18 @@ VALUES
   ('user-cashier-1', 'Sarah Johnson', 'EMP002', 'cashier', '2345', 'sarah.j@storehub.com', 'active', 'branch-1', '2025-01-15 00:00:00+00'),
   ('user-waiter-1', 'Mike Chen', 'EMP003', 'waiter', '3456', 'mike.c@storehub.com', 'active', 'branch-1', '2025-02-01 00:00:00+00')
 ON CONFLICT (id) DO NOTHING;
+
+-- Expenses table
+CREATE TABLE IF NOT EXISTS expenses (
+  id TEXT PRIMARY KEY,
+  branch_id TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',
+  description TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_by TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'approved',
+  receipt TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

@@ -63,7 +63,12 @@ export function RealtimeSyncEngine() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
         const up = p.new as any;
         setProducts(prev => prev.map(prod =>
-          prod.id === up.id ? { ...prod, ...up, categoryId: up.category_id, availabilityStatus: up.availability_status } : prod
+          prod.id === up.id ? {
+            ...prod, ...up,
+            categoryId:        up.category_id,
+            availabilityStatus: up.availability_status || 'available',
+            kitchenStatus:     up.kitchen_status       || 'available',
+          } : prod
         ));
       })
       // Orders

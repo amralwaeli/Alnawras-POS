@@ -104,11 +104,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         </div>
         <div>
           {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Alnawras Logo"
-              style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block' }}
-            />
+            <div style={{ width: 130, height: 90, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <img
+                src={logoUrl}
+                alt="Alnawras Logo"
+                style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block', backgroundColor: '#fff' }}
+              />
+            </div>
           ) : renderLogo()}
         </div>
       </div>

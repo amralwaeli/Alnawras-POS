@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
-import { useCatalog } from '../../context/CatalogContext';
+import { usePOS } from '../../context/POSContext';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -16,7 +16,7 @@ export function InvoicesView() {
     { id: '1', name: '', qty: 1, unitPrice: 0 }
   ]);
 
-  const { products } = useCatalog();
+  const { products } = usePOS();
   const [activeSuggest, setActiveSuggest] = useState<string | null>(null);
 
   const selectProduct = (itemId: string, product: { id: string; name: string; price: number }) => {
@@ -158,21 +158,31 @@ export function InvoicesView() {
                           value={item.name}
                           onChange={e => { updateItem(item.id, 'name', e.target.value); setActiveSuggest(item.id); }}
                           onFocus={() => setActiveSuggest(item.id)}
+                          onBlur={() => setTimeout(() => setActiveSuggest(null), 200)}
                           placeholder="Item description"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-500 bg-white"
                         />
                         {activeSuggest === item.id && item.name.trim() !== '' && (
-                          <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 max-h-44 overflow-auto">
-                            {products.filter(p => p.name.toLowerCase().includes(item.name.toLowerCase())).slice(0, 8).map(p => (
-                              <div
-                                key={p.id}
-                                onMouseDown={e => { e.preventDefault(); selectProduct(item.id, p); }}
-                                className="px-3 py-2.5 text-sm hover:bg-gray-100 active:bg-gray-200 cursor-pointer"
-                              >
-                                <div className="font-medium">{p.name}</div>
-                                <div className="text-xs text-gray-500">RM {p.price.toFixed(2)}</div>
-                              </div>
-                            ))}
+                          <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 max-h-52 overflow-auto">
+                            {(() => {
+                              const matches = products.filter(p =>
+                                p.isActive !== false &&
+                                p.name.toLowerCase().split(' ').some(word => word.startsWith(item.name.toLowerCase())) ||
+                                p.name.toLowerCase().includes(item.name.toLowerCase())
+                              ).slice(0, 10);
+                              return matches.length > 0 ? matches.map(p => (
+                                <div
+                                  key={p.id}
+                                  onPointerDown={e => { e.preventDefault(); selectProduct(item.id, p); }}
+                                  className="px-3 py-2.5 text-sm hover:bg-amber-50 active:bg-amber-100 cursor-pointer border-b border-gray-50 last:border-0"
+                                >
+                                  <div className="font-medium text-gray-800">{p.name}</div>
+                                  <div className="text-xs text-amber-600 font-semibold mt-0.5">RM {p.price.toFixed(2)}</div>
+                                </div>
+                              )) : (
+                                <div className="px-3 py-3 text-xs text-gray-400 text-center">No products found</div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>

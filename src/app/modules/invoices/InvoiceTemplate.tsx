@@ -72,6 +72,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         boxSizing: 'border-box',
       }}
     >
+      {/* Suppress browser URL / date / page-number headers & footers */}
       <style>{`
         @media print {
           @page {
@@ -87,10 +88,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         }
       `}</style>
 
+      {/* ── Title ───────────────────────────────────── */}
       <div style={{ textAlign: 'center', marginBottom: 14 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Invoice</h1>
       </div>
 
+      {/* ── From + Logo ─────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
           <p style={{ fontWeight: 700, textDecoration: 'underline', margin: '0 0 4px' }}>From</p>
@@ -110,6 +113,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         </div>
       </div>
 
+      {/* ── Invoice To + Ref ────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
           <p style={{ fontWeight: 700, textDecoration: 'underline', margin: '0 0 6px' }}>Invoice To</p>
@@ -122,6 +126,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         </div>
       </div>
 
+      {/* ── Items Table ─────────────────────────────── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 4 }}>
         <thead>
           <tr style={{ background: '#f5f5f5' }}>
@@ -145,6 +150,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         </tbody>
       </table>
 
+      {/* ── Totals (right-aligned) ──────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
         <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 220 }}>
           <tbody>
@@ -164,6 +170,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
         </table>
       </div>
 
+      {/* ── Footer: Pay To + Notes + Total Due ──────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div style={{ width: '55%' }}>
           <div style={{ marginBottom: 12 }}>

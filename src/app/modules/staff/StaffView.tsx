@@ -72,7 +72,7 @@ export function StaffView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Staff</h1>
@@ -102,7 +102,7 @@ export function StaffView() {
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">Team Members</h2>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-px">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 text-left">

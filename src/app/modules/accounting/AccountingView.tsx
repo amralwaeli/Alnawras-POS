@@ -18,14 +18,14 @@ export function AccountingView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Accounting</h1>
           <p className="text-gray-500 text-sm mt-0.5">Financial overview and expense tracking</p>
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
             <div className="inline-flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mb-3"><TrendingUp className="size-5" /></div>
             <p className="text-sm text-gray-500">Total Revenue</p>
@@ -102,7 +102,7 @@ export function AccountingView() {
         {/* Export */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Export Reports</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {['Daily', 'Weekly', 'Monthly'].map(period => (
               <button key={period} className="flex items-center gap-3 p-4 border-2 border-gray-100 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all text-left">
                 <Download className="size-4 text-gray-400 shrink-0" />

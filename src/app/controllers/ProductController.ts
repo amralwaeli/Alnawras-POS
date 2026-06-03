@@ -146,7 +146,6 @@ export class ProductController {
     user: User
   ): Promise<{
     success: boolean;
-    product?: Product;
     error?: string;
   }> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
@@ -154,51 +153,38 @@ export class ProductController {
     }
 
     try {
-      const { data, error } = await supabase
+      // Build payload explicitly — only include fields that were actually provided
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined)               payload.name = updates.name;
+      if ('categoryId' in updates)                  payload.category_id = updates.categoryId ?? null;
+      if (updates.category !== undefined)            payload.category = updates.category;
+      if (updates.price !== undefined)               payload.price = updates.price;
+      if (updates.stock !== undefined)               payload.stock = updates.stock;
+      if (updates.image !== undefined)               payload.image = updates.image;
+      if (updates.sku !== undefined)                 payload.sku = updates.sku;
+      if (updates.taxRate !== undefined)             payload.tax_rate = updates.taxRate;
+      if (updates.reorderPoint !== undefined)        payload.reorder_point = updates.reorderPoint;
+      if (updates.station !== undefined)             payload.station = updates.station;
+      if (updates.availabilityStatus !== undefined) {
+        payload.availability_status = updates.availabilityStatus;
+        payload.kitchen_status      = updates.availabilityStatus;
+      }
+      if (updates.isActive !== undefined)            payload.is_active = updates.isActive;
+
+      const { error } = await supabase
         .from('products')
-        .update({
-          name: updates.name,
-          category_id: updates.categoryId,
-          category: updates.category,
-          price: updates.price,
-          stock: updates.stock,
-          image: updates.image,
-          sku: updates.sku,
-          tax_rate: updates.taxRate,
-          reorder_point: updates.reorderPoint,
-          station: updates.station,
-          availability_status: updates.availabilityStatus,
-          kitchen_status: updates.availabilityStatus,
-          is_active: updates.isActive,
-        })
+        .update(payload)
         .eq('id', productId)
-        .eq('branch_id', user.branchId)
-        .select()
-        .single();
+        .eq('branch_id', user.branchId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('updateProduct DB error:', error);
+        throw error;
+      }
 
-      const product: Product = {
-        id: data.id,
-        name: data.name,
-        categoryId: data.category_id,
-        category: data.category,
-        price: data.price,
-        stock: data.stock,
-        image: data.image,
-        sku: data.sku,
-        taxRate: data.tax_rate,
-        reorderPoint: data.reorder_point,
-        branchId: data.branch_id,
-        station: data.station,
-        availabilityStatus: data.availability_status,
-        kitchenStatus: data.kitchen_status,
-        isActive: data.is_active,
-        createdAt: new Date(data.created_at),
-      };
-
-      return { success: true, product };
+      return { success: true };
     } catch (error) {
+      console.error('updateProduct failed:', error);
       return { success: false, error: 'Failed to update product' };
     }
   }

@@ -69,11 +69,13 @@ function Lazy({ children }: { children: React.ReactNode }) {
 function LandingPage() {
   const { currentUser } = usePOS();
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  if (currentUser.role === 'admin')   return <Navigate to="/admin-dashboard" replace />;
-  if (currentUser.role === 'cashier') return <Navigate to="/tables" replace />;
-  if (currentUser.role === 'waiter')  return <Navigate to="/dashboard" replace />;
-  if (currentUser.role === 'kitchen') return <Navigate to="/kitchen" replace />;
-  if (currentUser.role === 'hr')      return <Navigate to="/hr-panel" replace />;
+  if (currentUser.role === 'admin')      return <Navigate to="/admin-dashboard" replace />;
+  if (currentUser.role === 'cashier')    return <Navigate to="/tables" replace />;
+  if (currentUser.role === 'waiter')     return <Navigate to="/dashboard" replace />;
+  if (currentUser.role === 'kitchen')    return <Navigate to="/kitchen" replace />;
+  if (currentUser.role === 'hr')         return <Navigate to="/hr-panel" replace />;
+  if (currentUser.role === 'staff')      return <Navigate to="/invoices" replace />;
+  if (currentUser.role === 'accounting') return <Navigate to="/accounting" replace />;
   return <Navigate to="/admin-dashboard" replace />;
 }
 
@@ -109,8 +111,8 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
-      { path: 'quotations',          element: <Lazy><ProtectedRoute adminOnly><QuotationsView /></ProtectedRoute></Lazy> },
-      { path: 'invoices',            element: <Lazy><ProtectedRoute adminOnly><InvoicesView /></ProtectedRoute></Lazy> },
+      { path: 'quotations',          element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><QuotationsView /></ProtectedRoute></Lazy> },
+      { path: 'invoices',            element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><InvoicesView /></ProtectedRoute></Lazy> },
 
       // ── Staff ──
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },

@@ -1,6 +1,6 @@
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting';
 
 export interface User {
   id: string;
@@ -203,6 +203,7 @@ export interface RolePermissions {
   canImportProducts: boolean;
   canViewAttendance: boolean;
   canCheckIn: boolean;
+  canManageInvoicesQuotations: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
@@ -218,6 +219,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: true,
     canViewAttendance: true,
     canCheckIn: true,
+    canManageInvoicesQuotations: true,
   },
   cashier: {
     canViewTables: true,
@@ -231,6 +233,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
+    canManageInvoicesQuotations: false,
   },
   waiter: {
     canViewTables: true,
@@ -244,6 +247,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
+    canManageInvoicesQuotations: false,
   },
   kitchen: {
     canViewTables: false,
@@ -257,6 +261,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
+    canManageInvoicesQuotations: false,
   },
   juice: {
     canViewTables: false,
@@ -270,6 +275,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
+    canManageInvoicesQuotations: false,
   },
   hr: {
     canViewTables: false,
@@ -283,6 +289,37 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canImportProducts: false,
     canViewAttendance: true,
     canCheckIn: true,
+    canManageInvoicesQuotations: false,
+  },
+  // Staff: waiter-level POS access + invoices & quotations
+  staff: {
+    canViewTables: true,
+    canAddOrders: true,
+    canProcessPayments: false,
+    canManageInventory: false,
+    canViewReports: false,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+    canManageInvoicesQuotations: true,
+  },
+  // Accounting: invoices, quotations, and accounting page
+  accounting: {
+    canViewTables: false,
+    canAddOrders: false,
+    canProcessPayments: false,
+    canManageInventory: false,
+    canViewReports: false,
+    canManageStaff: false,
+    canManageAccounting: true,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+    canManageInvoicesQuotations: true,
   },
 };
 

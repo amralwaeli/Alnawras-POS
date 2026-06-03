@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   employment_number TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'cashier', 'waiter', 'kitchen', 'hr')),
+  role TEXT NOT NULL CHECK (role IN ('admin', 'cashier', 'waiter', 'kitchen', 'hr', 'juice', 'staff', 'accounting')),
   pin TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),

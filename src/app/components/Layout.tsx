@@ -16,6 +16,7 @@ export function Layout() {
 
   // Detect if user is a POS-only role (no sidebar)
   const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter'].includes(currentUser.role);
+  // staff gets a sidebar (needs invoices/quotations) but also has waiter-level POS access
 
   // If user is kitchen, cashier, or waiter, render fullscreen POS layout
   if (isPOSOnlyRole) {
@@ -46,8 +47,8 @@ export function Layout() {
     { path: '/product-management',  label: 'Products',        icon: Package,         permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',         label: 'Manage Menu',     icon: Tag,             permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',         label: 'Bill Format',     icon: ReceiptText,     permission: 'canManageAccounting' as const, adminOnly: true },
-    { path: '/quotations',          label: 'Quotations',      icon: FileText,        permission: 'canManageAccounting' as const, adminOnly: true },
-    { path: '/invoices',            label: 'Invoices',        icon: FileText,        permission: 'canManageAccounting' as const, adminOnly: true },
+    { path: '/quotations',          label: 'Quotations',      icon: FileText,        permission: 'canManageInvoicesQuotations' as const },
+    { path: '/invoices',            label: 'Invoices',        icon: FileText,        permission: 'canManageInvoicesQuotations' as const },
     { path: '/table-qr',            label: 'QR Codes',        icon: QrCode,          permission: 'canViewReports' as const },
   ];
 
@@ -58,12 +59,14 @@ export function Layout() {
 
   const initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
   const roleColors: Record<string, string> = {
-    admin:   'from-violet-500 to-purple-600',
-    cashier: 'from-blue-500 to-cyan-600',
-    waiter:  'from-emerald-500 to-green-600',
-    kitchen: 'from-orange-500 to-amber-600',
-    hr:      'from-pink-500 to-rose-600',
-    juice:   'from-yellow-500 to-amber-500',
+    admin:      'from-violet-500 to-purple-600',
+    cashier:    'from-blue-500 to-cyan-600',
+    waiter:     'from-emerald-500 to-green-600',
+    kitchen:    'from-orange-500 to-amber-600',
+    hr:         'from-pink-500 to-rose-600',
+    juice:      'from-yellow-500 to-amber-500',
+    staff:      'from-teal-500 to-cyan-600',
+    accounting: 'from-indigo-500 to-blue-600',
   };
   const avatarGradient = roleColors[currentUser.role] ?? 'from-gray-500 to-gray-600';
 

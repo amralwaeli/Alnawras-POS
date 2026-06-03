@@ -24,7 +24,12 @@ export function CatalogProvider({ children, currentUser }: { children: ReactNode
 
   const updateProduct = async (id: string, up: any) => {
     const res = await ProductController.updateProduct(id, up, currentUser!);
-    if (res.success) setProducts(prev => prev.map(p => p.id === id ? { ...p, ...up } : p));
+    if (res.success) {
+      const stateUpdate = { ...up };
+      // kitchenStatus mirrors availabilityStatus in the DB — keep local state in sync
+      if (up.availabilityStatus !== undefined) stateUpdate.kitchenStatus = up.availabilityStatus;
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...stateUpdate } : p));
+    }
     return res;
   };
   const addProduct    = (p: any) => ProductController.addProduct(p, currentUser!);

@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react';
-import { useReactToPrint } from 'react-to-print';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
@@ -27,10 +26,30 @@ export function InvoicesView() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `Invoice_${invoiceNo}`,
-  });
+  const handlePrint = () => {
+    const el = printRef.current;
+    if (!el) return;
+    const win = window.open('', '_blank');
+    if (!win) { alert('Allow pop-ups for this site to print'); return; }
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Invoice_${invoiceNo}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:0;background:#fff;font-family:Arial,Helvetica,sans-serif}
+    @page{size:A4 portrait;margin:0}
+    @media print{html,body{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+  </style>
+</head>
+<body>${el.outerHTML}</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 350);
+  };
 
   const addItem = () => {
     setItems([...items, { id: Math.random().toString(36).substring(7), name: '', qty: 1, unitPrice: 0 }]);
@@ -72,7 +91,7 @@ export function InvoicesView() {
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">Generate and print professional invoices</p>
         </div>
         <button
-          onClick={() => handlePrint()}
+          onClick={handlePrint}
           disabled={!canPrint}
           className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
         >

@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
+import { supabase } from '../../../lib/supabase';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -15,8 +16,23 @@ export function InvoicesView() {
     { id: '1', name: '', qty: 1, unitPrice: 0 }
   ]);
 
-  const { products } = usePOS();
+  const { currentUser } = usePOS();
+  const [catalogProducts, setCatalogProducts] = useState<{ id: string; name: string; price: number }[]>([]);
   const [activeSuggest, setActiveSuggest] = useState<string | null>(null);
+
+  // Load products directly from Supabase so they're available for all roles
+  useEffect(() => {
+    if (!currentUser?.branchId) return;
+    supabase
+      .from('products')
+      .select('id, name, price')
+      .eq('branch_id', currentUser.branchId)
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        if (data) setCatalogProducts(data.map((p: any) => ({ id: p.id, name: p.name, price: Number(p.price) })));
+      });
+  }, [currentUser?.branchId]);
 
   const selectProduct = (itemId: string, product: { id: string; name: string; price: number }) => {
     updateItem(itemId, 'name', product.name);
@@ -36,6 +52,7 @@ export function InvoicesView() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <base href="${window.location.origin}${import.meta.env.BASE_URL}">
   <title>Invoice_${invoiceNo}</title>
   <style>
     *{box-sizing:border-box}
@@ -184,11 +201,8 @@ export function InvoicesView() {
                         {activeSuggest === item.id && item.name.trim() !== '' && (
                           <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 max-h-52 overflow-auto">
                             {(() => {
-                              const matches = products.filter(p =>
-                                p.isActive !== false &&
-                                p.name.toLowerCase().split(' ').some(word => word.startsWith(item.name.toLowerCase())) ||
-                                p.name.toLowerCase().includes(item.name.toLowerCase())
-                              ).slice(0, 10);
+                              const q = item.name.toLowerCase().trim();
+                              const matches = catalogProducts.filter(p => p.name.toLowerCase().includes(q)).slice(0, 10);
                               return matches.length > 0 ? matches.map(p => (
                                 <div
                                   key={p.id}

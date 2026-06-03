@@ -92,7 +92,7 @@ export function CustomerMenuView() {
   const availableTables = useMemo(() => tables.filter(t => t.status === 'available'), [tables]);
 
   const sortedCategories = useMemo(
-    () => [...menuCategories].sort((a, b) => a.displayOrder - b.displayOrder),
+    () => [...menuCategories].filter(c => c.isActive).sort((a, b) => a.displayOrder - b.displayOrder),
     [menuCategories]
   );
 
@@ -258,7 +258,7 @@ export function CustomerMenuView() {
         <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {filteredProducts.map(p => {
-              const isAvailable = (p.kitchenStatus || 'available') === 'available';
+              const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
               return (
                 <div
                   key={p.id}
@@ -394,7 +394,7 @@ export function CustomerMenuView() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <div className="grid grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {filteredProducts.map(p => {
-              const isAvailable = (p.kitchenStatus || 'available') === 'available';
+              const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
               return (
                 <div
                   key={p.id}

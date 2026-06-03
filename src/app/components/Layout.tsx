@@ -10,7 +10,7 @@ import { ROLE_PERMISSIONS } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1024);
 
   if (!currentUser) return <Navigate to="/check-in" replace />;
 

@@ -78,9 +78,10 @@ export function CustomerMenuView() {
       return;
     }
 
-    const hasSelectedCategory = menuCategories.some(category => category.id === selectedCategory);
+    const sorted = [...menuCategories].sort((a, b) => a.displayOrder - b.displayOrder);
+    const hasSelectedCategory = sorted.some(category => category.id === selectedCategory);
     if (!hasSelectedCategory) {
-      setSelectedCategory(menuCategories[0].id);
+      setSelectedCategory(sorted[0].id);
     }
   }, [menuCategories, selectedCategory]);
 
@@ -89,10 +90,15 @@ export function CustomerMenuView() {
   // ─── COMPUTED ───────────────────────────────────────────────────────────────
   const activeTables = useMemo(() => tables.filter(t => t.currentOrderId || t.status === 'occupied'), [tables]);
   const availableTables = useMemo(() => tables.filter(t => t.status === 'available'), [tables]);
-  
+
+  const sortedCategories = useMemo(
+    () => [...menuCategories].sort((a, b) => a.displayOrder - b.displayOrder),
+    [menuCategories]
+  );
+
   const filteredProducts = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    const activeCategory = menuCategories.find(category => category.id === selectedCategory);
+    const activeCategory = sortedCategories.find(category => category.id === selectedCategory);
     return products.filter(p => {
       if (!p.isActive) return false;
       // When searching, scan all products regardless of selected tab
@@ -103,7 +109,7 @@ export function CustomerMenuView() {
           (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
         : false;
     });
-  }, [products, menuCategories, selectedCategory, searchQuery]);
+  }, [products, sortedCategories, selectedCategory, searchQuery]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   const newItemsOnly = cartItems.filter(i => i.source === 'new');
@@ -281,7 +287,7 @@ export function CustomerMenuView() {
 
         {/* Category tabs */}
         <div className="bg-white border-t px-2 py-2 flex gap-2 overflow-x-auto no-scrollbar">
-          {(menuCategories || []).map(cat => (
+          {sortedCategories.map(cat => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-5 py-3 rounded-[16px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>
@@ -416,7 +422,7 @@ export function CustomerMenuView() {
         </div>
 
         <div className="bg-white border-t p-3 flex gap-2 overflow-x-auto no-scrollbar">
-          {(menuCategories || []).map(cat => (
+          {sortedCategories.map(cat => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-10 py-5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>

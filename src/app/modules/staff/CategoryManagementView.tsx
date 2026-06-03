@@ -170,26 +170,35 @@ export function CategoryManagementView() {
         product.category?.toLowerCase() === selectedCategoryObj.name.toLowerCase()
       );
 
-      const productsToUpdate = products.filter(product => categoryProducts.has(product.id));
+      const productsToAssign = products.filter(product =>
+        categoryProducts.has(product.id) &&
+        (product.categoryId !== selectedCategory || product.category !== selectedCategoryObj.name)
+      );
       const productsToRemove = assignedProducts.filter(product => !categoryProducts.has(product.id));
 
-      for (const product of productsToUpdate) {
-        if (product.categoryId !== selectedCategory || product.category !== selectedCategoryObj.name) {
-          await updateProduct(product.id, {
-            categoryId: selectedCategory,
-            category: selectedCategoryObj.name,
-          });
-        }
+      let failed = 0;
+
+      for (const product of productsToAssign) {
+        const res = await updateProduct(product.id, {
+          categoryId: selectedCategory,
+          category: selectedCategoryObj.name,
+        });
+        if (!res.success) failed++;
       }
 
       for (const product of productsToRemove) {
-        await updateProduct(product.id, {
-          categoryId: undefined,
+        const res = await updateProduct(product.id, {
+          categoryId: null,
           category: 'Uncategorized',
         });
+        if (!res.success) failed++;
       }
 
-      toast.success('Menu assignments saved successfully');
+      if (failed > 0) {
+        toast.error(`${failed} product(s) failed to update`);
+      } else {
+        toast.success('Menu assignments saved successfully');
+      }
     } catch (error) {
       toast.error('Failed to save assignments');
     }

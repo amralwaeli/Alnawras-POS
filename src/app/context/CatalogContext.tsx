@@ -22,7 +22,11 @@ export function CatalogProvider({ children, currentUser }: { children: ReactNode
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  const updateProduct = (id: string, up: any) => ProductController.updateProduct(id, up, currentUser!);
+  const updateProduct = async (id: string, up: any) => {
+    const res = await ProductController.updateProduct(id, up, currentUser!);
+    if (res.success) setProducts(prev => prev.map(p => p.id === id ? { ...p, ...up } : p));
+    return res;
+  };
   const addProduct    = (p: any) => ProductController.addProduct(p, currentUser!);
   const deleteProduct = (id: string) => ProductController.deleteProduct(id, currentUser!);
   const importProducts = (data: any[]) => ProductController.importProducts(data, currentUser!);

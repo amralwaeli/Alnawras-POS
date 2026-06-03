@@ -91,16 +91,17 @@ export function CustomerMenuView() {
   const availableTables = useMemo(() => tables.filter(t => t.status === 'available'), [tables]);
   
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     const activeCategory = menuCategories.find(category => category.id === selectedCategory);
-
     return products.filter(p => {
-      const catMatch = selectedCategory
+      if (!p.isActive) return false;
+      // When searching, scan all products regardless of selected tab
+      if (q) return p.name.toLowerCase().includes(q);
+      // Otherwise filter by selected category tab
+      return selectedCategory
         ? p.categoryId === selectedCategory ||
           (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
         : false;
-      const searchMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      // Show all products but mark unavailable ones
-      return catMatch && searchMatch && p.isActive;
     });
   }, [products, menuCategories, selectedCategory, searchQuery]);
 

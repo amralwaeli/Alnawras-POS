@@ -123,13 +123,16 @@ export function QROrderingView() {
 
   // ── Filtered products ────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     const activeCategory = categories.find(c => c.id === selectedCategory);
     return products.filter(p => {
-      const catMatch = selectedCategory
+      // When searching, scan all products regardless of selected tab
+      if (q) return p.name.toLowerCase().includes(q);
+      // Otherwise filter by selected category tab
+      return selectedCategory
         ? p.categoryId === selectedCategory ||
           (!!activeCategory && p.category?.toLowerCase() === activeCategory.name.toLowerCase())
         : false;
-      return catMatch && p.name.toLowerCase().includes(searchQuery.toLowerCase());
     });
   }, [products, categories, selectedCategory, searchQuery]);
 

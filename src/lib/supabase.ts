@@ -25,17 +25,15 @@ export const supabase = createClient(
 
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    const { error } = await supabase.from('_health_check_').select('*').limit(1)
-    if (error && (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('does not exist'))) {
-      return true
-    }
-    if (error) {
-      console.warn('[Supabase] Connection failed:', error.message, 'code:', error.code)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.warn('[Supabase] Could not reach Supabase:', err)
+    // Use a plain fetch with only the anon key — no Bearer token — so an
+    // invalid session token cannot cause a false "connection failed" report.
+    const res = await fetch(
+      `${supabaseUrl ?? ''}/rest/v1/_health_check_?select=*&limit=1`,
+      { headers: { apikey: supabaseAnonKey ?? '', 'Content-Type': 'application/json' } }
+    )
+    // Any HTTP response (including 404 / 401 / 406) means the server is reachable.
+    return res.status < 500
+  } catch {
     return false
   }
 }

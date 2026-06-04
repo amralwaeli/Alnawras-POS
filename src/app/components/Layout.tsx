@@ -18,7 +18,19 @@ export function Layout() {
 
   const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter'].includes(currentUser.role);
   if (isPOSOnlyRole) {
-    return <div className="h-screen w-screen overflow-hidden"><Outlet /></div>;
+    return (
+      <div className="h-screen w-screen overflow-hidden relative">
+        <Outlet />
+        <button
+          onClick={logout}
+          title="Logout"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-gray-900/80 hover:bg-gray-900 text-white text-xs font-semibold rounded-xl shadow-lg backdrop-blur-sm transition-all"
+        >
+          <LogOut className="size-3.5" />
+          Logout
+        </button>
+      </div>
+    );
   }
 
   const permissions = ROLE_PERMISSIONS[currentUser.role];

@@ -25,7 +25,7 @@ export class StaffController {
     try {
       let query = supabase
         .from('users')
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change');
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date');
       if (activeOnly) query = query.eq('status', 'active');
       const { data, error } = await query;
       if (error) return { success: false, error: error.message };
@@ -46,7 +46,7 @@ export class StaffController {
         name: newStaff.name,
         employment_number: newStaff.employmentNumber,
         role: newStaff.role,
-        pin_must_change: true,
+        pin: (newStaff as any).pin,
         email: newStaff.email,
         status: newStaff.status,
         branch_id: newStaff.branchId,
@@ -60,7 +60,7 @@ export class StaffController {
       const { data, error } = await supabase
         .from('users')
         .insert([staffData])
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change')
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date')
         .single();
 
       if (error) {
@@ -96,7 +96,7 @@ export class StaffController {
         .from('users')
         .update(dbUpdates)
         .eq('id', staffId)
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change')
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date')
         .single();
 
       if (error) return { success: false, error: error.message };

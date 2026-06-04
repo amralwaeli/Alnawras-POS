@@ -49,6 +49,8 @@ const BillFormatView         = lazy(() => import('./modules/accounting').then(m 
 const QuotationsView         = lazy(() => import('./modules/quotations').then(m => ({ default: m.QuotationsView })));
 const InvoicesView           = lazy(() => import('./modules/invoices').then(m => ({ default: m.InvoicesView })));
 
+const LogisticsView          = lazy(() => import('./modules/logistics/LogisticsView').then(m => ({ default: m.LogisticsView })));
+
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const TakeawayView           = lazy(() => import('./modules/menu').then(m => ({ default: m.TakeawayOrderView })));
@@ -128,6 +130,9 @@ export const router = createHashRouter([
 
       // ── Takeaway ──
       { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canAddOrders"><TakeawayView /></ProtectedRoute></Lazy> },
+
+      // ── Logistics ──
+      { path: 'logistics',           element: <Lazy><ProtectedRoute adminOnly><LogisticsView /></ProtectedRoute></Lazy> },
 
       // ── Loyalty ──
       { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },

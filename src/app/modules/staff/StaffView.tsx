@@ -39,7 +39,7 @@ const roleLabels: Record<string, string> = {
 export function StaffView() {
   const { users, currentUser, addUser } = usePOS();
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ name: '', role: 'cashier' as UserRole });
+  const [formData, setFormData] = useState({ name: '', role: 'cashier' as UserRole, pin: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,16 +52,18 @@ export function StaffView() {
 
   const handleAdd = async () => {
     if (!formData.name.trim()) { setError('Name is required'); return; }
+    if (!/^\d{4}$/.test(formData.pin)) { setError('PIN must be exactly 4 digits'); return; }
     setSubmitting(true); setError('');
     const result = await addUser({
       name: formData.name.trim(),
       employmentNumber: genEmpNum(),
       role: formData.role,
+      pin: formData.pin,
       email: `${formData.name.toLowerCase().replace(/\s+/g, '.')}@alnawras.com`,
       status: 'active',
       branchId: currentUser.branchId,
     });
-    if (result.success) { setShowModal(false); setFormData({ name: '', role: 'cashier' }); }
+    if (result.success) { setShowModal(false); setFormData({ name: '', role: 'cashier', pin: '' }); }
     else setError(result.error || 'Failed to add staff member');
     setSubmitting(false);
   };
@@ -169,8 +171,15 @@ export function StaffView() {
                   ))}
                 </select>
               </div>
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-800">
-                No default PIN is stored. Set the initial PIN through the secure PIN change workflow before the staff member signs in.
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">4-Digit PIN *</label>
+                <input
+                  type="password" inputMode="numeric" maxLength={4}
+                  value={formData.pin}
+                  onChange={e => setFormData(f => ({ ...f, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-mono text-center tracking-[0.5em] text-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="••••"
+                />
               </div>
             </div>
 

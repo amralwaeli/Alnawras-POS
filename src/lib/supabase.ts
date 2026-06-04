@@ -16,7 +16,10 @@ export const supabase = createClient(
       fetch: (input, init = {}) => {
         const token = getAccessToken()
         const headers = new Headers(init.headers)
-        if (token) headers.set('Authorization', `Bearer ${token}`)
+        // Only inject if it is a real JWT (3 dot-separated parts)
+        if (token && token.split('.').length === 3) {
+          headers.set('Authorization', `Bearer ${token}`)
+        }
         return fetch(input, { ...init, headers })
       },
     },

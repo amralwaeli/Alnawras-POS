@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
-  Settings, Fingerprint, ReceiptText, FileText,
+  Settings, Fingerprint, ReceiptText, FileText, Printer,
   ChevronsLeft, ChevronsRight, Menu, X,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
@@ -45,6 +45,7 @@ export function Layout() {
     { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
+    { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     // Quotations & Invoices: accessible to anyone with the permission (staff/special waiter)
     // OR explicitly to accounting role (which uses canManageAccounting instead)
     { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const, allowedRoles: ['accounting'] },

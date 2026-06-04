@@ -409,3 +409,20 @@ export interface ShiftRule {
 
 // Fingerprint scanner status
 export type ScannerStatus = 'disconnected' | 'ready' | 'scanning' | 'processing' | 'error';
+
+// ==================== Printers ====================
+
+export type PrinterStation = 'kitchen' | 'juice';
+
+export interface Printer {
+  id: string;
+  name: string;
+  type: 'network' | 'usb';
+  ipAddress?: string;
+  port?: number;
+  usbPath?: string;
+  stations: PrinterStation[];
+  isActive: boolean;
+  branchId: string;
+  createdAt: string;
+}

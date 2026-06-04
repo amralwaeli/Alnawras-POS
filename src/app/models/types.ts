@@ -468,7 +468,33 @@ export function saveLoyaltySettings(s: LoyaltySettings) {
 
 // ==================== Printers ====================
 
-export type PrinterStation = 'kitchen' | 'juice';
+export type PrinterStation = string;
+
+export interface Station {
+  id: string;
+  name: string;
+  color: string;
+  isBuiltIn: boolean;
+}
+
+export const DEFAULT_STATIONS: Station[] = [
+  { id: 'kitchen', name: 'Kitchen',  color: '#f97316', isBuiltIn: true },
+  { id: 'juice',   name: 'Juice Bar', color: '#22c55e', isBuiltIn: true },
+];
+
+export function loadStations(): Station[] {
+  try {
+    const raw = localStorage.getItem('alnawras_stations');
+    if (!raw) return [...DEFAULT_STATIONS];
+    return JSON.parse(raw);
+  } catch {
+    return [...DEFAULT_STATIONS];
+  }
+}
+
+export function saveStations(stations: Station[]) {
+  localStorage.setItem('alnawras_stations', JSON.stringify(stations));
+}
 
 export interface Printer {
   id: string;

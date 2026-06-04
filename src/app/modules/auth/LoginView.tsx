@@ -133,7 +133,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
           <p className="text-gray-500 text-xl font-medium">Enter your credentials to access the dashboard.</p>
         </div>
         
-        <p className="text-gray-600 text-xs font-bold uppercase tracking-widest">© 2025 Alnawras Restaurant Group</p>
+        <p className="text-gray-600 text-xs font-bold uppercase tracking-widest">© 2026 Amr Alwaeli Group</p>
       </div>
 
       {/* Right panel - Keypad */}

@@ -15,27 +15,32 @@ export class AuthController {
       return { success: false, error: 'PIN must be 4 digits' };
     }
 
-    const { data, error } = await supabase.functions.invoke('pin-authenticate', { body: { pin } });
-    if (error || !data?.user || !data?.access_token) {
-      return { success: false, error: data?.error || error?.message || 'Invalid PIN or inactive account' };
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, employment_number, role, email, status, branch_id, created_at')
+      .eq('pin', pin)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (error || !data) {
+      return { success: false, error: 'Invalid PIN or inactive account' };
     }
 
-    const user = {
-      id: data.user.id,
-      name: data.user.name,
-      employmentNumber: data.user.employment_number,
-      role: data.user.role,
-      email: data.user.email,
-      status: data.user.status,
-      branchId: data.user.branch_id,
-      pinMustChange: data.user.pin_must_change,
-      createdAt: new Date(data.user.created_at),
+    const user: User = {
+      id: data.id,
+      name: data.name,
+      employmentNumber: data.employment_number,
+      role: data.role,
+      email: data.email,
+      status: data.status,
+      branchId: data.branch_id,
+      createdAt: new Date(data.created_at),
       lastLogin: new Date(),
-    } as User;
+    };
 
     saveAuthSession({
-      accessToken: data.access_token,
-      expiresAt: Date.now() + Number(data.expires_in ?? 28800) * 1000,
+      accessToken: 'direct-auth',
+      expiresAt: Date.now() + 28800 * 1000,
       user,
     });
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { usePOS } from '../../context/POSContext';
-import { CheckCircle2, Clock4, ChefHat, Bell, Search, Wifi } from 'lucide-react';
+import { CheckCircle2, Clock4, ChefHat, Bell, Search, Wifi, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
+import { IngredientOrdersTab } from './IngredientOrdersTab';
 
 type KitchenStatus = 'available' | 'out-of-stock' | 'finished';
 
@@ -22,7 +23,7 @@ const STATUS_STYLE: Record<string, { badge: string; btn: string; label: string }
 export function KitchenView() {
   const { products, currentUser, updateProduct, setProducts } = usePOS();
   const [tickets, setTickets]     = useState<any[]>([]);
-  const [tab, setTab]             = useState<'orders' | 'products'>('orders');
+  const [tab, setTab]             = useState<'orders' | 'products' | 'order-request'>('orders');
   const [newAlert, setNewAlert]   = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
   const [connected, setConnected] = useState(true);
@@ -136,18 +137,26 @@ export function KitchenView() {
             </div>
           )}
           <div className="flex bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06]">
-            {(['orders', 'products'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === t ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
-                {t === 'orders' ? `Tickets (${tickets.length})` : 'Inventory'}
-              </button>
-            ))}
+            <button onClick={() => setTab('orders')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              Tickets ({tickets.length})
+            </button>
+            <button onClick={() => setTab('products')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'products' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              Inventory
+            </button>
+            <button onClick={() => setTab('order-request')}
+              className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'order-request' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              <ShoppingCart className="size-3.5" /> Order
+            </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-8 kitchen-scroll">
-        {tab === 'orders' ? (
+        {tab === 'order-request' ? (
+          <IngredientOrdersTab currentUser={currentUser} />
+        ) : tab === 'orders' ? (
           tickets.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-700">
               <div className="bg-gray-900/50 p-10 rounded-[50px] mb-6">

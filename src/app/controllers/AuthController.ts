@@ -11,8 +11,8 @@ export class AuthController {
     user?: User;
     error?: string;
   }> {
-    if (pin.length < 6 || pin.length > 12 || !/^\d+$/.test(pin)) {
-      return { success: false, error: 'PIN must be 6 to 12 digits' };
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return { success: false, error: 'PIN must be 4 digits' };
     }
 
     const { data, error } = await supabase.functions.invoke('pin-authenticate', { body: { pin } });

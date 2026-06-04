@@ -77,7 +77,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF p_pin !~ '^[0-9]{6,12}$' THEN
+  IF p_pin !~ '^[0-9]{4}$' THEN
     RETURN;
   END IF;
 
@@ -99,10 +99,8 @@ SET search_path = public
 AS $$
 DECLARE ok BOOLEAN;
 BEGIN
-  IF p_new_pin !~ '^[0-9]{6,12}$'
-     OR p_new_pin ~ '^([0-9])\1+$'
-     OR p_new_pin ~ '(012345|123456|234567|345678|456789|987654|876543|765432|654321)' THEN
-    RAISE EXCEPTION 'New PIN does not meet complexity requirements';
+  IF p_new_pin !~ '^[0-9]{4}$' THEN
+    RAISE EXCEPTION 'New PIN must be exactly 4 digits';
   END IF;
 
   SELECT EXISTS (

@@ -3,15 +3,13 @@ import { Order } from '../models/types';
 
 // Shared order/item mapping helpers (used by sync engine too)
 export const mapOrderItem = (item: any) => {
-  const mapped = {
+  return {
     ...item,
     productName: item.product_name,
     addedBy: item.added_by ?? item.addedBy,
     addedByName: item.added_by_name ?? item.addedByName,
     addedAt: item.created_at ? new Date(item.created_at) : new Date(),
   };
-  console.log('[mapOrderItem] added_by:', item.added_by, '→ addedBy:', mapped.addedBy);
-  return mapped;
 };
 
 export const mapOrder = (order: any): Order => ({

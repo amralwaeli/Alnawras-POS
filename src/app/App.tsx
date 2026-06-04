@@ -39,7 +39,10 @@ function isPublicRoute(): boolean {
 }
 
 function AppContent() {
-  const { currentUser, authLoading } = usePOS();
+  const { currentUser, authLoading, changePin, logout } = usePOS() as any;
+  const [pinForm, setPinForm] = useState({ current: '', next: '', confirm: '' });
+  const [pinError, setPinError] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
 
   // While auth is initializing (fetching staff list from Supabase), show a
   // neutral loading screen. This prevents the PIN pad from flashing on screen
@@ -66,6 +69,47 @@ function AppContent() {
   // If no staff is logged in AND this is not a public QR/customer route,
   // show the staff PIN login screen.
   if (!currentUser && !isPublicRoute()) return <LoginView onLoginSuccess={() => {}} />;
+
+  if (currentUser?.pinMustChange && !isPublicRoute()) {
+    const submit = async () => {
+      setPinError('');
+      if (!/^\d{6,12}$/.test(pinForm.next)) {
+        setPinError('New PIN must be 6 to 12 digits.');
+        return;
+      }
+      if (/^(\d)\1+$/.test(pinForm.next) || /012345|123456|234567|345678|456789|987654|876543|765432|654321/.test(pinForm.next)) {
+        setPinError('Choose a less predictable PIN.');
+        return;
+      }
+      if (pinForm.next !== pinForm.confirm) {
+        setPinError('PIN confirmation does not match.');
+        return;
+      }
+      setSavingPin(true);
+      const res = await changePin(pinForm.current, pinForm.next);
+      setSavingPin(false);
+      if (!res.success) setPinError(res.error || 'Failed to change PIN.');
+    };
+
+    return (
+      <div className="min-h-screen bg-[#0B0E14] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Change PIN</h1>
+          <p className="text-sm text-gray-500 mb-5">Set a secure PIN before continuing.</p>
+          {pinError && <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{pinError}</div>}
+          <div className="space-y-3">
+            <input type="password" inputMode="numeric" placeholder="Current PIN" value={pinForm.current} onChange={e => setPinForm({ ...pinForm, current: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="password" inputMode="numeric" placeholder="New PIN" value={pinForm.next} onChange={e => setPinForm({ ...pinForm, next: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="password" inputMode="numeric" placeholder="Confirm new PIN" value={pinForm.confirm} onChange={e => setPinForm({ ...pinForm, confirm: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
+          </div>
+          <div className="flex gap-3 mt-5">
+            <button onClick={logout} className="flex-1 py-3 rounded-xl border text-sm font-semibold">Logout</button>
+            <button onClick={submit} disabled={savingPin} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-semibold disabled:opacity-50">{savingPin ? 'Saving...' : 'Save PIN'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return <RouterProvider router={router} />;
 }

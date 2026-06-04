@@ -2,28 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User } from '../models/types';
 import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
-
-const SESSION_KEY = 'alnawras_session_user';
-
-function loadSessionUser(): User | null {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    // Rehydrate Date fields
-    if (parsed.createdAt) parsed.createdAt = new Date(parsed.createdAt);
-    if (parsed.lastLogin) parsed.lastLogin = new Date(parsed.lastLogin);
-    return parsed as User;
-  } catch { return null; }
-}
-
-function saveSessionUser(user: User | null) {
-  if (user) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  } else {
-    sessionStorage.removeItem(SESSION_KEY);
-  }
-}
+import { clearAuthSession, loadAuthSession, saveAuthSession } from '../../lib/authSession';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -32,6 +11,7 @@ interface AuthContextType {
   setCurrentUser: (u: User | null) => void;
   setUsers: (u: User[]) => void;
   login: (pin: string) => Promise<{ success: boolean; user?: User; error?: string }>;
+  changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   addUser: (u: any) => Promise<any>;
   updateUser: (id: string, up: any) => Promise<any>;
@@ -41,7 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
-  const [currentUser, setCurrentUserState] = useState<User | null>(loadSessionUser);
+  const [currentUser, setCurrentUserState] = useState<User | null>(() => loadAuthSession()?.user ?? null);
   const [users, setUsers] = useState<User[]>([]);
   // authLoading stays true until the initial user list is fetched from Supabase.
   // While true, App.tsx shows a neutral spinner instead of the login screen,
@@ -49,7 +29,9 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   const [authLoading, setAuthLoading] = useState(true);
 
   const setCurrentUser = (u: User | null) => {
-    saveSessionUser(u);
+    const existing = loadAuthSession();
+    if (u && existing) saveAuthSession({ ...existing, user: u });
+    if (!u) clearAuthSession();
     setCurrentUserState(u);
   };
 
@@ -58,7 +40,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       if (res.success && res.data) {
         setUsers(res.data);
         // Validate the restored session user still exists and is active
-        const sessionUser = loadSessionUser();
+        const sessionUser = loadAuthSession()?.user;
         if (sessionUser) {
           const stillValid = res.data.find(u => u.id === sessionUser.id && u.status === 'active');
           if (!stillValid) {
@@ -73,13 +55,20 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   }, []);
 
   const login = async (pin: string) => {
-    const result = AuthController.authenticate(pin, users);
+    const result = await AuthController.authenticate(pin);
     if (result.success) setCurrentUser(result.user!);
     return result;
   };
 
+  const changePin = async (currentPin: string, newPin: string) => {
+    const result = await AuthController.changePin(currentPin, newPin);
+    if (result.success && currentUser) setCurrentUser({ ...currentUser, pinMustChange: false });
+    return result;
+  };
+
   const logout = () => {
-    setCurrentUser(null);
+    clearAuthSession();
+    setCurrentUserState(null);
     onLogout?.();
   };
 
@@ -89,13 +78,21 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
     return res;
   };
 
-  const updateUser = (id: string, up: any) => StaffController.updateStaff(id, up);
-  const deleteUser = (id: string) => StaffController.deleteStaff(id);
+  const updateUser = async (id: string, up: any) => {
+    const res = await StaffController.updateStaff(id, up);
+    if (res.success && res.data) setUsers(prev => prev.map(u => u.id === id ? res.data! : u));
+    return res;
+  };
+  const deleteUser = async (id: string) => {
+    const res = await StaffController.deleteStaff(id);
+    if (res.success) setUsers(prev => prev.filter(u => u.id !== id));
+    return res;
+  };
 
   return (
     <AuthContext.Provider value={{
       currentUser, authLoading, users, setCurrentUser, setUsers,
-      login, logout, addUser, updateUser, deleteUser,
+      login, changePin, logout, addUser, updateUser, deleteUser,
     }}>
       {children}
     </AuthContext.Provider>

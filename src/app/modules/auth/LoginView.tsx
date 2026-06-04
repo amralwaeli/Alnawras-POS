@@ -52,7 +52,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
   const isLocked = lockoutRemaining > 0;
 
   const handleSubmit = useCallback(async (currentPin: string) => {
-    if (currentPin.length !== 4 || loading || isLocked) return;
+    if (currentPin.length < 6 || currentPin.length > 12 || loading || isLocked) return;
 
     const rec = getAttemptRecord();
     if (rec.lockedUntil && rec.lockedUntil > Date.now()) {
@@ -95,7 +95,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
     const handler = (e: KeyboardEvent) => {
       if (isLocked || loading) return;
       if (e.key >= '0' && e.key <= '9') {
-        setPin(p => p.length < 4 ? p + e.key : p);
+        setPin(p => p.length < 12 ? p + e.key : p);
       } else if (e.key === 'Backspace') {
         setPin(p => p.slice(0, -1));
         setError('');
@@ -105,9 +105,9 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [isLocked, loading]);
 
-  // Auto-submit when 4 digits entered
+  // Auto-submit once the minimum secure PIN length is entered.
   useEffect(() => {
-    if (pin.length === 4) {
+    if (pin.length >= 6) {
       void handleSubmit(pin);
     }
   }, [pin, handleSubmit]);
@@ -149,12 +149,12 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
 
           <div className="text-center lg:text-left mb-10">
             <h2 className="text-3xl font-black text-white tracking-tight uppercase italic">Staff Check-in</h2>
-            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest mt-2">Enter your 4-digit security PIN</p>
+            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest mt-2">Enter your 6-12 digit security PIN</p>
           </div>
 
           {/* PIN Display (Dots) */}
           <div className={`flex justify-center lg:justify-start gap-5 mb-10 ${shake ? 'animate-shake' : ''}`}>
-            {[0, 1, 2, 3].map(i => (
+            {[0, 1, 2, 3, 4, 5].map(i => (
               <div key={i} className={`size-5 rounded-full border-2 transition-all duration-200 ${
                 pin.length > i
                   ? 'bg-orange-500 border-orange-500 scale-125 shadow-lg shadow-orange-500/40'
@@ -180,7 +180,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
             {[1,2,3,4,5,6,7,8,9].map(n => (
               <button
                 key={n}
-                onClick={() => { if (!isLocked && pin.length < 4) setPin(p => p + n); }}
+                onClick={() => { if (!isLocked && pin.length < 12) setPin(p => p + n); }}
                 disabled={loading || isLocked}
                 className="h-20 rounded-[24px] bg-gray-800/40 text-white text-2xl font-black hover:bg-gray-800 hover:scale-105 active:scale-95 transition-all border border-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label={`Digit ${n}`}
@@ -197,7 +197,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
             </button>
             <button
-              onClick={() => { if (!isLocked && pin.length < 4) setPin(p => p + '0'); }}
+              onClick={() => { if (!isLocked && pin.length < 12) setPin(p => p + '0'); }}
               disabled={loading || isLocked}
               className="h-20 rounded-[24px] bg-gray-800/40 text-white text-2xl font-black hover:bg-gray-800 hover:scale-105 transition-all border border-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Digit 0"
@@ -206,7 +206,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
             </button>
             <button
               onClick={() => void handleSubmit(pin)}
-              disabled={loading || pin.length !== 4 || isLocked}
+              disabled={loading || pin.length < 6 || isLocked}
               className="h-20 rounded-[24px] bg-orange-500 text-white shadow-xl shadow-orange-500/20 hover:bg-orange-600 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Submit PIN"
             >

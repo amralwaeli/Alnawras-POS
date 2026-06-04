@@ -8,7 +8,7 @@ function mapDbRowToStaff(row: any): Staff {
     name: row.name,
     employmentNumber: row.employment_number,
     role: row.role as UserRole,
-    pin: row.pin,
+    pinMustChange: row.pin_must_change ?? false,
     email: row.email,
     status: row.status,
     branchId: row.branch_id,
@@ -23,7 +23,9 @@ function mapDbRowToStaff(row: any): Staff {
 export class StaffController {
   static async getStaff(activeOnly: boolean = false): Promise<{ success: boolean; data?: Staff[]; error?: string }> {
     try {
-      let query = supabase.from('users').select('*');
+      let query = supabase
+        .from('users')
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change');
       if (activeOnly) query = query.eq('status', 'active');
       const { data, error } = await query;
       if (error) return { success: false, error: error.message };
@@ -44,7 +46,7 @@ export class StaffController {
         name: newStaff.name,
         employment_number: newStaff.employmentNumber,
         role: newStaff.role,
-        pin: newStaff.pin,
+        pin_must_change: true,
         email: newStaff.email,
         status: newStaff.status,
         branch_id: newStaff.branchId,
@@ -58,7 +60,7 @@ export class StaffController {
       const { data, error } = await supabase
         .from('users')
         .insert([staffData])
-        .select()
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change')
         .single();
 
       if (error) {
@@ -81,7 +83,9 @@ export class StaffController {
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.employmentNumber !== undefined) dbUpdates.employment_number = updates.employmentNumber;
       if (updates.role !== undefined) dbUpdates.role = updates.role;
-      if (updates.pin !== undefined) dbUpdates.pin = updates.pin;
+      if ((updates as any).pin !== undefined) {
+        return { success: false, error: 'PIN changes must use the secure PIN change workflow' };
+      }
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.branchId !== undefined) dbUpdates.branch_id = updates.branchId;
@@ -92,7 +96,7 @@ export class StaffController {
         .from('users')
         .update(dbUpdates)
         .eq('id', staffId)
-        .select()
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date, pin_must_change')
         .single();
 
       if (error) return { success: false, error: error.message };

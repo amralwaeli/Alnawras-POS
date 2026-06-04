@@ -7,7 +7,7 @@ export interface User {
   name: string;
   employmentNumber: string;
   role: UserRole;
-  pin: string;
+  pinMustChange?: boolean;
   email: string;
   status: 'active' | 'inactive';
   branchId: string;

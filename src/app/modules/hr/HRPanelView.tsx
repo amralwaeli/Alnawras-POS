@@ -30,7 +30,7 @@ function EmployeeFormModal({
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
-    employeeId: initial?.employeeId || `EMP${Date.now().toString().slice(-4)}`,
+    employeeId: initial?.employeeId || `EMP${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
     fullName: initial?.fullName || '',
     role: initial?.role || 'waiter',
     monthlySalary: initial?.monthlySalary || 0,

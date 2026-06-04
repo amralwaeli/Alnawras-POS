@@ -84,7 +84,7 @@ function StationDialog({
     e.preventDefault();
     if (!name.trim()) { toast.error('Station name is required'); return; }
     onSave({
-      id: station?.id ?? name.trim().toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+      id: station?.id ?? `${name.trim().toLowerCase().replace(/\s+/g, '-')}-${crypto.randomUUID()}`,
       name: name.trim(),
       color,
       isBuiltIn: station?.isBuiltIn ?? false,

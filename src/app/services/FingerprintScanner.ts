@@ -147,7 +147,7 @@ export class FingerprintScanner {
   static async simulateCapture(forceEmployeeId?: string): Promise<ScanResult> {
     await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
     // Generate a pseudo-template. In demo, same "session" produces same template.
-    const seed = forceEmployeeId || `DEMO-${Date.now()}`;
+    const seed = forceEmployeeId || `DEMO-${crypto.randomUUID()}`;
     let template = '';
     for (let i = 0; i < 128; i++) {
       const code = ((seed.charCodeAt(i % seed.length) * (i + 1) * 7919) % 256);

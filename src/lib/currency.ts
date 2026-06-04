@@ -1,5 +1,5 @@
 /** Currency symbol — configured via VITE_CURRENCY env var */
-export const CURRENCY: string = (import.meta.env.VITE_CURRENCY as string) || 'YER';
+export const CURRENCY: string = (import.meta.env.VITE_CURRENCY as string) || 'RM';
 
 /** Compute the real order total from items (DB total may be 0 if items were
  *  inserted directly without updating the orders row). */

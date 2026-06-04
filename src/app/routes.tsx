@@ -21,7 +21,6 @@ function ProtectedRoute({ children, permission, adminOnly, allowedRoles }: {
 
 // ── Lazy-load each module ─────────────────────────────────────────────────────
 const AdminDashboardView     = lazy(() => import('./modules/dashboard').then(m => ({ default: m.AdminDashboardView })));
-const DashboardView          = lazy(() => import('./modules/dashboard').then(m => ({ default: m.DashboardView })));
 
 const TablesView             = lazy(() => import('./modules/tables').then(m => ({ default: m.TablesView })));
 const TableManagementView    = lazy(() => import('./modules/tables').then(m => ({ default: m.TableManagementView })));
@@ -78,7 +77,7 @@ function LandingPage() {
   if (!currentUser) return <Navigate to="/check-in" replace />;
   if (currentUser.role === 'admin')      return <Navigate to="/admin-dashboard" replace />;
   if (currentUser.role === 'cashier')    return <Navigate to="/tables" replace />;
-  if (currentUser.role === 'waiter')     return <Navigate to="/dashboard" replace />;
+  if (currentUser.role === 'waiter')     return <Navigate to="/waiter" replace />;
   if (currentUser.role === 'kitchen')    return <Navigate to="/kitchen" replace />;
   if (currentUser.role === 'juice')      return <Navigate to="/kitchen" replace />;
   if (currentUser.role === 'hr')         return <Navigate to="/hr-panel" replace />;
@@ -95,8 +94,10 @@ export const router = createHashRouter([
       { index: true, element: <Lazy><LandingPage /></Lazy> },
 
       // ── Dashboard ──
-      { path: 'dashboard',           element: <Lazy><ProtectedRoute permission="canViewTables"><DashboardView /></ProtectedRoute></Lazy> },
       { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><AdminDashboardView /></ProtectedRoute></Lazy> },
+
+      // ── Waiter view ──
+      { path: 'waiter',              element: <Lazy><ProtectedRoute permission="canAddOrders"><TablesView /></ProtectedRoute></Lazy> },
 
       // ── Tables ──
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },

@@ -6,12 +6,15 @@
 import { useState, useMemo } from 'react';
 import {
   X, Clock, CheckCircle, CreditCard, Banknote, QrCode,
-  SplitSquareHorizontal, Plus, Minus,
+  SplitSquareHorizontal, Plus, Minus, Search, UserCheck, Star, Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
+import { LoyaltyController } from '../../controllers/LoyaltyController';
+import { loadLoyaltySettings } from '../../models/types';
+import type { Customer } from '../../models/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -101,6 +104,151 @@ export function printReceipt(order: any, paymentSummary: string, billNo: string)
   win.document.close();
 }
 
+// ── CustomerPanel ─────────────────────────────────────────────────────────────
+interface CustomerPanelProps {
+  branchId: string;
+  loyaltyDiscount: number;
+  onCustomerChange: (c: Customer | null) => void;
+  onRedemptionChange: (discount: number, points: number) => void;
+  linkedCustomer: Customer | null;
+}
+
+function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedemptionChange, linkedCustomer }: CustomerPanelProps) {
+  const [phone, setPhone] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [addMode, setAddMode] = useState(false);
+  const [newName, setNewName] = useState('');
+  const settings = loadLoyaltySettings();
+
+  const search = async () => {
+    if (!phone.trim()) return;
+    setSearching(true);
+    const res = await LoyaltyController.findByPhone(phone.trim(), branchId);
+    setSearching(false);
+    if (!res.success) { toast.error('Lookup failed'); return; }
+    if (res.customer) {
+      onCustomerChange(res.customer);
+      setAddMode(false);
+    } else {
+      toast.info('Customer not found — add them?');
+      setAddMode(true);
+    }
+  };
+
+  const addNew = async () => {
+    if (!newName.trim() || !phone.trim()) return;
+    setSearching(true);
+    const res = await LoyaltyController.createCustomer({ name: newName.trim(), phone: phone.trim(), branchId });
+    setSearching(false);
+    if (!res.success) { toast.error(res.error || 'Failed to add'); return; }
+    onCustomerChange(res.customer!);
+    setAddMode(false);
+    toast.success('Customer added to loyalty program');
+  };
+
+  const unlink = () => {
+    onCustomerChange(null);
+    onRedemptionChange(0, 0);
+    setPhone('');
+    setAddMode(false);
+    setNewName('');
+  };
+
+  const maxPoints = linkedCustomer ? Math.min(linkedCustomer.pointsBalance, Math.floor(linkedCustomer.pointsBalance / settings.minimumRedemption) * settings.minimumRedemption) : 0;
+  const canRedeem = linkedCustomer && linkedCustomer.pointsBalance >= settings.minimumRedemption;
+
+  if (!settings.enabled) return null;
+
+  return (
+    <div className="border rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border-b border-amber-100">
+        <Star className="size-3.5 text-amber-500 shrink-0" />
+        <p className="text-xs font-semibold text-amber-700">Loyalty — {settings.pointsLabel}</p>
+      </div>
+
+      {!linkedCustomer ? (
+        <div className="p-3 space-y-2">
+          {!addMode ? (
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                placeholder="Phone number…"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && search()}
+                className="flex-1 text-sm border rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
+              />
+              <button
+                onClick={search}
+                disabled={searching || !phone.trim()}
+                className="px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 disabled:opacity-40 flex items-center gap-1"
+              >
+                <Search className="size-3.5" />
+                {searching ? '…' : 'Find'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">New customer — enter their name to register:</p>
+              <input
+                type="text"
+                placeholder="Customer name"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                className="w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setAddMode(false)} className="flex-1 py-2 text-xs text-gray-600 border rounded-lg hover:bg-gray-50">Back</button>
+                <button onClick={addNew} disabled={searching || !newName.trim()} className="flex-1 py-2 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40">
+                  {searching ? 'Adding…' : 'Add & Link'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCheck className="size-4 text-emerald-500" />
+              <div>
+                <p className="text-sm font-semibold">{linkedCustomer.name}</p>
+                <p className="text-xs text-gray-400">{linkedCustomer.phone}</p>
+              </div>
+            </div>
+            <button onClick={unlink} className="text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded">Unlink</button>
+          </div>
+          <div className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <Gift className="size-3.5 text-amber-500" />
+              <span className="text-sm font-bold text-amber-700">{linkedCustomer.pointsBalance.toLocaleString()}</span>
+              <span className="text-xs text-amber-600">{settings.pointsLabel}</span>
+            </div>
+            {canRedeem && loyaltyDiscount === 0 ? (
+              <button
+                onClick={() => onRedemptionChange(
+                  parseFloat((maxPoints / settings.redemptionRate).toFixed(2)),
+                  maxPoints
+                )}
+                className="text-xs bg-amber-500 text-white px-2.5 py-1 rounded-lg hover:bg-amber-600"
+              >
+                Redeem All
+              </button>
+            ) : loyaltyDiscount > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-emerald-600">−{fmt(loyaltyDiscount)} applied</span>
+                <button onClick={() => onRedemptionChange(0, 0)} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400">Need {settings.minimumRedemption} to redeem</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── CashChangeRow ─────────────────────────────────────────────────────────────
 function CashChangeRow({ total }: { total: number }) {
   const [received, setReceived] = useState('');
@@ -151,9 +299,23 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
   const [splits, setSplits]             = useState<SplitEntry[]>([
     { method: 'cash', amount: '' }, { method: 'card', amount: '' },
   ]);
+  const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
 
-  const totals     = useMemo(() => calcOrderTotals(order), [order]);
+  const loyaltySettings = loadLoyaltySettings();
+
+  const baseTotals = useMemo(() => calcOrderTotals(order), [order]);
+  const totals = useMemo(() => {
+    const discount = baseTotals.discount + loyaltyDiscount;
+    const total    = Math.max(0, baseTotals.subtotal + baseTotals.tax - discount);
+    return { ...baseTotals, discount, total };
+  }, [baseTotals, loyaltyDiscount]);
   const splitTotal = splits.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const handleRedemptionChange = (discount: number, points: number) => {
+    setLoyaltyDiscount(discount);
+    setLoyaltyPointsToRedeem(points);
+  };
   const splitRemain = Math.max(0, totals.total - splitTotal);
   const splitExact  = Math.abs(totals.total - splitTotal) < 0.005;
 
@@ -191,10 +353,15 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
 
-      const { error: orderErr } = await supabase.from('orders').update({
+      const orderUpdate: any = {
         status: 'completed', completed_at: new Date().toISOString(),
         payment_method: summary, bill_number: billNo, payment_status: 'paid',
-      }).eq('id', order.id).eq('branch_id', currentUser.branchId);
+      };
+      if (loyaltyDiscount > 0) {
+        orderUpdate.discount = baseTotals.discount + loyaltyDiscount;
+        orderUpdate.total = totals.total;
+      }
+      const { error: orderErr } = await supabase.from('orders').update(orderUpdate).eq('id', order.id).eq('branch_id', currentUser.branchId);
 
       if (orderErr) throw orderErr;
 
@@ -202,6 +369,29 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
         await supabase.from('tables')
           .update({ status: 'available', current_order_id: null })
           .eq('id', order.tableId).eq('branch_id', currentUser.branchId);
+      }
+
+      // ── Loyalty: apply discount & earn/redeem points ──────────────────────
+      if (linkedCustomer && loyaltySettings.enabled) {
+        if (loyaltyPointsToRedeem > 0) {
+          await LoyaltyController.redeemPoints({
+            customerId: linkedCustomer.id,
+            orderId: order.id,
+            points: loyaltyPointsToRedeem,
+            branchId: currentUser.branchId,
+          });
+        }
+        const pointsEarned = Math.floor(totals.total * loyaltySettings.pointsPerDollar);
+        if (pointsEarned > 0) {
+          await LoyaltyController.earnPoints({
+            customerId: linkedCustomer.id,
+            orderId: order.id,
+            points: pointsEarned,
+            amountSpent: totals.total,
+            branchId: currentUser.branchId,
+          });
+          toast.success(`+${pointsEarned} ${loyaltySettings.pointsLabel} earned for ${linkedCustomer.name}`);
+        }
       }
 
       setLastBillNo(billNo);
@@ -282,12 +472,20 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
         <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
           <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
           {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>Tax</span><span>{fmt(totals.tax)}</span></div>}
-          {totals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(totals.discount)}</span></div>}
+          {baseTotals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(baseTotals.discount)}</span></div>}
+          {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
           <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
         </div>
 
         {(currentUser.role === 'cashier' || currentUser.role === 'admin') && order.status !== 'completed' && (
           <div className="px-6 py-4 border-t space-y-3">
+            <CustomerPanel
+              branchId={currentUser.branchId}
+              linkedCustomer={linkedCustomer}
+              loyaltyDiscount={loyaltyDiscount}
+              onCustomerChange={setLinkedCustomer}
+              onRedemptionChange={handleRedemptionChange}
+            />
             <p className="text-sm font-semibold text-gray-700">Payment Method</p>
             <div className="grid grid-cols-4 gap-2">
               <button onClick={() => setPaymentMode('cash')} className={methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')}><Banknote className="size-4" />Cash</button>

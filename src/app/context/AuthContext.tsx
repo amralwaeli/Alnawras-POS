@@ -56,7 +56,12 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
 
   const login = async (pin: string) => {
     const result = await AuthController.authenticate(pin);
-    if (result.success) setCurrentUser(result.user!);
+    if (result.success) {
+      // Reset the hash to root BEFORE updating state so the RouterProvider
+      // mounts at '/' and LandingPage redirects to the correct role dashboard.
+      window.location.hash = '#/';
+      setCurrentUser(result.user!);
+    }
     return result;
   };
 

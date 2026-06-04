@@ -44,13 +44,6 @@ function AppContent() {
   const [pinError, setPinError] = useState('');
   const [savingPin, setSavingPin] = useState(false);
 
-  // When the logged-in user changes, reset the router to "/" so LandingPage
-  // redirects to the correct dashboard for the new user's role.
-  useEffect(() => {
-    if (currentUser?.id) {
-      router.navigate('/');
-    }
-  }, [currentUser?.id]);
 
   // While auth is initializing (fetching staff list from Supabase), show a
   // neutral loading screen. This prevents the PIN pad from flashing on screen

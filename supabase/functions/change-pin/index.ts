@@ -14,11 +14,8 @@ Deno.serve(async (req) => {
     if (typeof currentPin !== 'string' || typeof newPin !== 'string') {
       return Response.json({ error: 'PIN values are required' }, { status: 400, headers: corsHeaders });
     }
-    if (!/^\d{6,12}$/.test(newPin)) {
-      return Response.json({ error: 'New PIN must be 6 to 12 digits' }, { status: 400, headers: corsHeaders });
-    }
-    if (/^(\d)\1+$/.test(newPin) || /012345|123456|234567|345678|456789|987654|876543|765432|654321/.test(newPin)) {
-      return Response.json({ error: 'New PIN is too predictable' }, { status: 400, headers: corsHeaders });
+    if (!/^\d{4}$/.test(newPin)) {
+      return Response.json({ error: 'New PIN must be exactly 4 digits' }, { status: 400, headers: corsHeaders });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

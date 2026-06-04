@@ -73,12 +73,8 @@ function AppContent() {
   if (currentUser?.pinMustChange && !isPublicRoute()) {
     const submit = async () => {
       setPinError('');
-      if (!/^\d{6,12}$/.test(pinForm.next)) {
-        setPinError('New PIN must be 6 to 12 digits.');
-        return;
-      }
-      if (/^(\d)\1+$/.test(pinForm.next) || /012345|123456|234567|345678|456789|987654|876543|765432|654321/.test(pinForm.next)) {
-        setPinError('Choose a less predictable PIN.');
+      if (!/^\d{4}$/.test(pinForm.next)) {
+        setPinError('New PIN must be exactly 4 digits.');
         return;
       }
       if (pinForm.next !== pinForm.confirm) {
@@ -98,9 +94,9 @@ function AppContent() {
           <p className="text-sm text-gray-500 mb-5">Set a secure PIN before continuing.</p>
           {pinError && <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{pinError}</div>}
           <div className="space-y-3">
-            <input type="password" inputMode="numeric" placeholder="Current PIN" value={pinForm.current} onChange={e => setPinForm({ ...pinForm, current: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
-            <input type="password" inputMode="numeric" placeholder="New PIN" value={pinForm.next} onChange={e => setPinForm({ ...pinForm, next: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
-            <input type="password" inputMode="numeric" placeholder="Confirm new PIN" value={pinForm.confirm} onChange={e => setPinForm({ ...pinForm, confirm: e.target.value.replace(/\D/g, '').slice(0, 12) })} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="password" inputMode="numeric" placeholder="Current PIN" value={pinForm.current} onChange={e => setPinForm({ ...pinForm, current: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="password" inputMode="numeric" placeholder="New PIN" value={pinForm.next} onChange={e => setPinForm({ ...pinForm, next: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="password" inputMode="numeric" placeholder="Confirm new PIN" value={pinForm.confirm} onChange={e => setPinForm({ ...pinForm, confirm: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="w-full px-4 py-3 rounded-xl border" />
           </div>
           <div className="flex gap-3 mt-5">
             <button onClick={logout} className="flex-1 py-3 rounded-xl border text-sm font-semibold">Logout</button>

@@ -13,7 +13,7 @@ function mapDbRowToStaff(row: any): Staff {
     status: row.status,
     branchId: row.branch_id,
     createdAt: new Date(row.created_at),
-    lastLogin: row.last_login ? new Date(row.last_login) : undefined,
+    lastLogin: undefined,
     hourlyRate: row.hourly_rate || 0,
     position: row.position || row.role,
     hireDate: row.hire_date ? new Date(row.hire_date) : new Date(row.created_at),
@@ -25,7 +25,7 @@ export class StaffController {
     try {
       let query = supabase
         .from('users')
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date');
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, hourly_rate, position, hire_date');
       if (activeOnly) query = query.eq('status', 'active');
       const { data, error } = await query;
       if (error) return { success: false, error: error.message };
@@ -60,7 +60,7 @@ export class StaffController {
       const { data, error } = await supabase
         .from('users')
         .insert([staffData])
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date')
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, hourly_rate, position, hire_date')
         .single();
 
       if (error) {
@@ -96,7 +96,7 @@ export class StaffController {
         .from('users')
         .update(dbUpdates)
         .eq('id', staffId)
-        .select('id, name, employment_number, role, email, status, branch_id, created_at, last_login, hourly_rate, position, hire_date')
+        .select('id, name, employment_number, role, email, status, branch_id, created_at, hourly_rate, position, hire_date')
         .single();
 
       if (error) return { success: false, error: error.message };

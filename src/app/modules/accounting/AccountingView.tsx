@@ -61,7 +61,7 @@ export function AccountingView() {
     const amount = parseFloat(form.amount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     setSaving(true);
-    const id = `exp-${Date.now()}`;
+    const id = crypto.randomUUID();
     const { error } = await supabase.from('expenses').insert([{
       id,
       branch_id:        currentUser.branchId,

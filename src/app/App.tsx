@@ -1,9 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Component, ReactNode } from 'react';
 import { RouterProvider } from 'react-router';
 import { POSProvider, usePOS } from './context/POSContext';
 import { router } from './routes';
 import { LoginView } from './modules/auth';
 import { checkSupabaseConnection } from '../lib/supabase';
+
+// ── Global error boundary ─────────────────────────────────────────────────────
+interface EBState { hasError: boolean; message: string; }
+class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { hasError: false, message: '' };
+  static getDerivedStateFromError(err: Error): EBState {
+    return { hasError: true, message: err?.message ?? 'Unknown error' };
+  }
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B0E14', flexDirection: 'column', gap: 16, padding: 24 }}>
+        <div style={{ background: '#1e1e2e', border: '1px solid #3f3f5a', borderRadius: 16, padding: '32px 40px', maxWidth: 480, textAlign: 'center' }}>
+          <p style={{ color: '#f87171', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Something went wrong</p>
+          <p style={{ color: '#64748b', fontSize: 12, marginBottom: 24 }}>{this.state.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: '#f59e0b', color: '#0B0E14', border: 'none', borderRadius: 10, padding: '10px 24px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}
+          >
+            Reload App
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
 
 // Routes that customers reach via QR code scan — no staff login required.
 const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/'];
@@ -52,17 +78,19 @@ export default function App() {
   }, []);
 
   return (
-    <POSProvider>
-      {supabaseOk === false && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-          background: '#f59e0b', color: '#1c1917', padding: '6px 16px',
-          fontSize: '13px', textAlign: 'center',
-        }}>
-          ⚠️ Supabase connection failed — check your API key in .env and rebuild.
-        </div>
-      )}
-      <AppContent />
-    </POSProvider>
+    <ErrorBoundary>
+      <POSProvider>
+        {supabaseOk === false && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+            background: '#f59e0b', color: '#1c1917', padding: '6px 16px',
+            fontSize: '13px', textAlign: 'center',
+          }}>
+            ⚠️ Supabase connection failed — check your API key in .env and rebuild.
+          </div>
+        )}
+        <AppContent />
+      </POSProvider>
+    </ErrorBoundary>
   );
 }

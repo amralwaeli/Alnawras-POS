@@ -1,6 +1,7 @@
 import { Product, Category, ProductImportData, User } from '../models/types';
 import { AuthController } from './AuthController';
 import { supabase } from '../../lib/supabase';
+import { genId } from '../../lib/id';
 
 export class ProductController {
   /**
@@ -90,7 +91,7 @@ export class ProductController {
       const { data, error } = await supabase
         .from('products')
         .insert({
-          id: `prod-${Date.now()}`,
+          id: genId('prod'),
           name: productData.name,
           category_id: productData.categoryId,
           category: productData.category,
@@ -246,7 +247,7 @@ export class ProductController {
 
       if (uniqueNewCategories.length > 0) {
         const categoryRows = uniqueNewCategories.map((name, i) => ({
-          id: `cat-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          id: genId('cat'),
           name,
           branch_id: user.branchId,
           is_active: true,
@@ -271,7 +272,7 @@ export class ProductController {
           return;
         }
         productRows.push({
-          id: `prod-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 6)}`,
+          id: genId('prod'),
           name: item.name,
           category_id: categoryId,
           category: item.category?.trim(),
@@ -336,7 +337,7 @@ export class CategoryController {
 
   static async addCategory(data: any, user: User) {
     const { data: cat, error } = await supabase.from('categories').insert({
-        id: `cat-${Date.now()}`,
+        id: genId('cat'),
         name: data.name,
         description: data.description || null,
         color: data.color || '#3B82F6',

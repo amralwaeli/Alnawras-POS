@@ -187,22 +187,40 @@ export function QROrderingView() {
       let oid = orderId || table.currentOrderId;
 
       if (!oid) {
-        oid = `order-${Date.now()}`;
-        await supabase.from('tables')
-          .update({ status: 'occupied', current_order_id: oid })
-          .eq('id', table.id).is('current_order_id', null);
-        await supabase.from('orders').insert([{
-          id: oid, table_id: table.id, table_number: table.number,
-          subtotal: 0, tax: 0, discount: 0, total: 0,
-          status: 'open', payment_status: 'unpaid', order_type: 'dine-in',
-          branch_id: table.branchId, waiters: [],
-        }]);
+        const newOid = crypto.randomUUID();
+
+        // Atomic claim: only update if another session hasn't already created an order
+        const { data: claimedTable, error: claimErr } = await supabase
+          .from('tables')
+          .update({ status: 'occupied', current_order_id: newOid })
+          .eq('id', table.id)
+          .is('current_order_id', null)
+          .select('current_order_id')
+          .maybeSingle();
+
+        if (claimErr || !claimedTable) {
+          // Another session won the race — fetch their order ID instead
+          const { data: freshTable } = await supabase
+            .from('tables').select('current_order_id').eq('id', table.id).single();
+          oid = freshTable?.current_order_id ?? null;
+        } else {
+          oid = newOid;
+          const { error: orderErr } = await supabase.from('orders').insert([{
+            id: oid, table_id: table.id, table_number: table.number,
+            subtotal: 0, tax: 0, discount: 0, total: 0,
+            status: 'open', payment_status: 'unpaid', order_type: 'dine-in',
+            branch_id: table.branchId, waiters: [],
+          }]);
+          if (orderErr) throw new Error(orderErr.message);
+        }
+
+        if (!oid) throw new Error('Could not create or claim order for this table.');
         setOrderId(oid);
         setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: oid! } : prev);
       }
 
       const payload = cartItems.map(item => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        id: crypto.randomUUID(),
         order_id: oid, product_id: item.productId, product_name: item.productName,
         quantity: item.quantity, price: item.price, subtotal: item.price * item.quantity,
         status: 'pending', notes: item.notes || null,

@@ -3,7 +3,7 @@ import { usePOS } from '../../context/POSContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
-import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag } from 'lucide-react';
+import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentModal } from '../shared/PaymentModal';
 
@@ -319,7 +319,16 @@ export function TablesView() {
                 : 'Live table status — updates in real time'}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            {(currentUser.role === 'waiter' || currentUser.role === 'admin' || currentUser.role === 'staff') && (
+              <button
+                onClick={() => navigate('/takeaway')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors shadow-sm"
+              >
+                <Plus className="size-4" />
+                New Takeaway
+              </button>
+            )}
             {currentUser.role !== 'cashier' && (
               <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
                 <p className="text-2xl font-bold text-emerald-600">{available}</p>

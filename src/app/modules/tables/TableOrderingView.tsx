@@ -252,7 +252,7 @@ export function TableOrderingView() {
       let shouldCreateOrder = false;
 
       if (!orderId) {
-        orderId = `order-${Date.now()}`;
+        orderId = crypto.randomUUID();
         shouldCreateOrder = true;
       }
 
@@ -300,7 +300,7 @@ export function TableOrderingView() {
       }
 
       const newItems = cartItems.map(item => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        id: crypto.randomUUID(),
         order_id: orderId,
         product_id: item.productId,
         product_name: item.productName,

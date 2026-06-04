@@ -51,6 +51,7 @@ const InvoicesView           = lazy(() => import('./modules/invoices').then(m =>
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
+const TakeawayView           = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ function LandingPage() {
   if (currentUser.role === 'cashier')    return <Navigate to="/tables" replace />;
   if (currentUser.role === 'waiter')     return <Navigate to="/dashboard" replace />;
   if (currentUser.role === 'kitchen')    return <Navigate to="/kitchen" replace />;
+  if (currentUser.role === 'juice')      return <Navigate to="/kitchen" replace />;
   if (currentUser.role === 'hr')         return <Navigate to="/hr-panel" replace />;
   if (currentUser.role === 'staff')      return <Navigate to="/invoices" replace />;
   if (currentUser.role === 'accounting') return <Navigate to="/accounting" replace />;
@@ -91,7 +93,7 @@ export const router = createHashRouter([
       { index: true, element: <Lazy><LandingPage /></Lazy> },
 
       // ── Dashboard ──
-      { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
+      { path: 'dashboard',           element: <Lazy><ProtectedRoute permission="canViewTables"><DashboardView /></ProtectedRoute></Lazy> },
       { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><AdminDashboardView /></ProtectedRoute></Lazy> },
 
       // ── Tables ──
@@ -123,6 +125,9 @@ export const router = createHashRouter([
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
       { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
       { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
+
+      // ── Takeaway ──
+      { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canAddOrders"><TakeawayView /></ProtectedRoute></Lazy> },
 
       // ── Loyalty ──
       { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },

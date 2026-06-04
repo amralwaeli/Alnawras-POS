@@ -3,10 +3,6 @@ import { Plus, Trash2, Send, Clock, CheckCircle2, ShoppingCart, RefreshCw } from
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const OWNER_WHATSAPP = '601111544800';
-
 const UNITS = ['kg', 'g', 'L', 'mL', 'pieces', 'boxes', 'bags', 'bottles', 'cans', 'packs', 'dozen'];
 
 const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
@@ -27,44 +23,6 @@ interface IngredientOrder {
   status: string;
   branch_id: string;
   created_at: string;
-}
-
-// ── WhatsApp helper ───────────────────────────────────────────────────────────
-
-function buildWhatsAppMessage(order: {
-  name: string;
-  role: string;
-  items: OrderItem[];
-  notes: string;
-  branchId: string;
-}): string {
-  const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-  const itemLines = order.items
-    .filter(i => i.name.trim())
-    .map(i => `  • ${i.name} — ${i.quantity} ${i.unit}`)
-    .join('\n');
-
-  const msg = [
-    `🛒 *Ingredient Order Request*`,
-    ``,
-    `👤 From: ${order.name} (${order.role})`,
-    `📅 Date: ${date} at ${time}`,
-    ``,
-    `📦 *Items Needed:*`,
-    itemLines,
-    order.notes ? `\n📝 *Notes:* ${order.notes}` : '',
-    ``,
-    `Please confirm when ordered. Thank you! 🙏`,
-  ].filter(l => l !== undefined).join('\n');
-
-  return msg;
-}
-
-function sendWhatsApp(message: string) {
-  const encoded = encodeURIComponent(message);
-  window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encoded}`, '_blank');
 }
 
 // ── Empty row ─────────────────────────────────────────────────────────────────
@@ -107,20 +65,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
     if (validItems.length === 0) { toast.error('Add at least one item'); return; }
 
     setSubmitting(true);
-
-    const msg = buildWhatsAppMessage({
-      name:     currentUser.name,
-      role:     currentUser.role,
-      items:    validItems,
-      notes:    notes.trim(),
-      branchId: currentUser.branchId,
-    });
-
-    // Open WhatsApp immediately — don't block on DB
-    sendWhatsApp(msg);
-
-    // Save to DB in the background if the table exists
-    supabase.from('ingredient_orders').insert([{
+    const { error } = await supabase.from('ingredient_orders').insert([{
       requested_by:      currentUser.id,
       requested_by_name: currentUser.name,
       role:              currentUser.role,
@@ -128,14 +73,17 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
       notes:             notes.trim(),
       status:            'pending',
       branch_id:         currentUser.branchId,
-    }]).then(({ error }) => {
-      if (!error) { void loadHistory(); }
-    });
+    }]);
 
-    toast.success('WhatsApp opened — send the message to notify the owner.');
-    setItems([emptyItem()]);
-    setNotes('');
-    setView('history');
+    if (error) {
+      toast.error('Failed to submit request');
+    } else {
+      toast.success('Request submitted — the admin will see it in the Logistics tab.');
+      setItems([emptyItem()]);
+      setNotes('');
+      await loadHistory();
+      setView('history');
+    }
     setSubmitting(false);
   };
 
@@ -166,7 +114,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
               </div>
               <div>
                 <h2 className="text-lg font-black uppercase tracking-tight">Request Ingredients</h2>
-                <p className="text-xs text-gray-500">Owner will be notified via WhatsApp</p>
+                <p className="text-xs text-gray-500">Admin will see this in the Logistics tab</p>
               </div>
             </div>
           </div>
@@ -238,7 +186,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
               className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
             >
               <Send className="size-4" />
-              {submitting ? 'Sending…' : 'Submit & Notify Owner via WhatsApp'}
+              {submitting ? 'Submitting…' : 'Submit Request'}
             </button>
           </div>
         </div>
@@ -293,22 +241,6 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
                         {order.notes}
                       </p>
                     )}
-                    {/* Resend WhatsApp */}
-                    <button
-                      onClick={() => {
-                        const msg = buildWhatsAppMessage({
-                          name: order.requested_by_name,
-                          role: order.role,
-                          items: order.items,
-                          notes: order.notes,
-                          branchId: order.branch_id,
-                        });
-                        sendWhatsApp(msg);
-                      }}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-bold transition-colors"
-                    >
-                      <Send className="size-3" /> Resend to WhatsApp
-                    </button>
                   </div>
                 );
               })}

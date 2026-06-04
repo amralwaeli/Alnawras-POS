@@ -36,6 +36,7 @@ const InventoryView          = lazy(() => import('./modules/inventory').then(m =
 
 const StaffView              = lazy(() => import('./modules/staff').then(m => ({ default: m.StaffView })));
 const CategoryManagementView = lazy(() => import('./modules/staff').then(m => ({ default: m.CategoryManagementView })));
+const PrinterManagementView  = lazy(() => import('./modules/staff').then(m => ({ default: m.PrinterManagementView })));
 
 const HRPanelView            = lazy(() => import('./modules/hr').then(m => ({ default: m.HRPanelView })));
 const AttendanceView         = lazy(() => import('./modules/hr').then(m => ({ default: m.AttendanceView })));
@@ -100,6 +101,7 @@ export const router = createHashRouter([
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
       { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },
       { path: 'category-management', element: <Navigate to="/manage-menu" replace /> },
+      { path: 'printers',            element: <Lazy><ProtectedRoute adminOnly><PrinterManagementView /></ProtectedRoute></Lazy> },
 
       // ── Kitchen ──
       { path: 'kitchen',             element: <Lazy><ProtectedRoute permission="canManageInventory"><KitchenView /></ProtectedRoute></Lazy> },

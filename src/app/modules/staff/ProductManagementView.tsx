@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Edit, Trash2, Upload, Download, Package, Tag, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Download, Package, Tag, DollarSign, ChefHat, Printer } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -34,6 +34,7 @@ export function ProductManagementView() {
     sku: '',
     taxRate: '8.25',
     reorderPoint: '',
+    station: 'kitchen' as 'kitchen' | 'juice' | 'none',
   });
 
   const [categoryFormData, setCategoryFormData] = useState({
@@ -54,6 +55,7 @@ export function ProductManagementView() {
       sku: '',
       taxRate: '8.25',
       reorderPoint: '',
+      station: 'kitchen',
     });
     setEditingProduct(null);
   };
@@ -83,6 +85,7 @@ export function ProductManagementView() {
       taxRate: parseFloat(productFormData.taxRate),
       reorderPoint: parseInt(productFormData.reorderPoint) || 0,
       branchId: currentUser?.branchId || 'branch-1',
+      station: productFormData.station,
       kitchenStatus: 'available' as const,
       isActive: true,
     };
@@ -161,6 +164,7 @@ export function ProductManagementView() {
       sku: product.sku || '',
       taxRate: product.taxRate.toString(),
       reorderPoint: product.reorderPoint.toString(),
+      station: product.station || 'kitchen',
     });
     setIsProductDialogOpen(true);
   };
@@ -374,6 +378,12 @@ export function ProductManagementView() {
                     {product.sku && (
                       <div className="text-sm text-gray-600">SKU: {product.sku}</div>
                     )}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <ChefHat className="size-3.5 text-gray-400" />
+                      {product.station === 'kitchen' && <Badge className="bg-orange-100 text-orange-700 text-xs">Kitchen</Badge>}
+                      {product.station === 'juice' && <Badge className="bg-green-100 text-green-700 text-xs">Juice Bar</Badge>}
+                      {product.station === 'none' && <Badge className="bg-gray-100 text-gray-500 text-xs">No Station</Badge>}
+                    </div>
                   </div>
                   <div className="flex gap-2 mt-4">
                     <Button
@@ -566,6 +576,23 @@ export function ProductManagementView() {
                 value={productFormData.sku}
                 onChange={(e) => setProductFormData(prev => ({ ...prev, sku: e.target.value }))}
               />
+            </div>
+            <div>
+              <Label htmlFor="product-station">Preparation Station</Label>
+              <Select
+                value={productFormData.station}
+                onValueChange={(value: 'kitchen' | 'juice' | 'none') => setProductFormData(prev => ({ ...prev, station: value }))}
+              >
+                <SelectTrigger id="product-station">
+                  <SelectValue placeholder="Select station" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kitchen">Kitchen</SelectItem>
+                  <SelectItem value="juice">Juice Bar</SelectItem>
+                  <SelectItem value="none">No Station (pre-made / external)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">Where orders for this product are sent for preparation</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

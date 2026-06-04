@@ -107,39 +107,36 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
     if (validItems.length === 0) { toast.error('Add at least one item'); return; }
 
     setSubmitting(true);
-    try {
-      const { error } = await supabase.from('ingredient_orders').insert([{
-        requested_by:      currentUser.id,
-        requested_by_name: currentUser.name,
-        role:              currentUser.role,
-        items:             validItems,
-        notes:             notes.trim(),
-        status:            'pending',
-        branch_id:         currentUser.branchId,
-      }]);
 
-      if (error) throw error;
+    const msg = buildWhatsAppMessage({
+      name:     currentUser.name,
+      role:     currentUser.role,
+      items:    validItems,
+      notes:    notes.trim(),
+      branchId: currentUser.branchId,
+    });
 
-      const msg = buildWhatsAppMessage({
-        name:     currentUser.name,
-        role:     currentUser.role,
-        items:    validItems,
-        notes:    notes.trim(),
-        branchId: currentUser.branchId,
-      });
+    // Open WhatsApp immediately — don't block on DB
+    sendWhatsApp(msg);
 
-      sendWhatsApp(msg);
+    // Save to DB in the background if the table exists
+    supabase.from('ingredient_orders').insert([{
+      requested_by:      currentUser.id,
+      requested_by_name: currentUser.name,
+      role:              currentUser.role,
+      items:             validItems,
+      notes:             notes.trim(),
+      status:            'pending',
+      branch_id:         currentUser.branchId,
+    }]).then(({ error }) => {
+      if (!error) { void loadHistory(); }
+    });
 
-      toast.success('Order submitted! WhatsApp opened to send message to owner.');
-      setItems([emptyItem()]);
-      setNotes('');
-      await loadHistory();
-      setView('history');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to submit order');
-    } finally {
-      setSubmitting(false);
-    }
+    toast.success('WhatsApp opened — send the message to notify the owner.');
+    setItems([emptyItem()]);
+    setNotes('');
+    setView('history');
+    setSubmitting(false);
   };
 
   return (

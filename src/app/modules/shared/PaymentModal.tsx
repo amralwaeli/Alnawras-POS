@@ -340,36 +340,18 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
 
     setProcessing(true);
     try {
-      const { data: lastBill } = await supabase
-        .from('orders').select('bill_number')
-        .eq('branch_id', currentUser.branchId)
-        .eq('order_type', getOrderType(order))
-        .not('bill_number', 'is', null)
-        .order('bill_number', { ascending: false })
-        .limit(1).maybeSingle();
-
-      const billNo  = String((lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0) + 1).padStart(4, '0');
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();
 
-      const orderUpdate: any = {
-        status: 'completed', completed_at: new Date().toISOString(),
-        payment_method: summary, bill_number: billNo, payment_status: 'paid',
-      };
-      if (loyaltyDiscount > 0) {
-        orderUpdate.discount = baseTotals.discount + loyaltyDiscount;
-        orderUpdate.total = totals.total;
-      }
-      const { error: orderErr } = await supabase.from('orders').update(orderUpdate).eq('id', order.id).eq('branch_id', currentUser.branchId);
-
-      if (orderErr) throw orderErr;
-
-      if (order.tableId) {
-        await supabase.from('tables')
-          .update({ status: 'available', current_order_id: null })
-          .eq('id', order.tableId).eq('branch_id', currentUser.branchId);
-      }
+      const { data: paymentRows, error: paymentErr } = await supabase.rpc('process_order_payment', {
+        p_order_id: order.id,
+        p_payment_method: summary,
+        p_discount: loyaltyDiscount > 0 ? baseTotals.discount + loyaltyDiscount : null,
+      });
+      if (paymentErr) throw paymentErr;
+      const billNo = Array.isArray(paymentRows) ? paymentRows[0]?.bill_number : paymentRows?.bill_number;
+      if (!billNo) throw new Error('Payment completed without a bill number');
 
       // ── Loyalty: apply discount & earn/redeem points ──────────────────────
       if (linkedCustomer && loyaltySettings.enabled) {

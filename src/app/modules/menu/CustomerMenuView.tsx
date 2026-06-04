@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Product, ROLE_PERMISSIONS } from '../../models/types';
 import { toast } from 'sonner';
+import { fmt } from '../../../lib/currency';
 
 interface CartItem {
   id: string;
@@ -20,7 +21,13 @@ interface CartItem {
   status?: string;
 }
 
-export function CustomerMenuView() {
+export function CustomerMenuView({
+  initialOrderType = 'dine-in',
+  lockOrderType = false,
+}: {
+  initialOrderType?: 'dine-in' | 'takeaway';
+  lockOrderType?: boolean;
+}) {
   const navigate = useNavigate();
   const {
     products,
@@ -39,7 +46,7 @@ export function CustomerMenuView() {
   const [showTableOverlay, setShowTableOverlay] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>('dine-in');
+  const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>(initialOrderType);
   const [isSending, setIsSending] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [mobileView, setMobileView] = useState<'menu' | 'cart'>('menu');
@@ -121,7 +128,7 @@ export function CustomerMenuView() {
     setCartItems(prev => {
       const existingNew = prev.find(i => i.productId === product.id && i.source === 'new');
       if (existingNew) return prev.map(i => i.id === existingNew.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { id: `new-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, station: (product.station as any) || 'kitchen', source: 'new' }];
+      return [...prev, { id: crypto.randomUUID(), productId: product.id, productName: product.name, price: product.price, quantity: 1, station: (product.station as any) || 'kitchen', source: 'new' }];
     });
   };
 
@@ -132,83 +139,31 @@ export function CustomerMenuView() {
 
     setIsSending(true);
     try {
-      let orderId = tables.find(t => t.id === finalTableId)?.currentOrderId;
-
-      if (!orderId) {
-        orderId = crypto.randomUUID();
-        console.log('[handleSendToKitchen] Creating new order:', orderId, 'Type:', orderType);
-
-        // Generate bill number for takeaway at creation
-        let billNo: string | null = null;
-        if (orderType === 'takeaway') {
-          const { data: lastBill } = await supabase
-            .from('orders')
-            .select('bill_number')
-            .eq('branch_id', currentUser.branchId)
-            .eq('order_type', 'takeaway')
-            .not('bill_number', 'is', null)
-            .order('bill_number', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
-          billNo = String(lastNum + 1).padStart(4, '0');
-        }
-
-        const { error: orderError } = await supabase.from('orders').insert([{
-          id: orderId,
-          table_id: orderType === 'dine-in' ? finalTableId : null,
-          table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
-          status: 'open',
+      const { data: orderId, error: submitError } = await supabase.rpc('submit_order_items', {
+        p_order_id: tables.find(t => t.id === finalTableId)?.currentOrderId || null,
+        p_table_id: orderType === 'dine-in' ? finalTableId : null,
+        p_order_type: orderType,
+        p_items: newItemsOnly.map(i => ({
+          id: crypto.randomUUID(),
+          product_id: i.productId,
+          product_name: i.productName,
+          quantity: i.quantity,
+          price: i.price,
           branch_id: currentUser.branchId,
-          order_type: orderType,
-          ...(billNo ? { bill_number: billNo } : {}),
-        }]).select();
-        
-        if (orderError) {
-          console.error('[handleSendToKitchen] Failed to create order:', orderError);
-          throw new Error('Failed to create order: ' + orderError.message);
-        }
-        
-        console.log('[handleSendToKitchen] Order created successfully');
-        
-        if (orderType === 'dine-in') {
-          const { error: tableError } = await supabase
-            .from('tables')
-            .update({ status: 'occupied', current_order_id: orderId })
-            .eq('id', finalTableId);
-          
-          if (tableError) {
-            console.error('[handleSendToKitchen] Failed to update table:', tableError);
-            throw new Error('Failed to update table: ' + tableError.message);
-          }
-        }
+        })),
+        p_added_by: currentUser.id,
+        p_added_by_name: currentUser.name,
+      });
+      if (submitError || !orderId) {
+        throw new Error('Failed to submit order: ' + (submitError?.message || 'Unknown error'));
       }
-
-      const payload = newItemsOnly.map(i => ({
-        id: crypto.randomUUID(),
-        order_id: orderId, product_id: i.productId, product_name: i.productName,
-        quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity,
-        status: 'pending', added_by: currentUser.id,
-        added_by_name: currentUser.name
-      }));
-
-      console.log('[handleSendToKitchen] Inserting order items:', payload.length, 'items');
-      
-      const { error: itemsError } = await supabase.from('order_items').insert(payload);
-      
-      if (itemsError) {
-        console.error('[handleSendToKitchen] Failed to insert order items:', itemsError);
-        throw new Error('Failed to insert order items: ' + itemsError.message);
-      }
-      
-      console.log('[handleSendToKitchen] Order items inserted successfully');
 
       setShowSuccess(true);
       setTimeout(async () => {
         setShowSuccess(false);
         setSelectedTableId(null); 
         setCartItems([]);         
-        setOrderType('dine-in');  
+        setOrderType(initialOrderType);  
         await refreshData();      
       }, 2000);
     } catch (e: any) { 
@@ -275,7 +230,7 @@ export function CustomerMenuView() {
                     )}
                     <h3 className={`text-xs font-bold leading-snug break-words ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
                     <div className="mt-auto flex items-center justify-between gap-1">
-                      <span className={`text-sm font-black ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
+                      <span className={`text-sm font-black ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>{fmt(p.price)}</span>
                       {isAvailable && <div className="bg-orange-500 text-white p-1.5 rounded-lg"><Plus className="size-3.5" strokeWidth={4} /></div>}
                     </div>
                   </div>
@@ -301,7 +256,7 @@ export function CustomerMenuView() {
           {newItemsOnly.length > 0 && (
             <span className="bg-white text-orange-500 rounded-full text-xs font-black px-2 py-0.5 leading-none">{newItemsOnly.reduce((s, i) => s + i.quantity, 0)}</span>
           )}
-          <span>Cart {newItemsOnly.length > 0 ? `· RM ${cartTotal.toFixed(2)}` : ''}</span>
+          <span>Cart {newItemsOnly.length > 0 ? `· ${fmt(cartTotal)}` : ''}</span>
         </button>
       </div>
 
@@ -318,7 +273,7 @@ export function CustomerMenuView() {
             {selectedTableId && <button onClick={() => setSelectedTableId(null)} className="bg-white/20 text-white p-2 rounded-xl hover:bg-white/30 transition-all"><X className="size-4" strokeWidth={3} /></button>}
           </div>
           <div className="flex bg-orange-600/30 p-1.5 rounded-[18px] shadow-inner">
-            <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
+            {!lockOrderType && <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>}
             <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
           </div>
         </div>
@@ -345,7 +300,7 @@ export function CustomerMenuView() {
               ? <div className="h-44 border-4 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center justify-center text-gray-300"><ShoppingCart className="size-10 mb-2 opacity-10" /><span className="text-xs font-bold opacity-30 uppercase tracking-widest">Cart Empty</span></div>
               : newItemsOnly.map(item => (
                   <div key={item.id} className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100 flex items-center gap-3 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p></div>
+                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-0.5">{fmt(item.price)}</p></div>
                     <div className="flex items-center bg-white rounded-xl border-2 border-orange-100 p-1 gap-3 shadow-sm">
                       <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                       <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
@@ -361,7 +316,7 @@ export function CustomerMenuView() {
         <div className="p-4 border-t bg-gray-50 pb-safe">
           <div className="flex justify-between items-end mb-4">
             <span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic">Total Due</span>
-            <span className="text-2xl font-black text-gray-900 tracking-tighter">RM {cartTotal.toFixed(2)}</span>
+            <span className="text-2xl font-black text-gray-900 tracking-tighter">{fmt(cartTotal)}</span>
           </div>
           <button onClick={() => handleSendToKitchen()} disabled={isSending || newItemsOnly.length === 0} className={`w-full font-black py-4 rounded-[20px] shadow-xl transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 ${newItemsOnly.length > 0 ? 'bg-orange-500 text-white shadow-orange-200 active:scale-[0.98]' : 'bg-gray-200 text-gray-400'}`}>
             <ShoppingBag className="size-5" /> {isSending ? 'Sending...' : (orderType === 'takeaway' ? 'Send Takeaway' : (selectedTableId ? 'Confirm Order' : 'Choose Table'))}
@@ -411,7 +366,7 @@ export function CustomerMenuView() {
                     )}
                     <h3 className={`text-sm font-bold leading-snug tracking-tight break-words ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
                     <div className="mt-auto flex items-center justify-between gap-2">
-                      <span className={`font-black ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
+                      <span className={`font-black ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>{fmt(p.price)}</span>
                       {isAvailable && <div className="bg-orange-500 text-white p-2 rounded-xl"><Plus className="size-4" strokeWidth={4} /></div>}
                     </div>
                   </div>
@@ -432,7 +387,7 @@ export function CustomerMenuView() {
       <aside className="hidden lg:flex w-[380px] xl:w-[400px] bg-white border-l flex-col shadow-2xl z-10">
         <div className="p-5 bg-orange-500 relative">
           <div className="flex bg-orange-600/30 p-1.5 rounded-[22px] relative shadow-inner">
-            <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
+            {!lockOrderType && <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>}
             <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
             {selectedTableId && (
               <button onClick={() => setSelectedTableId(null)} className="absolute -right-2 -top-2 bg-white text-orange-600 p-2 rounded-full shadow-2xl border-2 border-orange-100 hover:scale-110 transition-all"><X className="size-4" strokeWidth={4} /></button>
@@ -464,7 +419,7 @@ export function CustomerMenuView() {
               ? <div className="h-48 border-4 border-dashed border-gray-50 rounded-[40px] flex flex-col items-center justify-center text-gray-300 italic"><ShoppingCart className="size-12 mb-3 opacity-10" /><span className="text-sm font-bold opacity-30 uppercase tracking-widest tracking-tighter">Cart Empty</span></div>
               : newItemsOnly.map(item => (
                   <div key={item.id} className="bg-orange-50/50 rounded-3xl p-5 border border-orange-100 flex items-center gap-4 animate-in slide-in-from-right-4 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-1">RM {item.price.toFixed(2)}</p></div>
+                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-1">{fmt(item.price)}</p></div>
                     <div className="flex items-center bg-white rounded-2xl border-2 border-orange-100 p-1.5 gap-4 shadow-sm">
                       <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                       <span className="font-black text-gray-900 w-4 text-center text-sm">{item.quantity}</span>
@@ -477,7 +432,7 @@ export function CustomerMenuView() {
         </div>
 
         <div className="p-8 border-t bg-gray-50">
-          <div className="flex justify-between items-end mb-6"><span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic leading-none">Total Due</span><span className="text-3xl font-black text-gray-900 leading-none tracking-tighter">RM {cartTotal.toFixed(2)}</span></div>
+          <div className="flex justify-between items-end mb-6"><span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic leading-none">Total Due</span><span className="text-3xl font-black text-gray-900 leading-none tracking-tighter">{fmt(cartTotal)}</span></div>
           <button onClick={() => handleSendToKitchen()} disabled={isSending || newItemsOnly.length === 0} className={`w-full font-black py-5 rounded-[24px] shadow-2xl transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 ${newItemsOnly.length > 0 ? 'bg-orange-500 text-white hover:scale-[1.02] shadow-orange-200' : 'bg-gray-200 text-gray-400'}`}>
             <ShoppingBag className="size-5" /> {isSending ? 'Sending...' : (orderType === 'takeaway' ? 'Send Takeaway' : (selectedTableId ? 'Confirm Order' : 'Choose Table'))}
           </button>

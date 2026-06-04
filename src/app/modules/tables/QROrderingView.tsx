@@ -7,6 +7,7 @@ import {
   Plus, Minus, ShoppingCart, X, Search,
   CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed,
 } from 'lucide-react';
+import { fmt } from '../../../lib/currency';
 
 interface CartItem {
   id: string;
@@ -165,7 +166,7 @@ export function QROrderingView() {
       const ex = prev.find(i => i.productId === product.id);
       if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, {
-        id: `new-${Date.now()}`, productId: product.id, productName: product.name,
+        id: crypto.randomUUID(), productId: product.id, productName: product.name,
         price: product.price, quantity: 1, station: product.station || 'kitchen', notes: '',
       }];
     });
@@ -184,55 +185,25 @@ export function QROrderingView() {
     if (!table || cartItems.length === 0) { toast.error('Add items to your order first.'); return; }
     setSubmitting(true);
     try {
-      let oid = orderId || table.currentOrderId;
-
-      if (!oid) {
-        const newOid = crypto.randomUUID();
-
-        // Atomic claim: only update if another session hasn't already created an order
-        const { data: claimedTable, error: claimErr } = await supabase
-          .from('tables')
-          .update({ status: 'occupied', current_order_id: newOid })
-          .eq('id', table.id)
-          .is('current_order_id', null)
-          .select('current_order_id')
-          .maybeSingle();
-
-        if (claimErr || !claimedTable) {
-          // Another session won the race — fetch their order ID instead
-          const { data: freshTable } = await supabase
-            .from('tables').select('current_order_id').eq('id', table.id).single();
-          oid = freshTable?.current_order_id ?? null;
-        } else {
-          oid = newOid;
-          const { error: orderErr } = await supabase.from('orders').insert([{
-            id: oid, table_id: table.id, table_number: table.number,
-            subtotal: 0, tax: 0, discount: 0, total: 0,
-            status: 'open', payment_status: 'unpaid', order_type: 'dine-in',
-            branch_id: table.branchId, waiters: [],
-          }]);
-          if (orderErr) throw new Error(orderErr.message);
-        }
-
-        if (!oid) throw new Error('Could not create or claim order for this table.');
-        setOrderId(oid);
-        setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: oid! } : prev);
-      }
-
-      const payload = cartItems.map(item => ({
-        id: crypto.randomUUID(),
-        order_id: oid, product_id: item.productId, product_name: item.productName,
-        quantity: item.quantity, price: item.price, subtotal: item.price * item.quantity,
-        status: 'pending', notes: item.notes || null,
-        added_by: 'guest', added_by_name: 'Guest', sent_to_kitchen: true,
-      }));
-
-      const { error } = await supabase.from('order_items').insert(payload);
-      if (error) throw new Error(error.message);
-
-      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', oid);
-      const subtotal = (allItems || []).reduce((s: number, i: any) => s + Number(i.subtotal), 0);
-      await supabase.from('orders').update({ subtotal, total: subtotal }).eq('id', oid);
+      const { data: oid, error } = await supabase.rpc('submit_order_items', {
+        p_order_id: orderId || table.currentOrderId || null,
+        p_table_id: table.id,
+        p_order_type: 'dine-in',
+        p_items: cartItems.map(item => ({
+          id: crypto.randomUUID(),
+          product_id: item.productId,
+          product_name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes || null,
+          branch_id: table.branchId,
+        })),
+        p_added_by: 'guest',
+        p_added_by_name: 'Guest',
+      });
+      if (error || !oid) throw new Error(error?.message || 'Could not create or claim order for this table.');
+      setOrderId(oid);
+      setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: oid } : prev);
 
       // Refresh existing items
       const { data: orderData } = await supabase.from('orders').select('*, order_items(*)').eq('id', oid).single();
@@ -302,7 +273,7 @@ export function QROrderingView() {
           )}
           <h3 className={`font-bold leading-snug break-words ${compact ? 'text-xs' : 'text-sm'} ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
           <div className="mt-auto flex items-center justify-between gap-1">
-            <span className={`font-black ${compact ? 'text-sm' : ''} ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
+            <span className={`font-black ${compact ? 'text-sm' : ''} ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>{fmt(p.price)}</span>
             {isAvailable && <div className={`bg-orange-500 text-white rounded-xl ${compact ? 'p-1.5' : 'p-2'}`}><Plus className={compact ? 'size-3.5' : 'size-4'} strokeWidth={4} /></div>}
           </div>
         </div>
@@ -316,7 +287,7 @@ export function QROrderingView() {
       <div className="flex items-center gap-3">
         <div className="flex-1">
           <h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>
-          <p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p>
+          <p className="text-orange-600 font-black text-xs mt-0.5">{fmt(item.price)}</p>
         </div>
         <div className={`flex items-center bg-white border-2 border-orange-100 shadow-sm rounded-${compact ? 'xl p-1 gap-3' : '2xl p-1.5 gap-4'}`}>
           <button
@@ -434,7 +405,7 @@ export function QROrderingView() {
           {totalItems > 0 && (
             <span className="bg-white text-orange-500 rounded-full text-xs font-black px-2 py-0.5 leading-none">{totalItems}</span>
           )}
-          <span>Order{totalItems > 0 ? ` · RM ${cartTotal.toFixed(2)}` : ''}</span>
+          <span>Order{totalItems > 0 ? ` · ${fmt(cartTotal)}` : ''}</span>
         </button>
       </div>
 
@@ -465,7 +436,7 @@ export function QROrderingView() {
                     <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider capitalize">{item.status}</p>
                   </div>
                   <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
-                  <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                  <div className="text-sm font-bold text-gray-500">{fmt(item.price * item.quantity)}</div>
                 </div>
               ))}
             </div>
@@ -489,12 +460,12 @@ export function QROrderingView() {
           {existingItems.length > 0 && (
             <div className="flex justify-between text-xs text-gray-400 mb-1.5 px-1">
               <span className="font-bold uppercase tracking-widest">Already ordered</span>
-              <span className="font-black">RM {existingTotal.toFixed(2)}</span>
+              <span className="font-black">{fmt(existingTotal)}</span>
             </div>
           )}
           <div className="flex justify-between items-end mb-4">
             <span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic">New items total</span>
-            <span className="text-2xl font-black text-gray-900 tracking-tighter">RM {cartTotal.toFixed(2)}</span>
+            <span className="text-2xl font-black text-gray-900 tracking-tighter">{fmt(cartTotal)}</span>
           </div>
           <button
             onClick={handleSubmitOrder}
@@ -593,7 +564,7 @@ export function QROrderingView() {
                     <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider capitalize">{item.status}</p>
                   </div>
                   <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
-                  <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                  <div className="text-sm font-bold text-gray-500">{fmt(item.price * item.quantity)}</div>
                 </div>
               ))}
             </div>
@@ -616,12 +587,12 @@ export function QROrderingView() {
           {existingItems.length > 0 && (
             <div className="flex justify-between text-xs text-gray-400 px-1">
               <span className="font-bold uppercase tracking-widest">Already ordered</span>
-              <span className="font-black">RM {existingTotal.toFixed(2)}</span>
+              <span className="font-black">{fmt(existingTotal)}</span>
             </div>
           )}
           <div className="flex justify-between items-end">
             <span className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] italic leading-none">New items total</span>
-            <span className="text-3xl font-black text-gray-900 leading-none tracking-tighter">RM {cartTotal.toFixed(2)}</span>
+            <span className="text-3xl font-black text-gray-900 leading-none tracking-tighter">{fmt(cartTotal)}</span>
           </div>
           <button
             onClick={handleSubmitOrder}

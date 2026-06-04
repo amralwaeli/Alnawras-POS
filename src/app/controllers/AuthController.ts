@@ -1,37 +1,51 @@
 import { User, ROLE_PERMISSIONS, RolePermissions } from '../models/types';
+import { supabase } from '../../lib/supabase';
+import { saveAuthSession } from '../../lib/authSession';
 
 export class AuthController {
   /**
    * Authenticate user with PIN
    */
-  static authenticate(pin: string, users: User[]): {
+  static async authenticate(pin: string): Promise<{
     success: boolean;
     user?: User;
     error?: string;
-  } {
-    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-      return {
-        success: false,
-        error: 'PIN must be 4 digits',
-      };
+  }> {
+    if (pin.length < 6 || pin.length > 12 || !/^\d+$/.test(pin)) {
+      return { success: false, error: 'PIN must be 6 to 12 digits' };
     }
 
-    const user = users.find(u => u.pin === pin && u.status === 'active');
-
-    if (!user) {
-      return {
-        success: false,
-        error: 'Invalid PIN or inactive account',
-      };
+    const { data, error } = await supabase.functions.invoke('pin-authenticate', { body: { pin } });
+    if (error || !data?.user || !data?.access_token) {
+      return { success: false, error: data?.error || error?.message || 'Invalid PIN or inactive account' };
     }
 
-    return {
-      success: true,
-      user: {
-        ...user,
-        lastLogin: new Date(),
-      },
-    };
+    const user = {
+      id: data.user.id,
+      name: data.user.name,
+      employmentNumber: data.user.employment_number,
+      role: data.user.role,
+      email: data.user.email,
+      status: data.user.status,
+      branchId: data.user.branch_id,
+      pinMustChange: data.user.pin_must_change,
+      createdAt: new Date(data.user.created_at),
+      lastLogin: new Date(),
+    } as User;
+
+    saveAuthSession({
+      accessToken: data.access_token,
+      expiresAt: Date.now() + Number(data.expires_in ?? 28800) * 1000,
+      user,
+    });
+
+    return { success: true, user };
+  }
+
+  static async changePin(currentPin: string, newPin: string): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('change-pin', { body: { currentPin, newPin } });
+    if (error || data?.error) return { success: false, error: data?.error || error?.message || 'Failed to change PIN' };
+    return { success: true };
   }
 
   /**

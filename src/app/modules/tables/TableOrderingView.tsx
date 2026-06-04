@@ -207,7 +207,7 @@ export function TableOrderingView() {
       if (existing) {
         return prev.map(item => item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { id: `cart-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, notes: '' }];
+      return [...prev, { id: crypto.randomUUID(), productId: product.id, productName: product.name, price: product.price, quantity: 1, notes: '' }];
     });
   };
 
@@ -248,85 +248,24 @@ export function TableOrderingView() {
     setSubmitting(true);
 
     try {
-      let orderId = order?.id || table.currentOrderId;
-      let shouldCreateOrder = false;
-
-      if (!orderId) {
-        orderId = crypto.randomUUID();
-        shouldCreateOrder = true;
-      }
-
-      if (shouldCreateOrder) {
-        const { data: tableResponse, error: updateError } = await supabase
-          .from('tables')
-          .update({ status: 'occupied', current_order_id: orderId })
-          .eq('id', table.id)
-          .is('current_order_id', null)
-          .select('current_order_id, status')
-          .single();
-
-        if (updateError && updateError.details) {
-          const refreshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          if (refreshTable.data?.current_order_id) {
-            orderId = refreshTable.data.current_order_id;
-          } else {
-            throw new Error(updateError.message || 'Could not reserve table');
-          }
-        }
-
-        if (!tableResponse?.current_order_id) {
-          const freshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          orderId = freshTable.data?.current_order_id || orderId;
-        }
-
-        const { error: createError } = await supabase.from('orders').insert([{ 
-          id: orderId,
-          table_id: table.id,
-          table_number: table.number,
-          subtotal: 0,
-          tax: 0,
-          discount: 0,
-          total: 0,
-          status: 'open',
-          payment_status: 'unpaid',
-          order_type: 'dine-in',
+      const { data: orderId, error: submitError } = await supabase.rpc('submit_order_items', {
+        p_order_id: order?.id || table.currentOrderId || null,
+        p_table_id: table.id,
+        p_order_type: 'dine-in',
+        p_items: cartItems.map(item => ({
+          id: crypto.randomUUID(),
+          product_id: item.productId,
+          product_name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes || null,
           branch_id: table.branchId,
-          waiters: currentUser?.id ? [currentUser.id] : [],
-        }]);
-
-        if (createError) {
-          throw new Error(createError.message || 'Could not create order');
-        }
-      }
-
-      const newItems = cartItems.map(item => ({
-        id: crypto.randomUUID(),
-        order_id: orderId,
-        product_id: item.productId,
-        product_name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.price * item.quantity,
-        status: 'pending',
-        notes: item.notes || null,
-        added_by: currentUser?.id ?? 'guest',
-        added_by_name: currentUser?.name ?? 'Guest',
-        sent_to_kitchen: true,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(newItems);
-      if (itemsError) {
-        throw new Error(itemsError.message || 'Could not send items to kitchen');
-      }
-
-      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-      const subtotal = (allItems || []).reduce((sum, item: any) => sum + Number(item.subtotal), 0);
-      const tax = 0;
-      const total = subtotal + tax;
-
-      const { error: orderUpdateError } = await supabase.from('orders').update({ subtotal, tax, total }).eq('id', orderId);
-      if (orderUpdateError) {
-        throw new Error(orderUpdateError.message || 'Could not update order totals');
+        })),
+        p_added_by: currentUser?.id ?? 'guest',
+        p_added_by_name: currentUser?.name ?? 'Guest',
+      });
+      if (submitError || !orderId) {
+        throw new Error(submitError?.message || 'Could not send items to kitchen');
       }
 
       const { data: savedOrder } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();

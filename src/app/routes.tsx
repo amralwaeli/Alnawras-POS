@@ -51,7 +51,7 @@ const InvoicesView           = lazy(() => import('./modules/invoices').then(m =>
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
-const TakeawayView           = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
+const TakeawayView           = lazy(() => import('./modules/menu').then(m => ({ default: m.TakeawayOrderView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────

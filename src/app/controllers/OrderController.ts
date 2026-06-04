@@ -181,6 +181,12 @@ export class OrderController {
 
   static applyDiscount(orders: Order[], orderId: string, discount: number, user: User, products: Product[]) {
     if (user.role !== 'admin') return { success: false, error: 'Admin only' };
+    if (discount < 0) return { success: false, error: 'Discount cannot be negative' };
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return { success: false, error: 'Order not found' };
+    if (discount > order.subtotal + order.tax) {
+      return { success: false, error: 'Discount cannot exceed order total' };
+    }
     const updatedOrders = orders.map(o => {
       if (o.id === orderId) {
         const total = calculateOrderTotal(o.subtotal, o.tax, discount);

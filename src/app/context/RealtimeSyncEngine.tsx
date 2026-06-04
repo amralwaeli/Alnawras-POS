@@ -32,7 +32,9 @@ export function RealtimeSyncEngine() {
         .from('orders')
         .select('*, order_items(*)')
         .eq('branch_id', branch)
-        .or(`status.eq.open,and(status.eq.completed,created_at.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()})`),
+        .or(`status.eq.open,and(status.eq.completed,created_at.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()})`)
+        .order('created_at', { ascending: false })
+        .limit(200),
     ]);
 
     if (prodRes.success)   setProducts(prodRes.products || []);

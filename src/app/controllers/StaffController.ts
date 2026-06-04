@@ -1,5 +1,6 @@
 import { Staff, UserRole } from '../models/types';
 import { supabase } from '../../lib/supabase';
+import { genId } from '../../lib/id';
 
 function mapDbRowToStaff(row: any): Staff {
   return {
@@ -36,7 +37,7 @@ export class StaffController {
     newStaff: Omit<Staff, 'id' | 'createdAt'>
   ): Promise<{ success: boolean; data?: Staff; error?: string }> {
     try {
-      const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const id = genId('user');
 
       const staffData = {
         id,

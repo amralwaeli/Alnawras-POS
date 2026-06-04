@@ -135,7 +135,7 @@ export function CustomerMenuView() {
       let orderId = tables.find(t => t.id === finalTableId)?.currentOrderId;
 
       if (!orderId) {
-        orderId = `order-${Date.now()}`;
+        orderId = crypto.randomUUID();
         console.log('[handleSendToKitchen] Creating new order:', orderId, 'Type:', orderType);
 
         // Generate bill number for takeaway at creation
@@ -185,7 +185,7 @@ export function CustomerMenuView() {
       }
 
       const payload = newItemsOnly.map(i => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        id: crypto.randomUUID(),
         order_id: orderId, product_id: i.productId, product_name: i.productName,
         quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity,
         status: 'pending', added_by: currentUser.id,

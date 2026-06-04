@@ -1,35 +1,43 @@
 import { supabase } from '../../lib/supabase';
+import { genId } from '../../lib/id';
 import { Employee, EmployeeFingerprint, AttendanceLog, PayrollSummary } from '../models/types';
 
 // ─────────────────────────────────────────────
-// Utility: generate IDs
+// Fingerprint encryption via Web Crypto AES-GCM
+// The encryption key is derived from the Supabase
+// project URL so it is unique per deployment and
+// never stored as a plain string literal.
+// NOTE: For production use a server-side Edge
+// Function with a secret key stored in Vault.
 // ─────────────────────────────────────────────
-const uid = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-// ─────────────────────────────────────────────
-// Utility: simple AES-like XOR encryption for
-// fingerprint template storage. In production,
-// use Web Crypto API with a server-side key.
-// ─────────────────────────────────────────────
-const ENCRYPTION_KEY = 'ALNAWRAS_FP_KEY_2024';
-
-function encryptTemplate(data: string): string {
-  const key = ENCRYPTION_KEY;
-  let result = '';
-  for (let i = 0; i < data.length; i++) {
-    result += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return btoa(result);
+async function getAesKey(): Promise<CryptoKey> {
+  const raw = import.meta.env.VITE_SUPABASE_URL ?? 'fallback-dev-key';
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(raw.padEnd(32, '0').slice(0, 32)),
+    { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
+  );
+  return keyMaterial;
 }
 
-function decryptTemplate(encoded: string): string {
-  const key = ENCRYPTION_KEY;
-  const data = atob(encoded);
-  let result = '';
-  for (let i = 0; i < data.length; i++) {
-    result += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return result;
+async function encryptTemplate(data: string): Promise<string> {
+  const key = await getAesKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(data);
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  const combined = new Uint8Array(iv.byteLength + cipher.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(cipher), iv.byteLength);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptTemplate(stored: string): Promise<string> {
+  const key = await getAesKey();
+  const combined = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const cipher = combined.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+  return new TextDecoder().decode(plain);
 }
 
 async function sha256(message: string): Promise<string> {
@@ -264,8 +272,8 @@ export class HRController {
         .eq('finger_index', fingerIndex);
 
       const templateHash = await sha256(templateRaw);
-      const encryptedTemplate = encryptTemplate(templateRaw);
-      const id = uid('fp');
+      const encryptedTemplate = await encryptTemplate(templateRaw);
+      const id = genId('fp');
 
       const { error } = await supabase
         .from('employee_fingerprints')
@@ -291,85 +299,43 @@ export class HRController {
    * Returns the matched employee or null.
    * Uses template_hash for fast pre-filtering.
    */
+  /**
+   * Match a scanned fingerprint template against enrolled templates.
+   * Uses SHA-256 hash for fast exact matching only.
+   * Real-world biometric fuzzy matching must be handled by the scanner SDK
+   * before this method is called (the SDK returns a verified employee ID).
+   */
   static async matchFingerprint(
     scannedTemplateRaw: string
   ): Promise<{ success: boolean; employee?: Employee; score?: number; error?: string }> {
     try {
-      // Fast path: exact hash match
       const hash = await sha256(scannedTemplateRaw);
-      const { data: exactMatch } = await supabase
+      const { data: match, error } = await supabase
         .from('employee_fingerprints')
         .select('employee_id, quality_score')
         .eq('template_hash', hash)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (exactMatch) {
-        const { data: empRow } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('employee_id', exactMatch.employee_id)
-          .eq('status', 'active')
-          .single();
-        if (empRow) return { success: true, employee: mapEmployee(empRow), score: 100 };
-      }
-
-      // Fallback: load all templates and do fuzzy matching
-      const { data: allTemplates, error } = await supabase
-        .from('employee_fingerprints')
-        .select('*')
-        .eq('is_active', true);
-
       if (error) throw error;
-      if (!allTemplates || allTemplates.length === 0) {
-        return { success: false, error: 'No fingerprints enrolled' };
-      }
 
-      let bestScore = 0;
-      let bestEmployeeId = '';
-
-      for (const row of allTemplates) {
-        const decrypted = decryptTemplate(row.template_data);
-        const score = HRController.computeSimilarity(scannedTemplateRaw, decrypted);
-        if (score > bestScore) {
-          bestScore = score;
-          bestEmployeeId = row.employee_id;
-        }
-      }
-
-      // Threshold: 85% similarity required
-      if (bestScore < 85) {
+      if (!match) {
         return { success: false, error: 'Fingerprint not recognized' };
       }
 
       const { data: empRow } = await supabase
         .from('employees')
         .select('*')
-        .eq('employee_id', bestEmployeeId)
+        .eq('employee_id', match.employee_id)
         .eq('status', 'active')
         .single();
 
       if (!empRow) return { success: false, error: 'Employee not found or inactive' };
 
-      return { success: true, employee: mapEmployee(empRow), score: bestScore };
+      return { success: true, employee: mapEmployee(empRow), score: 100 };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
-  }
-
-  /**
-   * Simple character-level similarity (Hamming-like).
-   * A real implementation uses Minutiae matching from the SDK.
-   */
-  private static computeSimilarity(a: string, b: string): number {
-    if (a === b) return 100;
-    const minLen = Math.min(a.length, b.length);
-    if (minLen === 0) return 0;
-    let matches = 0;
-    for (let i = 0; i < minLen; i++) {
-      if (a[i] === b[i]) matches++;
-    }
-    return Math.round((matches / Math.max(a.length, b.length)) * 100);
   }
 
   static async deleteFingerprint(employeeId: string): Promise<{ success: boolean; error?: string }> {
@@ -423,7 +389,7 @@ export class HRController {
         }
         const lateMinutes = Math.max(0, nowMins - shiftStartMins);
         const status = lateMinutes > 0 ? 'late' : 'on-time';
-        const id = uid('att');
+        const id = genId('att');
         const { data: newLog, error } = await supabase
           .from('attendance_logs')
           .insert({
@@ -555,7 +521,12 @@ export class HRController {
         .gte('log_date', start)
         .lte('log_date', end);
 
-      const workingDays = endDate.getDate(); // simplified; can skip weekends
+      // Count Mon–Fri working days in the month
+      let workingDays = 0;
+      for (let d = 1; d <= endDate.getDate(); d++) {
+        const day = new Date(year, month - 1, d).getDay(); // 0=Sun, 6=Sat
+        if (day !== 0 && day !== 6) workingDays++;
+      }
       const presentDays = (logs || []).filter(l => l.check_in_time).length;
       const absentDays = workingDays - presentDays;
       const totalLateMinutes = (logs || []).reduce((s, l) => s + (l.late_minutes || 0), 0);
@@ -569,7 +540,7 @@ export class HRController {
       const absentDeduction = absentDays * dailyRate;
       const netSalary = Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus);
 
-      const id = uid('pay');
+      const id = genId('pay');
       const { data: payRow, error } = await supabase
         .from('payroll_summary')
         .upsert({

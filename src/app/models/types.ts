@@ -410,6 +410,62 @@ export interface ShiftRule {
 // Fingerprint scanner status
 export type ScannerStatus = 'disconnected' | 'ready' | 'scanning' | 'processing' | 'error';
 
+// ==================== Loyalty Program ====================
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  pointsBalance: number;
+  totalSpent: number;
+  totalVisits: number;
+  branchId: string;
+  createdAt: string;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  customerId: string;
+  customerName: string;
+  orderId?: string;
+  type: 'earn' | 'redeem' | 'adjust';
+  points: number;
+  description: string;
+  branchId: string;
+  createdAt: string;
+}
+
+export interface LoyaltySettings {
+  enabled: boolean;
+  pointsPerDollar: number;
+  redemptionRate: number;
+  minimumRedemption: number;
+  pointsLabel: string;
+}
+
+export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
+  enabled: true,
+  pointsPerDollar: 1,
+  redemptionRate: 100,
+  minimumRedemption: 100,
+  pointsLabel: 'Points',
+};
+
+export function loadLoyaltySettings(): LoyaltySettings {
+  try {
+    const raw = localStorage.getItem('alnawras_loyalty_settings');
+    if (!raw) return { ...DEFAULT_LOYALTY_SETTINGS };
+    return { ...DEFAULT_LOYALTY_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_LOYALTY_SETTINGS };
+  }
+}
+
+export function saveLoyaltySettings(s: LoyaltySettings) {
+  localStorage.setItem('alnawras_loyalty_settings', JSON.stringify(s));
+}
+
 // ==================== Printers ====================
 
 export type PrinterStation = 'kitchen' | 'juice';

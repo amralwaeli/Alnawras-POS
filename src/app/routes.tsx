@@ -51,6 +51,7 @@ const InvoicesView           = lazy(() => import('./modules/invoices').then(m =>
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
+const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 function PageLoader() {
@@ -122,6 +123,9 @@ export const router = createHashRouter([
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
       { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
       { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
+
+      // ── Loyalty ──
+      { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },
 
       // ── QR ──
       { path: 'table-qr',            element: <Lazy><ProtectedRoute permission="canViewReports"><TableQRView /></ProtectedRoute></Lazy> },

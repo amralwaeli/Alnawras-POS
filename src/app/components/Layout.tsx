@@ -67,7 +67,6 @@ export function Layout() {
     { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const,    allowedRoles: ['manager', 'supervisor'] },
     { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const, allowedRoles: ['manager', 'supervisor'] },
     { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const,  allowedRoles: [] as string[] },
-    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const,    allowedRoles: ['manager'] },
     { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const,    allowedRoles: [] as string[] },
   ].filter(item => {
     if (item.allowedRoles?.includes(currentUser.role)) return true;

@@ -1,1 +1,0 @@
-export { KitchenView } from './KitchenView';

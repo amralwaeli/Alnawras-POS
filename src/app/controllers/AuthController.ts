@@ -1,11 +1,7 @@
 import { User, ROLE_PERMISSIONS, RolePermissions } from '../models/types';
 import { supabase } from '../../lib/supabase';
-import { saveAuthSession } from '../../lib/authSession';
 
 export class AuthController {
-  /**
-   * Authenticate user with PIN
-   */
   static async authenticate(pin: string): Promise<{
     success: boolean;
     user?: User;
@@ -38,19 +34,7 @@ export class AuthController {
       lastLogin: new Date(),
     };
 
-    saveAuthSession({
-      accessToken: 'direct-auth',
-      expiresAt: Date.now() + 28800 * 1000,
-      user,
-    });
-
     return { success: true, user };
-  }
-
-  static async changePin(currentPin: string, newPin: string): Promise<{ success: boolean; error?: string }> {
-    const { data, error } = await supabase.functions.invoke('change-pin', { body: { currentPin, newPin } });
-    if (error || data?.error) return { success: false, error: data?.error || error?.message || 'Failed to change PIN' };
-    return { success: true };
   }
 
   /**

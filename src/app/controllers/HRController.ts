@@ -1,5 +1,4 @@
 import { supabase } from '../../lib/supabase';
-import { genId } from '../../lib/id';
 import { Employee, EmployeeFingerprint, AttendanceLog, PayrollSummary } from '../models/types';
 
 // ─────────────────────────────────────────────
@@ -181,7 +180,7 @@ export class HRController {
     emp: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
-      const id = uid('emp');
+      const id = crypto.randomUUID();
       const { data, error } = await supabase
         .from('employees')
         .insert({
@@ -273,7 +272,7 @@ export class HRController {
 
       const templateHash = await sha256(templateRaw);
       const encryptedTemplate = await encryptTemplate(templateRaw);
-      const id = genId('fp');
+      const id = crypto.randomUUID();
 
       const { error } = await supabase
         .from('employee_fingerprints')
@@ -389,7 +388,7 @@ export class HRController {
         }
         const lateMinutes = Math.max(0, nowMins - shiftStartMins);
         const status = lateMinutes > 0 ? 'late' : 'on-time';
-        const id = genId('att');
+        const id = crypto.randomUUID();
         const { data: newLog, error } = await supabase
           .from('attendance_logs')
           .insert({
@@ -540,7 +539,7 @@ export class HRController {
       const absentDeduction = absentDays * dailyRate;
       const netSalary = Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus);
 
-      const id = genId('pay');
+      const id = crypto.randomUUID();
       const { data: payRow, error } = await supabase
         .from('payroll_summary')
         .upsert({

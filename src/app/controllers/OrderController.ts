@@ -5,7 +5,6 @@ import {
   calculateTotalTax,
   calculateOrderTotal,
 } from '../models/businessLogic';
-import { genId } from '../../lib/id';
 
 export class OrderController {
   /**
@@ -32,7 +31,7 @@ export class OrderController {
     }
 
     const order: Order = {
-      id: genId('order'),
+      id: crypto.randomUUID(),
       tableId,
       tableNumber: table.number,
       items: [],
@@ -81,7 +80,7 @@ export class OrderController {
     }
 
     const newItem: OrderItem = {
-      id: genId('item'),
+      id: crypto.randomUUID(),
       productId: product.id,
       productName: product.name,
       quantity,

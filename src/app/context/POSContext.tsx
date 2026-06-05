@@ -81,7 +81,6 @@ export function usePOS() {
     setCurrentUser: auth.setCurrentUser,
     setUsers:       auth.setUsers,
     login:          auth.login,
-    changePin:      auth.changePin,
     logout:         auth.logout,
     addUser:        auth.addUser,
     updateUser:     auth.updateUser,

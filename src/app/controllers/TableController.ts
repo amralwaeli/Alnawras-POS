@@ -1,7 +1,6 @@
 import { Table, Order, User } from '../models/types';
 import { AuthController } from './AuthController';
 import { supabase } from '../../lib/supabase';
-import { genId } from '../../lib/id';
 
 export class TableController {
   /**
@@ -74,7 +73,7 @@ export class TableController {
       const { data, error } = await supabase
         .from('tables')
         .insert({
-          id: genId('table'),
+          id: crypto.randomUUID(),
           number: tableData.number,
           capacity: tableData.capacity,
           status: 'available',

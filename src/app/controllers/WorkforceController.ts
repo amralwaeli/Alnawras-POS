@@ -7,6 +7,16 @@ import {
 const uid = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+function isMissingTableError(err: any, tableName: string): boolean {
+  if (!err) return false;
+  const msg = typeof err.message === 'string' ? err.message : '';
+  if (msg.includes(`Could not find the table 'public.${tableName}'`)) return true;
+  if (msg.includes(`relation \"${tableName}\" does not exist`)) return true;
+  if (msg.includes(`relation "${tableName}" does not exist`)) return true;
+  if (typeof err.code === 'string' && (err.code === '42P01' || err.code === 'PGRST205')) return true;
+  return false;
+}
+
 // ─── Department default by role ───────────────────────────────────────────────
 const defaultDepartment = (role: string): string => {
   const map: Record<string, string> = {
@@ -438,7 +448,9 @@ export class WorkforceController {
 
       const total    = empResult.count ?? 0;
       const logs     = logsResult.data ?? [];
-      const onLeave  = (leaveResult.data ?? []).length;
+      const onLeave  = isMissingTableError(leaveResult.error, 'leave_requests')
+        ? 0
+        : (leaveResult.data ?? []).length;
       const present  = logs.filter(l => !l.check_out_time).length;
       const clockedOut = logs.filter(l => l.check_out_time).length;
       const late     = logs.filter(l => l.status === 'late').length;
@@ -487,6 +499,9 @@ export class WorkforceController {
       if (error) throw error;
       return { success: true, data: mapLeaveRequest(data) };
     } catch (err: any) {
+      if (isMissingTableError(err, 'leave_requests')) {
+        return { success: false, error: 'Leave management is not available because the leave_requests table is missing.' };
+      }
       return { success: false, error: err.message };
     }
   }
@@ -508,6 +523,9 @@ export class WorkforceController {
       if (error) throw error;
       return { success: true, data: undefined };
     } catch (err: any) {
+      if (isMissingTableError(err, 'leave_requests')) {
+        return { success: false, error: 'Leave management is not available because the leave_requests table is missing.' };
+      }
       return { success: false, error: err.message };
     }
   }
@@ -545,6 +563,9 @@ export class WorkforceController {
         })),
       };
     } catch (err: any) {
+      if (isMissingTableError(err, 'leave_requests')) {
+        return { success: true, data: [] };
+      }
       return { success: false, error: err.message };
     }
   }

@@ -8,6 +8,15 @@ import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { EmployeeWithUser, EmployeeFilters } from '../../../models/types';
 import { EmployeeFormModal } from './EmployeeFormModal';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+} from '../../../components/ui/alert-dialog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ROLE_LABELS: Record<string, string> = {
@@ -66,6 +75,11 @@ export function EmployeesView() {
   const [showForm, setShowForm]     = useState(false);
   const [editTarget, setEditTarget] = useState<EmployeeWithUser | undefined>();
   const [deleting, setDeleting]     = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [confirmAction, setConfirmAction] = useState<'deactivate' | 'reactivate' | null>(null);
+  const [confirmEmployee, setConfirmEmployee] = useState<EmployeeWithUser | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const [filters, setFilters] = useState<EmployeeFilters>({ status: 'active' });
   const [search, setSearch]   = useState('');
@@ -92,19 +106,42 @@ export function EmployeesView() {
     load();
   };
 
-  const handleDeactivate = async (emp: EmployeeWithUser) => {
-    if (!confirm(`Deactivate ${emp.fullName}? This will disable their POS login.`)) return;
-    setDeleting(emp.employeeId);
-    await WorkforceController.deactivateEmployee(emp.employeeId);
-    setDeleting(null);
-    load();
+  const openConfirm = (action: 'deactivate' | 'reactivate', emp: EmployeeWithUser) => {
+    setActionError('');
+    setConfirmAction(action);
+    setConfirmEmployee(emp);
+    setConfirmOpen(true);
   };
 
-  const handleReactivate = async (emp: EmployeeWithUser) => {
-    setDeleting(emp.employeeId);
-    await WorkforceController.reactivateEmployee(emp.employeeId);
+  const handleConfirmAction = async () => {
+    if (!confirmAction || !confirmEmployee) return;
+    setConfirmLoading(true);
+    setActionError('');
+    setDeleting(confirmEmployee.employeeId);
+
+    const employeeId = confirmEmployee.employeeId;
+    const actionFn = confirmAction === 'deactivate'
+      ? WorkforceController.deactivateEmployee
+      : WorkforceController.reactivateEmployee;
+
+    const result = await actionFn(employeeId);
+    if (result.success) {
+      setConfirmOpen(false);
+      load();
+    } else {
+      setActionError(result.error || 'Action failed. Please try again.');
+    }
+
+    setConfirmLoading(false);
     setDeleting(null);
-    load();
+  };
+
+  const handleDeactivate = (emp: EmployeeWithUser) => {
+    openConfirm('deactivate', emp);
+  };
+
+  const handleReactivate = (emp: EmployeeWithUser) => {
+    openConfirm('reactivate', emp);
   };
 
   // ── Stats ──
@@ -204,6 +241,11 @@ export function EmployeesView() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          {actionError}
         </div>
       )}
 
@@ -368,6 +410,39 @@ export function EmployeesView() {
           onClose={() => { setShowForm(false); setEditTarget(undefined); }}
         />
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'deactivate' ? 'Deactivate employee' : 'Reactivate employee'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmEmployee
+                ? confirmAction === 'deactivate'
+                  ? `This will disable ${confirmEmployee.fullName}'s POS login and mark them inactive.`
+                  : `This will restore ${confirmEmployee.fullName}'s POS login and mark them active.`
+                : 'Confirm this action to proceed.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {actionError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mb-4">
+              {actionError}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmLoading}>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={handleConfirmAction}
+              disabled={confirmLoading}
+              className="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {confirmLoading ? 'Processing...' : confirmAction === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,18 +1,23 @@
-import { NavLink, Outlet, Navigate } from 'react-router';
+import { NavLink, Outlet, Navigate, useLocation } from 'react-router';
 import { useState } from 'react';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
   Settings, Fingerprint, ReceiptText, FileText, Printer, Star,
-  ChevronsLeft, ChevronsRight, Menu, X,
+  ChevronsLeft, ChevronsRight, Menu, X, Building2, CalendarOff,
+  ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
+  const location = useLocation();
   const [collapsed, setCollapsed]     = useState(() => window.innerWidth < 1024);
   const [mobileOpen, setMobileOpen]   = useState(false);
+  const [workforceOpen, setWorkforceOpen] = useState(
+    () => location.pathname.startsWith('/workforce')
+  );
 
   if (!currentUser) return <Navigate to="/check-in" replace />;
 
@@ -23,12 +28,14 @@ export function Layout() {
 
   const permissions = ROLE_PERMISSIONS[currentUser.role];
 
-  const allNavItems: Array<{
+  type NavItem = {
     path: string; label: string; icon: any;
     permission: keyof typeof ROLE_PERMISSIONS['admin'];
     adminOnly?: boolean;
     allowedRoles?: string[];
-  }> = [
+  };
+
+  const allNavItems: NavItem[] = [
     ...(currentUser.role === 'admin'
       ? [{ path: '/admin-dashboard', label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewReports' as const }]
       : [{ path: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewReports' as const }]
@@ -38,29 +45,36 @@ export function Layout() {
     { path: '/inventory',          label: 'Inventory',      icon: Package,       permission: 'canManageInventory' as const },
     { path: '/reports',            label: 'Reports',        icon: BarChart3,     permission: 'canViewReports' as const },
     { path: '/accounting',         label: 'Accounting',     icon: DollarSign,    permission: 'canManageAccounting' as const },
-    { path: '/staff',              label: 'Staff',          icon: Users,         permission: 'canManageStaff' as const },
-    { path: '/hr-panel',           label: 'HR Panel',       icon: Fingerprint,   permission: 'canManageStaff' as const },
-    { path: '/attendance',         label: 'Attendance',     icon: Clock,         permission: 'canViewAttendance' as const },
     { path: '/table-management',   label: 'Manage Tables',  icon: Settings,      permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true },
-    // Quotations & Invoices: accessible to anyone with the permission (staff/special waiter)
-    // OR explicitly to accounting role (which uses canManageAccounting instead)
     { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const, allowedRoles: ['accounting'] },
     { path: '/invoices',   label: 'Invoices',   icon: FileText, permission: 'canManageInvoicesQuotations' as const, allowedRoles: ['accounting'] },
     { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const },
   ];
 
   const navItems = allNavItems.filter(item => {
-    // adminOnly but not in allowedRoles override
     if (item.adminOnly && currentUser.role !== 'admin' && !item.allowedRoles?.includes(currentUser.role)) return false;
-    // explicit role override (e.g. accounting for quotations/invoices)
     if (item.allowedRoles?.includes(currentUser.role)) return true;
     return !!permissions[item.permission];
   });
+
+  // Workforce sub-nav items
+  const workforceSubItems = [
+    { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const,    allowedRoles: ['manager', 'supervisor'] },
+    { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const, allowedRoles: ['manager', 'supervisor'] },
+    { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const,  allowedRoles: [] as string[] },
+    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const,    allowedRoles: ['manager'] },
+    { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const,    allowedRoles: [] as string[] },
+  ].filter(item => {
+    if (item.allowedRoles?.includes(currentUser.role)) return true;
+    return !!permissions[item.permission];
+  });
+
+  const showWorkforce = workforceSubItems.length > 0;
 
   const initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
   const roleColors: Record<string, string> = {
@@ -145,6 +159,78 @@ export function Layout() {
               <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
             </NavLink>
           ))}
+
+          {/* ── Workforce collapsible group ── */}
+          {showWorkforce && (
+            <div>
+              <button
+                onClick={() => {
+                  setWorkforceOpen(o => !o);
+                  if (collapsed) setCollapsed(false);
+                }}
+                title="Workforce"
+                className={`w-full flex items-center gap-3 ${collapsed ? 'lg:justify-center' : 'px-3'} py-2.5 rounded-lg text-sm transition-all ${
+                  location.pathname.startsWith('/workforce')
+                    ? 'text-amber-400 bg-white/5'
+                    : 'text-gray-400 hover:bg-white/8 hover:text-white'
+                }`}
+              >
+                <Building2 className="size-4 shrink-0" />
+                <span className={`flex-1 text-left ${collapsed ? 'lg:hidden' : ''}`}>Workforce</span>
+                {!collapsed && (
+                  workforceOpen
+                    ? <ChevronDown className="size-3.5 shrink-0" />
+                    : <ChevronRightIcon className="size-3.5 shrink-0" />
+                )}
+              </button>
+
+              {workforceOpen && !collapsed && (
+                <div className="ml-3 mt-0.5 border-l border-white/10 pl-3 space-y-0.5">
+                  {workforceSubItems.map(item => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      title={item.label}
+                      onClick={closeMobile}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-all ${
+                          isActive
+                            ? 'bg-amber-500 text-white font-medium'
+                            : 'text-gray-400 hover:bg-white/8 hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon className="size-3.5 shrink-0" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+
+              {/* Collapsed: show sub-icons directly */}
+              {workforceOpen && collapsed && (
+                <div className="mt-0.5 space-y-0.5">
+                  {workforceSubItems.map(item => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      title={item.label}
+                      onClick={closeMobile}
+                      className={({ isActive }) =>
+                        `flex items-center justify-center py-2 rounded-lg text-sm transition-all ${
+                          isActive
+                            ? 'bg-amber-500 text-white'
+                            : 'text-gray-400 hover:bg-white/8 hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon className="size-4" />
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* User section */}

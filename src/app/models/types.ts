@@ -1,6 +1,6 @@
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor';
 
 export interface User {
   id: string;
@@ -204,6 +204,9 @@ export interface RolePermissions {
   canViewAttendance: boolean;
   canCheckIn: boolean;
   canManageInvoicesQuotations: boolean;
+  canManagePayroll: boolean;
+  canManageLeave: boolean;
+  canViewOwnAttendance: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
@@ -220,6 +223,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: true,
     canCheckIn: true,
     canManageInvoicesQuotations: true,
+    canManagePayroll: true,
+    canManageLeave: true,
+    canViewOwnAttendance: true,
   },
   cashier: {
     canViewTables: true,
@@ -234,6 +240,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
   waiter: {
     canViewTables: true,
@@ -248,6 +257,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
   kitchen: {
     canViewTables: false,
@@ -262,6 +274,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
   juice: {
     canViewTables: false,
@@ -276,22 +291,61 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
   hr: {
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
     canManageInventory: false,
-    canViewReports: false,
+    canViewReports: true,
     canManageStaff: true,
+    canManageAccounting: false,
+    canExportReports: true,
+    canImportProducts: false,
+    canViewAttendance: true,
+    canCheckIn: true,
+    canManageInvoicesQuotations: false,
+    canManagePayroll: true,
+    canManageLeave: true,
+    canViewOwnAttendance: true,
+  },
+  manager: {
+    canViewTables: true,
+    canAddOrders: true,
+    canProcessPayments: true,
+    canManageInventory: true,
+    canViewReports: true,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: true,
+    canImportProducts: false,
+    canViewAttendance: true,
+    canCheckIn: true,
+    canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: true,
+    canViewOwnAttendance: true,
+  },
+  supervisor: {
+    canViewTables: true,
+    canAddOrders: true,
+    canProcessPayments: false,
+    canManageInventory: true,
+    canViewReports: true,
+    canManageStaff: false,
     canManageAccounting: false,
     canExportReports: false,
     canImportProducts: false,
     canViewAttendance: true,
     canCheckIn: true,
     canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
-  // Staff: waiter-level POS access + invoices & quotations
   staff: {
     canViewTables: true,
     canAddOrders: true,
@@ -305,21 +359,26 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: true,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
-  // Accounting: accounting page + invoices/quotations (via explicit role check, not this permission)
   accounting: {
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
     canManageInventory: false,
-    canViewReports: false,
+    canViewReports: true,
     canManageStaff: false,
     canManageAccounting: true,
-    canExportReports: false,
+    canExportReports: true,
     canImportProducts: false,
     canViewAttendance: false,
     canCheckIn: true,
-    canManageInvoicesQuotations: false,
+    canManageInvoicesQuotations: true,
+    canManagePayroll: true,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
   },
 };
 
@@ -329,19 +388,81 @@ export interface Employee {
   id: string;
   userId?: string;
   employeeId: string;
+  employeeNumber?: string;
   fullName: string;
+  email?: string;
+  phone?: string;
   role: string;
+  department?: string;
+  hireDate?: string;
   monthlySalary: number;
   shiftStart: string; // "HH:MM"
   shiftEnd: string;   // "HH:MM"
   earlyCheckinMinutes: number;
   lateCheckoutMinutes: number;
   status: 'active' | 'inactive';
+  avatarUrl?: string;
+  notes?: string;
   branchId: string;
   createdAt: Date;
   updatedAt: Date;
   hasFingerprint?: boolean;
 }
+
+// Unified view: employee + their user account data + live attendance snapshot
+export interface EmployeeWithUser extends Employee {
+  pin?: string;
+  lastLogin?: Date;
+  todayStatus?: 'present' | 'absent' | 'not-checked-in' | 'on-leave';
+  todayCheckIn?: Date;
+  todayCheckOut?: Date;
+}
+
+// Input for creating a new employee (creates both users + employees rows atomically)
+export interface CreateEmployeeInput {
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: Exclude<UserRole, 'admin'>;
+  department: string;
+  pin: string;
+  monthlySalary: number;
+  shiftStart: string;
+  shiftEnd: string;
+  hireDate: string;
+  branchId: string;
+  notes?: string;
+}
+
+export type EmployeeFilters = {
+  status?: 'active' | 'inactive' | 'all';
+  role?: string;
+  department?: string;
+  search?: string;
+};
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'other';
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  branchId: string;
+  createdAt: Date;
+}
+
+export type LeaveFilters = {
+  employeeId?: string;
+  status?: LeaveRequest['status'] | 'all';
+  month?: number;
+  year?: number;
+};
 
 export interface EmployeeFingerprint {
   id: string;

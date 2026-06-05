@@ -299,13 +299,18 @@ export class WorkforceController {
       if (updates.notes !== undefined) empUpdates.notes     = updates.notes;
       if (updates.pin)              userUpdates.pin         = updates.pin;
 
-      const { data: empRow, error: empErr } = await supabase
+      const { error: empErr } = await supabase
         .from('employees')
         .update(empUpdates)
-        .eq('employee_id', employeeId)
-        .select()
-        .single();
+        .eq('employee_id', employeeId);
       if (empErr) throw empErr;
+
+      const { data: empRow } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .limit(1)
+        .maybeSingle();
 
       // Sync user row if any user-facing fields changed
       if (Object.keys(userUpdates).length > 0 && empRow.user_id) {
@@ -324,13 +329,12 @@ export class WorkforceController {
   // ── Deactivate employee (disables login + marks inactive) ────────────────
   static async deactivateEmployee(employeeId: string): Promise<Result<void>> {
     try {
-      const { data: empRow, error: findErr } = await supabase
+      const { data: empRow } = await supabase
         .from('employees')
         .select('user_id')
         .eq('employee_id', employeeId)
         .limit(1)
-        .single();
-      if (findErr) throw findErr;
+        .maybeSingle();
 
       const { error: empErr } = await supabase
         .from('employees')
@@ -354,13 +358,12 @@ export class WorkforceController {
   // ── Reactivate employee ───────────────────────────────────────────────────
   static async reactivateEmployee(employeeId: string): Promise<Result<void>> {
     try {
-      const { data: empRow, error: findErr } = await supabase
+      const { data: empRow } = await supabase
         .from('employees')
         .select('user_id')
         .eq('employee_id', employeeId)
         .limit(1)
-        .single();
-      if (findErr) throw findErr;
+        .maybeSingle();
 
       await supabase
         .from('employees')
@@ -388,7 +391,7 @@ export class WorkforceController {
         .select('user_id')
         .eq('employee_id', employeeId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       await supabase.from('employees').delete().eq('employee_id', employeeId);
 

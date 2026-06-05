@@ -1,1 +1,0 @@
-export { LoyaltyManagementView } from './LoyaltyManagementView';

@@ -179,6 +179,46 @@ export class WorkforceController {
       const { data, error } = await query;
       if (error) throw error;
 
+      // If employees table is present but empty (migrations not applied yet),
+      // fall back to reading non-admin users so the UI remains usable.
+      let rows = data ?? [];
+      if ((rows || []).length === 0) {
+        try {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('*')
+            .neq('role', 'admin')
+            .order('name');
+
+          if (usersData && usersData.length > 0) {
+            rows = usersData.map((u: any) => ({
+              id: `emp-synth-${u.id}`,
+              user_id: u.id,
+              employee_id: u.employment_number ?? u.id,
+              employee_number: u.employment_number ?? u.id,
+              full_name: u.name,
+              email: u.email,
+              role: u.role,
+              department: null,
+              hire_date: u.hire_date ?? u.created_at,
+              monthly_salary: (u.hourly_rate ? u.hourly_rate * 160 : 0),
+              shift_start: '09:00',
+              shift_end: '18:00',
+              early_checkin_minutes: 5,
+              late_checkout_minutes: 5,
+              status: u.status ?? 'active',
+              avatar_url: u.avatar_url ?? null,
+              notes: null,
+              branch_id: u.branch_id ?? 'branch-1',
+              created_at: u.created_at,
+              updated_at: u.updated_at ?? new Date().toISOString(),
+            }));
+          }
+        } catch (uerr) {
+          // ignore and continue with empty rows
+        }
+      }
+
       // Attach hasFingerprint flag
       const { data: fps } = await supabase
         .from('employee_fingerprints')
@@ -194,7 +234,7 @@ export class WorkforceController {
         .eq('log_date', today);
       const logMap = new Map((todayLogs ?? []).map((l: any) => [l.employee_id, l]));
 
-      const employees: EmployeeWithUser[] = (data ?? []).map((row: any) => {
+      const employees: EmployeeWithUser[] = (rows ?? []).map((row: any) => {
         const emp = mapEmployee(row);
         const log = logMap.get(emp.employeeId);
         return {

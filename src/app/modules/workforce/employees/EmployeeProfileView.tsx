@@ -8,7 +8,7 @@ import {
 import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { HRController } from '../../../controllers/HRController';
-import { EmployeeWithUser, AttendanceLog, PayrollSummary, LeaveRequest } from '../../../models/types';
+import { EmployeeWithUser, AttendanceLog, PayrollSummary } from '../../../models/types';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import {
   AlertDialog,
@@ -48,7 +48,7 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-type Tab = 'attendance' | 'payroll' | 'leave' | 'biometrics';
+type Tab = 'attendance' | 'payroll' | 'biometrics';
 
 // ─────────────────────────────────────────────────────────────────────────────
 export function EmployeeProfileView() {
@@ -70,7 +70,6 @@ export function EmployeeProfileView() {
   // Tab data
   const [attLogs, setAttLogs]       = useState<AttendanceLog[]>([]);
   const [payrolls, setPayrolls]     = useState<PayrollSummary[]>([]);
-  const [leaves, setLeaves]         = useState<LeaveRequest[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
 
   // Action state
@@ -110,9 +109,6 @@ export function EmployeeProfileView() {
         if (r.success) {
           setPayrolls((r.data ?? []).filter(p => p.employeeId === employee.employeeId));
         }
-      } else if (activeTab === 'leave') {
-        const r = await WorkforceController.getLeaveRequests({ employeeId: employee.employeeId });
-        if (r.success) setLeaves(r.data);
       }
       setTabLoading(false);
     };
@@ -182,7 +178,6 @@ export function EmployeeProfileView() {
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: 'attendance', label: 'Attendance', icon: Clock },
     { id: 'payroll',    label: 'Payroll',    icon: DollarSign },
-    { id: 'leave',      label: 'Leave',      icon: Calendar },
     { id: 'biometrics', label: 'Biometrics', icon: Fingerprint },
   ];
 
@@ -336,14 +331,6 @@ export function EmployeeProfileView() {
                 <PayrollTab payrolls={payrolls} />
               )}
 
-              {/* ── Leave Tab ── */}
-              {activeTab === 'leave' && (
-                <LeaveTab leaves={leaves} employee={employee} onRefresh={() => {
-                  const r = WorkforceController.getLeaveRequests({ employeeId: employee.employeeId });
-                  r.then(res => { if (res.success) setLeaves(res.data); });
-                }} />
-              )}
-
               {/* ── Biometrics Tab ── */}
               {activeTab === 'biometrics' && (
                 <BiometricsTab employee={employee} onRefresh={loadEmployee} />
@@ -495,127 +482,6 @@ function PayrollTab({ payrolls }: { payrolls: PayrollSummary[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ─── Leave Tab ────────────────────────────────────────────────────────────
-function LeaveTab({ leaves, employee, onRefresh }: {
-  leaves: LeaveRequest[];
-  employee: EmployeeWithUser;
-  onRefresh: () => void;
-}) {
-  const [submitting, setSubmitting] = useState(false);
-  const [showForm, setShowForm]     = useState(false);
-  const [form, setForm]             = useState({ leaveType: 'annual' as LeaveRequest['leaveType'], startDate: '', endDate: '', reason: '' });
-  const { currentUser } = usePOS();
-
-  const canSubmit = currentUser?.role === 'admin' || currentUser?.role === 'hr' ||
-                    currentUser?.role === 'manager';
-
-  const handleSubmit = async () => {
-    if (!form.startDate || !form.endDate) return;
-    setSubmitting(true);
-    await WorkforceController.submitLeaveRequest({
-      employeeId: employee.employeeId,
-      leaveType: form.leaveType,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      reason: form.reason,
-      branchId: employee.branchId,
-    });
-    setSubmitting(false);
-    setShowForm(false);
-    onRefresh();
-  };
-
-  return (
-    <div className="space-y-4">
-      {canSubmit && (
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowForm(s => !s)}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors"
-          >
-            + Request Leave
-          </button>
-        </div>
-      )}
-
-      {showForm && (
-        <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Leave Type</label>
-              <select value={form.leaveType} onChange={e => setForm(f => ({ ...f, leaveType: e.target.value as any }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
-                {['annual','sick','emergency','unpaid','other'].map(t => (
-                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Reason</label>
-              <input type="text" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-                placeholder="Optional reason"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Start Date</label>
-              <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">End Date</label>
-              <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSubmit} disabled={submitting}
-              className="px-4 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50">
-              Submit
-            </button>
-          </div>
-        </div>
-      )}
-
-      {leaves.length === 0 ? (
-        <EmptyState icon={Calendar} message="No leave requests." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                {['Type', 'From', 'To', 'Days', 'Status', 'Reviewed By'].map(h => (
-                  <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {leaves.map(l => (
-                <tr key={l.id}>
-                  <td className="px-3 py-3 text-sm text-gray-900 capitalize">{l.leaveType}</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{l.startDate}</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{l.endDate}</td>
-                  <td className="px-3 py-3 text-sm text-gray-700">{l.daysCount}</td>
-                  <td className="px-3 py-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      l.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                      l.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                'bg-amber-100 text-amber-700'
-                    }`}>
-                      {l.status.charAt(0).toUpperCase() + l.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-500">{l.reviewedBy ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

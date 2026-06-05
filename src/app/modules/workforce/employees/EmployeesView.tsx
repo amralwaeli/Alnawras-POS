@@ -58,9 +58,8 @@ function avatarColor(id: string) {
 }
 
 function StatusDot({ status }: { status: EmployeeWithUser['todayStatus'] }) {
-  if (status === 'present')         return <span className="inline-block size-2 rounded-full bg-emerald-500" title="Present" />;
-  if (status === 'on-leave')        return <span className="inline-block size-2 rounded-full bg-blue-400" title="On Leave" />;
-  if (status === 'not-checked-in')  return <span className="inline-block size-2 rounded-full bg-gray-300" title="Not Checked In" />;
+  if (status === 'present')        return <span className="inline-block size-2 rounded-full bg-emerald-500" title="Present" />;
+  if (status === 'not-checked-in') return <span className="inline-block size-2 rounded-full bg-gray-300" title="Not Checked In" />;
   return null;
 }
 

@@ -1,21 +1,11 @@
 import { supabase } from '../../lib/supabase';
 import {
   Employee, EmployeeWithUser, CreateEmployeeInput, EmployeeFilters,
-  LeaveRequest, LeaveFilters, UserRole,
+  UserRole,
 } from '../models/types';
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-function isMissingTableError(err: any, tableName: string): boolean {
-  if (!err) return false;
-  const msg = typeof err.message === 'string' ? err.message : '';
-  if (msg.includes(`Could not find the table 'public.${tableName}'`)) return true;
-  if (msg.includes(`relation \"${tableName}\" does not exist`)) return true;
-  if (msg.includes(`relation "${tableName}" does not exist`)) return true;
-  if (typeof err.code === 'string' && (err.code === '42P01' || err.code === 'PGRST205')) return true;
-  return false;
-}
 
 // ─── Department default by role ───────────────────────────────────────────────
 const defaultDepartment = (role: string): string => {
@@ -64,24 +54,6 @@ function mapEmployee(row: any): Employee {
     branchId: row.branch_id,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
-  };
-}
-
-function mapLeaveRequest(row: any): LeaveRequest {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    employeeName: row.employee_name,
-    leaveType: row.leave_type,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    daysCount: row.days_count,
-    reason: row.reason,
-    status: row.status,
-    reviewedBy: row.reviewed_by,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at) : undefined,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
   };
 }
 
@@ -271,6 +243,7 @@ export class WorkforceController {
         .from('employees')
         .select('*')
         .eq('employee_id', employeeId)
+        .limit(1)
         .single();
       if (error) throw error;
 
@@ -355,6 +328,7 @@ export class WorkforceController {
         .from('employees')
         .select('user_id')
         .eq('employee_id', employeeId)
+        .limit(1)
         .single();
       if (findErr) throw findErr;
 
@@ -384,6 +358,7 @@ export class WorkforceController {
         .from('employees')
         .select('user_id')
         .eq('employee_id', employeeId)
+        .limit(1)
         .single();
       if (findErr) throw findErr;
 
@@ -412,6 +387,7 @@ export class WorkforceController {
         .from('employees')
         .select('user_id')
         .eq('employee_id', employeeId)
+        .limit(1)
         .single();
 
       await supabase.from('employees').delete().eq('employee_id', employeeId);
@@ -434,138 +410,22 @@ export class WorkforceController {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      const [empResult, logsResult, leaveResult] = await Promise.all([
+      const [empResult, logsResult] = await Promise.all([
         supabase.from('employees').select('*', { count: 'exact', head: true })
           .eq('branch_id', branchId).eq('status', 'active').neq('role', 'admin'),
         supabase.from('attendance_logs').select('employee_id, status, check_out_time')
           .eq('log_date', today).eq('branch_id', branchId),
-        supabase.from('leave_requests').select('employee_id')
-          .eq('status', 'approved')
-          .lte('start_date', today)
-          .gte('end_date', today)
-          .eq('branch_id', branchId),
       ]);
 
-      const total    = empResult.count ?? 0;
-      const logs     = logsResult.data ?? [];
-      const onLeave  = isMissingTableError(leaveResult.error, 'leave_requests')
-        ? 0
-        : (leaveResult.data ?? []).length;
-      const present  = logs.filter(l => !l.check_out_time).length;
+      const total      = empResult.count ?? 0;
+      const logs       = logsResult.data ?? [];
+      const present    = logs.filter(l => !l.check_out_time).length;
       const clockedOut = logs.filter(l => l.check_out_time).length;
-      const late     = logs.filter(l => l.status === 'late').length;
-      const absent   = Math.max(0, total - logs.length - onLeave);
+      const late       = logs.filter(l => l.status === 'late').length;
+      const absent     = Math.max(0, total - logs.length);
 
-      return { success: true, data: { total, present, absent, late, onLeave, clockedOut } };
+      return { success: true, data: { total, present, absent, late, clockedOut, onLeave: 0 } };
     } catch (err: any) {
-      return { success: false, error: err.message };
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // LEAVE MANAGEMENT
-  // ────────────────────────────────────────────────────────────────────────────
-
-  static async submitLeaveRequest(input: {
-    employeeId: string;
-    leaveType: LeaveRequest['leaveType'];
-    startDate: string;
-    endDate: string;
-    reason?: string;
-    branchId: string;
-  }): Promise<Result<LeaveRequest>> {
-    try {
-      const start = new Date(input.startDate);
-      const end   = new Date(input.endDate);
-      const daysCount = Math.ceil((end.getTime() - start.getTime()) / 86_400_000) + 1;
-
-      const id = uid('leave');
-      const { data, error } = await supabase
-        .from('leave_requests')
-        .insert({
-          id,
-          employee_id: input.employeeId,
-          leave_type: input.leaveType,
-          start_date: input.startDate,
-          end_date: input.endDate,
-          days_count: daysCount,
-          reason: input.reason ?? null,
-          status: 'pending',
-          branch_id: input.branchId,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return { success: true, data: mapLeaveRequest(data) };
-    } catch (err: any) {
-      if (isMissingTableError(err, 'leave_requests')) {
-        return { success: false, error: 'Leave management is not available because the leave_requests table is missing.' };
-      }
-      return { success: false, error: err.message };
-    }
-  }
-
-  static async reviewLeaveRequest(
-    leaveId: string,
-    status: 'approved' | 'rejected',
-    reviewedBy: string
-  ): Promise<Result<void>> {
-    try {
-      const { error } = await supabase
-        .from('leave_requests')
-        .update({
-          status,
-          reviewed_by: reviewedBy,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', leaveId);
-      if (error) throw error;
-      return { success: true, data: undefined };
-    } catch (err: any) {
-      if (isMissingTableError(err, 'leave_requests')) {
-        return { success: false, error: 'Leave management is not available because the leave_requests table is missing.' };
-      }
-      return { success: false, error: err.message };
-    }
-  }
-
-  static async getLeaveRequests(
-    filters: LeaveFilters = {}
-  ): Promise<Result<LeaveRequest[]>> {
-    try {
-      let query = supabase
-        .from('leave_requests')
-        .select(`
-          *,
-          employees!employee_id(full_name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
-      if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-      if (filters.month && filters.year) {
-        const y = filters.year;
-        const m = String(filters.month).padStart(2, '0');
-        query = query
-          .gte('start_date', `${y}-${m}-01`)
-          .lte('start_date', `${y}-${m}-${new Date(y, filters.month, 0).getDate()}`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      return {
-        success: true,
-        data: (data ?? []).map((row: any) => ({
-          ...mapLeaveRequest(row),
-          employeeName: row.employees?.full_name,
-        })),
-      };
-    } catch (err: any) {
-      if (isMissingTableError(err, 'leave_requests')) {
-        return { success: true, data: [] };
-      }
       return { success: false, error: err.message };
     }
   }

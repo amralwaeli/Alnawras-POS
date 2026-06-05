@@ -413,7 +413,7 @@ export interface Employee {
 export interface EmployeeWithUser extends Employee {
   pin?: string;
   lastLogin?: Date;
-  todayStatus?: 'present' | 'absent' | 'not-checked-in' | 'on-leave';
+  todayStatus?: 'present' | 'absent' | 'not-checked-in';
   todayCheckIn?: Date;
   todayCheckOut?: Date;
 }
@@ -439,29 +439,6 @@ export type EmployeeFilters = {
   role?: string;
   department?: string;
   search?: string;
-};
-
-export interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  employeeName?: string;
-  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'other';
-  startDate: string;
-  endDate: string;
-  daysCount: number;
-  reason?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewedBy?: string;
-  reviewedAt?: Date;
-  branchId: string;
-  createdAt: Date;
-}
-
-export type LeaveFilters = {
-  employeeId?: string;
-  status?: LeaveRequest['status'] | 'all';
-  month?: number;
-  year?: number;
 };
 
 export interface EmployeeFingerprint {

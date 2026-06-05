@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Edit, Trash2, Upload, Download, Package, Tag, DollarSign, ChefHat, Printer } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { loadStations, Station } from '../../models/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -25,6 +26,8 @@ export function ProductManagementView() {
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [stations, setStations] = useState<Station[]>(() => loadStations());
+
   const [productFormData, setProductFormData] = useState({
     name: '',
     categoryId: '',
@@ -34,7 +37,7 @@ export function ProductManagementView() {
     sku: '',
     taxRate: '8.25',
     reorderPoint: '',
-    station: 'kitchen' as 'kitchen' | 'juice' | 'none',
+    station: 'kitchen' as string,
   });
 
   const [categoryFormData, setCategoryFormData] = useState({
@@ -380,9 +383,15 @@ export function ProductManagementView() {
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
                       <ChefHat className="size-3.5 text-gray-400" />
-                      {product.station === 'kitchen' && <Badge className="bg-orange-100 text-orange-700 text-xs">Kitchen</Badge>}
-                      {product.station === 'juice' && <Badge className="bg-green-100 text-green-700 text-xs">Juice Bar</Badge>}
-                      {product.station === 'none' && <Badge className="bg-gray-100 text-gray-500 text-xs">No Station</Badge>}
+                      {product.station === 'none'
+                        ? <Badge className="bg-gray-100 text-gray-500 text-xs">No Station</Badge>
+                        : (() => {
+                            const st = stations.find(s => s.id === product.station);
+                            return st
+                              ? <Badge className="text-xs" style={{ backgroundColor: st.color + '22', color: st.color }}>{st.name}</Badge>
+                              : <Badge className="bg-orange-100 text-orange-700 text-xs">{product.station}</Badge>;
+                          })()
+                      }
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4">
@@ -512,7 +521,7 @@ export function ProductManagementView() {
       </Tabs>
 
       {/* Product Dialog */}
-      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+      <Dialog open={isProductDialogOpen} onOpenChange={(open) => { if (open) setStations(loadStations()); setIsProductDialogOpen(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
@@ -581,14 +590,15 @@ export function ProductManagementView() {
               <Label htmlFor="product-station">Preparation Station</Label>
               <Select
                 value={productFormData.station}
-                onValueChange={(value: 'kitchen' | 'juice' | 'none') => setProductFormData(prev => ({ ...prev, station: value }))}
+                onValueChange={(value: string) => setProductFormData(prev => ({ ...prev, station: value }))}
               >
                 <SelectTrigger id="product-station">
                   <SelectValue placeholder="Select station" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="kitchen">Kitchen</SelectItem>
-                  <SelectItem value="juice">Juice Bar</SelectItem>
+                  {stations.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                   <SelectItem value="none">No Station (pre-made / external)</SelectItem>
                 </SelectContent>
               </Select>

@@ -9,7 +9,7 @@ function ProtectedRoute({ children, permission, adminOnly, allowedRoles }: {
   children: React.ReactNode;
   permission?: keyof typeof ROLE_PERMISSIONS['admin'];
   adminOnly?: boolean;
-  allowedRoles?: string[]; // roles that bypass adminOnly / permission checks
+  allowedRoles?: string[];
 }) {
   const { currentUser } = usePOS();
   if (!currentUser) return <Navigate to="/check-in" replace />;
@@ -34,12 +34,19 @@ const KitchenView            = lazy(() => import('./modules/kitchen').then(m => 
 
 const InventoryView          = lazy(() => import('./modules/inventory').then(m => ({ default: m.InventoryView })));
 
-const StaffView              = lazy(() => import('./modules/staff').then(m => ({ default: m.StaffView })));
 const CategoryManagementView = lazy(() => import('./modules/staff').then(m => ({ default: m.CategoryManagementView })));
 const PrinterManagementView  = lazy(() => import('./modules/staff').then(m => ({ default: m.PrinterManagementView })));
 
-const HRPanelView            = lazy(() => import('./modules/hr').then(m => ({ default: m.HRPanelView })));
-const AttendanceView         = lazy(() => import('./modules/hr').then(m => ({ default: m.AttendanceView })));
+// ── Workforce module ──────────────────────────────────────────────────────────
+const WorkforceLayout        = lazy(() => import('./modules/workforce').then(m => ({ default: m.WorkforceLayout })));
+const EmployeesView          = lazy(() => import('./modules/workforce').then(m => ({ default: m.EmployeesView })));
+const EmployeeProfileView    = lazy(() => import('./modules/workforce').then(m => ({ default: m.EmployeeProfileView })));
+const WorkforceAttendanceView = lazy(() => import('./modules/workforce').then(m => ({ default: m.WorkforceAttendanceView })));
+const PayrollView            = lazy(() => import('./modules/workforce').then(m => ({ default: m.PayrollView })));
+const LeaveManagementView    = lazy(() => import('./modules/workforce').then(m => ({ default: m.LeaveManagementView })));
+const BiometricsView         = lazy(() => import('./modules/workforce').then(m => ({ default: m.BiometricsView })));
+
+// ── Fingerprint kiosk (standalone, no layout) ────────────────────────────────
 const FingerprintCheckInView = lazy(() => import('./modules/hr').then(m => ({ default: m.FingerprintCheckInView })));
 
 const ReportsView            = lazy(() => import('./modules/reports').then(m => ({ default: m.ReportsView })));
@@ -77,7 +84,9 @@ function LandingPage() {
   if (currentUser.role === 'cashier')    return <Navigate to="/tables" replace />;
   if (currentUser.role === 'waiter')     return <Navigate to="/dashboard" replace />;
   if (currentUser.role === 'kitchen')    return <Navigate to="/kitchen" replace />;
-  if (currentUser.role === 'hr')         return <Navigate to="/hr-panel" replace />;
+  if (currentUser.role === 'hr')         return <Navigate to="/workforce/employees" replace />;
+  if (currentUser.role === 'manager')    return <Navigate to="/workforce/employees" replace />;
+  if (currentUser.role === 'supervisor') return <Navigate to="/workforce/attendance" replace />;
   if (currentUser.role === 'staff')      return <Navigate to="/invoices" replace />;
   if (currentUser.role === 'accounting') return <Navigate to="/accounting" replace />;
   return <Navigate to="/admin-dashboard" replace />;
@@ -119,10 +128,31 @@ export const router = createHashRouter([
       { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><QuotationsView /></ProtectedRoute></Lazy> },
       { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><InvoicesView /></ProtectedRoute></Lazy> },
 
-      // ── Staff ──
-      { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
-      { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
-      { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
+      // ── Workforce (unified module) ──
+      {
+        path: 'workforce',
+        element: (
+          <Lazy>
+            <ProtectedRoute permission="canManageStaff" allowedRoles={['manager', 'supervisor']}>
+              <WorkforceLayout />
+            </ProtectedRoute>
+          </Lazy>
+        ),
+        children: [
+          { index: true, element: <Navigate to="employees" replace /> },
+          { path: 'employees',  element: <Lazy><EmployeesView /></Lazy> },
+          { path: 'employees/:employeeId', element: <Lazy><EmployeeProfileView /></Lazy> },
+          { path: 'attendance', element: <Lazy><WorkforceAttendanceView /></Lazy> },
+          { path: 'payroll',    element: <Lazy><ProtectedRoute permission="canManagePayroll"><PayrollView /></ProtectedRoute></Lazy> },
+          { path: 'leave',      element: <Lazy><ProtectedRoute permission="canManageLeave"><LeaveManagementView /></ProtectedRoute></Lazy> },
+          { path: 'biometrics', element: <Lazy><BiometricsView /></Lazy> },
+        ],
+      },
+
+      // ── Legacy redirects (keep old bookmarks working) ──
+      { path: 'staff',      element: <Navigate to="/workforce/employees" replace /> },
+      { path: 'hr-panel',   element: <Navigate to="/workforce/employees" replace /> },
+      { path: 'attendance', element: <Navigate to="/workforce/attendance" replace /> },
 
       // ── Loyalty ──
       { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },

@@ -4,9 +4,11 @@ import {
   ShoppingCart, AlertTriangle, ArrowRight, Activity,
   TrendingUp, Package, Clock, ShoppingBag, Utensils,
   CreditCard, BarChart2, X, QrCode, UserCheck, Trophy, Star,
+  Users, Building2,
 } from 'lucide-react';
 import { orderTotal, fmt } from '../../../lib/currency';
 import { useMemo, useState, useEffect } from 'react';
+import { WorkforceController } from '../../controllers/WorkforceController';
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
@@ -399,6 +401,17 @@ function LiveClock() {
 export function AdminDashboardView() {
   const { currentUser, orders, tables, products, users } = usePOS();
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [workforce, setWorkforce] = useState<{
+    total: number; present: number; absent: number;
+    late: number; onLeave: number; clockedOut: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    WorkforceController.getTodaySnapshot(currentUser.branchId ?? 'branch-1')
+      .then(r => { if (r.success) setWorkforce(r.data); });
+  }, [currentUser?.branchId]);
+
   if (!currentUser) return null;
 
   const today = new Date().toDateString();
@@ -547,6 +560,42 @@ export function AdminDashboardView() {
             </div>
           </div>
         </div>
+
+        {/* Today's Workforce */}
+        {workforce && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-xl bg-violet-50 flex items-center justify-center">
+                  <Building2 className="size-4 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Today's Workforce</h3>
+                  <p className="text-xs text-gray-400">{workforce.total} employees scheduled</p>
+                </div>
+              </div>
+              <Link to="/workforce/attendance"
+                className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700">
+                Full View <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {[
+                { label: 'Present',     value: workforce.present,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { label: 'Clocked Out', value: workforce.clockedOut,  color: 'text-blue-600',   bg: 'bg-blue-50' },
+                { label: 'Absent',      value: workforce.absent,      color: 'text-red-600',    bg: 'bg-red-50' },
+                { label: 'Late',        value: workforce.late,        color: 'text-amber-600',  bg: 'bg-amber-50' },
+                { label: 'On Leave',    value: workforce.onLeave,     color: 'text-purple-600', bg: 'bg-purple-50' },
+                { label: 'Total',       value: workforce.total,       color: 'text-gray-700',   bg: 'bg-gray-50' },
+              ].map(s => (
+                <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+                  <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bottom Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

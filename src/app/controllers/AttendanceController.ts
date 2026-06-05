@@ -1,5 +1,4 @@
 import { Attendance, User } from '../models/types';
-import { genId } from '../../lib/id';
 
 export class AttendanceController {
   /**
@@ -49,7 +48,7 @@ export class AttendanceController {
     const lateMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
 
     const newAttendance: Attendance = {
-      id: genId('att'),
+      id: crypto.randomUUID(),
       employmentNumber: staff.employmentNumber,
       staffId: staff.id,
       staffName: staff.name,

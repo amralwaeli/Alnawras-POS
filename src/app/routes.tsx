@@ -52,7 +52,6 @@ const LogisticsView          = lazy(() => import('./modules/logistics/LogisticsV
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
-const TakeawayView           = lazy(() => import('./modules/menu').then(m => ({ default: m.TakeawayOrderView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
@@ -128,9 +127,6 @@ export const router = createHashRouter([
       { path: 'staff',               element: <Lazy><ProtectedRoute permission="canManageStaff"><StaffView /></ProtectedRoute></Lazy> },
       { path: 'hr-panel',            element: <Lazy><ProtectedRoute permission="canManageStaff"><HRPanelView /></ProtectedRoute></Lazy> },
       { path: 'attendance',          element: <Lazy><ProtectedRoute permission="canViewAttendance"><AttendanceView /></ProtectedRoute></Lazy> },
-
-      // ── Takeaway ──
-      { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canAddOrders"><TakeawayView /></ProtectedRoute></Lazy> },
 
       // ── Logistics ──
       { path: 'logistics',           element: <Lazy><ProtectedRoute adminOnly><LogisticsView /></ProtectedRoute></Lazy> },

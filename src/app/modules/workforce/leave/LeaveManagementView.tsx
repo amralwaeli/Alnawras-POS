@@ -40,8 +40,12 @@ export function LeaveManagementView() {
   const review = async (id: string, status: 'approved' | 'rejected') => {
     if (!currentUser) return;
     setActing(id);
-    await WorkforceController.reviewLeaveRequest(id, status, currentUser.name);
+    const result = await WorkforceController.reviewLeaveRequest(id, status, currentUser.name);
     setActing(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
     load();
   };
 

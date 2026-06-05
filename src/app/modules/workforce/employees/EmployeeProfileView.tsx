@@ -10,6 +10,15 @@ import { WorkforceController } from '../../../controllers/WorkforceController';
 import { HRController } from '../../../controllers/HRController';
 import { EmployeeWithUser, AttendanceLog, PayrollSummary, LeaveRequest } from '../../../models/types';
 import { EmployeeFormModal } from './EmployeeFormModal';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+} from '../../../components/ui/alert-dialog';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt  = (d?: Date | string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -50,8 +59,13 @@ export function EmployeeProfileView() {
   const [employee, setEmployee]     = useState<EmployeeWithUser | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
+  const [actionError, setActionError] = useState('');
   const [activeTab, setActiveTab]   = useState<Tab>('attendance');
   const [showEdit, setShowEdit]     = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'deactivate' | 'reactivate' | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmEmployee, setConfirmEmployee] = useState<EmployeeWithUser | null>(null);
 
   // Tab data
   const [attLogs, setAttLogs]       = useState<AttendanceLog[]>([]);
@@ -106,21 +120,41 @@ export function EmployeeProfileView() {
     load();
   }, [activeTab, employee]);
 
-  const handleDeactivate = async () => {
+  const openConfirm = (action: 'deactivate' | 'reactivate') => {
     if (!employee) return;
-    if (!confirm(`Deactivate ${employee.fullName}?`)) return;
-    setActing(true);
-    await WorkforceController.deactivateEmployee(employee.employeeId);
-    setActing(false);
-    loadEmployee();
+    setError('');
+    setActionError('');
+    setConfirmAction(action);
+    setConfirmEmployee(employee);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction || !confirmEmployee) return;
+    setConfirmLoading(true);
+    setActionError('');
+
+    const actionFn = confirmAction === 'deactivate'
+      ? WorkforceController.deactivateEmployee
+      : WorkforceController.reactivateEmployee;
+
+    const result = await actionFn(confirmEmployee.employeeId);
+    if (result.success) {
+      setConfirmOpen(false);
+      loadEmployee();
+    } else {
+      setActionError(result.error || 'Action failed. Please try again.');
+    }
+
+    setConfirmLoading(false);
+  };
+
+  const handleDeactivate = async () => {
+    openConfirm('deactivate');
   };
 
   const handleReactivate = async () => {
-    if (!employee) return;
-    setActing(true);
-    await WorkforceController.reactivateEmployee(employee.employeeId);
-    setActing(false);
-    loadEmployee();
+    openConfirm('reactivate');
   };
 
   // ─── Loading / Error states ───────────────────────────────────────────────
@@ -328,6 +362,39 @@ export function EmployeeProfileView() {
           onClose={() => setShowEdit(false)}
         />
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'deactivate' ? 'Deactivate employee' : 'Reactivate employee'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmEmployee
+                ? confirmAction === 'deactivate'
+                  ? `This will disable ${confirmEmployee.fullName}'s POS login and mark them inactive.`
+                  : `This will restore ${confirmEmployee.fullName}'s POS login and mark them active.`
+                : 'Confirm this action to proceed.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {actionError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mb-4">
+              {actionError}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmLoading}>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={handleConfirmAction}
+              disabled={confirmLoading}
+              className="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {confirmLoading ? 'Processing...' : confirmAction === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

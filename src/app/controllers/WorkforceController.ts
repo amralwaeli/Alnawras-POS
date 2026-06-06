@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import {
   Employee, EmployeeWithUser, CreateEmployeeInput, EmployeeFilters,
-  UserRole,
+  UserRole, LeaveRequest, LeaveFilters,
 } from '../models/types';
 
 const uid = (prefix: string) =>
@@ -109,7 +109,6 @@ export class WorkforceController {
         email: input.email,
         phone: input.phone ?? null,
         role: input.role,
-        department: input.department || defaultDepartment(input.role),
         hire_date: input.hireDate,
         monthly_salary: input.monthlySalary,
         shift_start: input.shiftStart,
@@ -239,13 +238,14 @@ export class WorkforceController {
   // ── Get single employee with full profile ─────────────────────────────────
   static async getEmployee(employeeId: string): Promise<Result<EmployeeWithUser>> {
     try {
-      const { data: row, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('employees')
         .select('*')
         .eq('employee_id', employeeId)
-        .limit(1)
-        .single();
+        .limit(1);
       if (error) throw error;
+      const row = rows?.[0] ?? null;
+      if (!row) throw new Error(`Employee ${employeeId} not found`);
 
       const { data: fp } = await supabase
         .from('employee_fingerprints')
@@ -336,11 +336,15 @@ export class WorkforceController {
         .limit(1)
         .maybeSingle();
 
-      const { error: empErr } = await supabase
+      const { data: updatedRows, error: empErr } = await supabase
         .from('employees')
         .update({ status: 'inactive' })
-        .eq('employee_id', employeeId);
+        .eq('employee_id', employeeId)
+        .select('id');
       if (empErr) throw empErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Employee not found or update was blocked by database policy.');
+      }
 
       if (empRow?.user_id) {
         await supabase
@@ -365,10 +369,15 @@ export class WorkforceController {
         .limit(1)
         .maybeSingle();
 
-      await supabase
+      const { data: updatedRows, error: empErr } = await supabase
         .from('employees')
         .update({ status: 'active' })
-        .eq('employee_id', employeeId);
+        .eq('employee_id', employeeId)
+        .select('id');
+      if (empErr) throw empErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Employee not found or update was blocked by database policy.');
+      }
 
       if (empRow?.user_id) {
         await supabase
@@ -443,4 +452,101 @@ export class WorkforceController {
     const set = new Set((data ?? []).map((r: any) => r.department).filter(Boolean));
     return Array.from(set).sort();
   }
+
+  // ── Submit a leave request ────────────────────────────────────────────────
+  static async submitLeaveRequest(input: {
+    employeeId: string;
+    leaveType: LeaveRequest['leaveType'];
+    startDate: string;
+    endDate: string;
+    daysCount: number;
+    reason?: string;
+    branchId: string;
+  }): Promise<Result<LeaveRequest>> {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .insert({
+        id: uid('leave'),
+        employee_id: input.employeeId,
+        leave_type: input.leaveType,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        days_count: input.daysCount,
+        reason: input.reason ?? null,
+        status: 'pending',
+        branch_id: input.branchId,
+      })
+      .select()
+      .single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: mapLeaveRequest(data) };
+  }
+
+  // ── Approve or reject a leave request ────────────────────────────────────
+  static async reviewLeaveRequest(
+    id: string,
+    status: 'approved' | 'rejected',
+    reviewedBy: string
+  ): Promise<Result<void>> {
+    const { error } = await supabase
+      .from('leave_requests')
+      .update({ status, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: undefined };
+  }
+
+  // ── Get leave requests with optional filters ──────────────────────────────
+  static async getLeaveRequests(
+    branchId: string,
+    filters: LeaveFilters = {}
+  ): Promise<Result<LeaveRequest[]>> {
+    try {
+      let query = supabase
+        .from('leave_requests')
+        .select('*, employees(full_name)')
+        .eq('branch_id', branchId)
+        .order('created_at', { ascending: false });
+
+      if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
+      if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
+      if (filters.month) {
+        const year  = filters.year ?? new Date().getFullYear();
+        const month = filters.month.toString().padStart(2, '0');
+        query = query
+          .gte('start_date', `${year}-${month}-01`)
+          .lt('start_date',  `${year}-${(filters.month % 12) + 1 < 10 ? '0' : ''}${(filters.month % 12) + 1}-01`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: (data ?? []).map((r: any) => ({
+          ...mapLeaveRequest(r),
+          employeeName: r.employees?.full_name ?? undefined,
+        })),
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+}
+
+function mapLeaveRequest(row: any): LeaveRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    leaveType: row.leave_type,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    daysCount: row.days_count,
+    reason: row.reason ?? undefined,
+    status: row.status,
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at) : undefined,
+    branchId: row.branch_id,
+    createdAt: new Date(row.created_at),
+  };
 }

@@ -214,13 +214,14 @@ export class HRController {
       if (updates.lateCheckoutMinutes !== undefined) dbUpdates.late_checkout_minutes = updates.lateCheckoutMinutes;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
 
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('employees')
         .update(dbUpdates)
         .eq('employee_id', employeeId)
-        .select()
-        .single();
+        .select();
       if (error) throw error;
+      const data = rows?.[0] ?? null;
+      if (!data) throw new Error('Update failed: employee not found');
       return { success: true, data: mapEmployee(data) };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -305,12 +306,13 @@ export class HRController {
         .maybeSingle();
 
       if (exactMatch) {
-        const { data: empRow } = await supabase
+        const { data: empRows } = await supabase
           .from('employees')
           .select('*')
           .eq('employee_id', exactMatch.employee_id)
           .eq('status', 'active')
-          .single();
+          .limit(1);
+        const empRow = empRows?.[0] ?? null;
         if (empRow) return { success: true, employee: mapEmployee(empRow), score: 100 };
       }
 
@@ -342,12 +344,13 @@ export class HRController {
         return { success: false, error: 'Fingerprint not recognized' };
       }
 
-      const { data: empRow } = await supabase
+      const { data: empRows } = await supabase
         .from('employees')
         .select('*')
         .eq('employee_id', bestEmployeeId)
         .eq('status', 'active')
-        .single();
+        .limit(1);
+      const empRow = empRows?.[0] ?? null;
 
       if (!empRow) return { success: false, error: 'Employee not found or inactive' };
 
@@ -535,11 +538,12 @@ export class HRController {
     hrUserId: string
   ): Promise<{ success: boolean; data?: PayrollSummary; error?: string }> {
     try {
-      const { data: empRow } = await supabase
+      const { data: empRows } = await supabase
         .from('employees')
         .select('*')
         .eq('employee_id', employeeId)
-        .single();
+        .limit(1);
+      const empRow = empRows?.[0] ?? null;
       if (!empRow) return { success: false, error: 'Employee not found' };
       const employee = mapEmployee(empRow);
 

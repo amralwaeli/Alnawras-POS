@@ -4,20 +4,10 @@ import { WorkforceController } from '../../../controllers/WorkforceController';
 import { Employee, CreateEmployeeInput, UserRole } from '../../../models/types';
 
 const ROLES: { value: Exclude<UserRole, 'admin'>; label: string }[] = [
-  { value: 'cashier',    label: 'Cashier' },
-  { value: 'waiter',     label: 'Waiter' },
-  { value: 'kitchen',    label: 'Kitchen Staff' },
-  { value: 'juice',      label: 'Juice Bar' },
-  { value: 'hr',         label: 'HR' },
-  { value: 'accounting', label: 'Accountant' },
-  { value: 'manager',    label: 'Manager' },
-  { value: 'supervisor', label: 'Supervisor' },
-  { value: 'staff',      label: 'Staff' },
-];
-
-const DEPARTMENTS = [
-  'Operations', 'Service', 'Kitchen', 'Cashier',
-  'HR', 'Finance', 'Management',
+  { value: 'cashier', label: 'Cashier' },
+  { value: 'waiter',  label: 'Waiter' },
+  { value: 'kitchen', label: 'Kitchen Staff' },
+  { value: 'hr',      label: 'HR' },
 ];
 
 interface Props {
@@ -35,7 +25,6 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
     email:         initial?.email     ?? '',
     phone:         initial?.phone     ?? '',
     role:          (initial?.role as Exclude<UserRole, 'admin'>) ?? 'waiter',
-    department:    initial?.department ?? 'Operations',
     pin:           '',
     monthlySalary: initial?.monthlySalary ?? 0,
     shiftStart:    initial?.shiftStart ?? '09:00',
@@ -153,20 +142,6 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
               >
                 {ROLES.map(r => (
                   <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Department */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Department *</label>
-              <select
-                value={form.department}
-                onChange={e => set('department', e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-              >
-                {DEPARTMENTS.map(d => (
-                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>

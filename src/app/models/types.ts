@@ -424,7 +424,7 @@ export interface CreateEmployeeInput {
   email: string;
   phone?: string;
   role: Exclude<UserRole, 'admin'>;
-  department: string;
+  department?: string;
   pin: string;
   monthlySalary: number;
   shiftStart: string;
@@ -439,6 +439,29 @@ export type EmployeeFilters = {
   role?: string;
   department?: string;
   search?: string;
+};
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  leaveType: 'annual' | 'sick' | 'unpaid' | 'emergency' | 'other';
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  branchId: string;
+  createdAt: Date;
+}
+
+export type LeaveFilters = {
+  employeeId?: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'all';
+  month?: number;
+  year?: number;
 };
 
 export interface EmployeeFingerprint {

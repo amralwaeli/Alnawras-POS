@@ -42,7 +42,8 @@ const WorkforceLayout        = lazy(() => import('./modules/workforce').then(m =
 const EmployeesView          = lazy(() => import('./modules/workforce').then(m => ({ default: m.EmployeesView })));
 const EmployeeProfileView    = lazy(() => import('./modules/workforce').then(m => ({ default: m.EmployeeProfileView })));
 const WorkforceAttendanceView = lazy(() => import('./modules/workforce').then(m => ({ default: m.WorkforceAttendanceView })));
-const PayrollView            = lazy(() => import('./modules/workforce').then(m => ({ default: m.PayrollView }))); 
+const PayrollView            = lazy(() => import('./modules/workforce').then(m => ({ default: m.PayrollView })));
+const LeaveManagementView    = lazy(() => import('./modules/workforce').then(m => ({ default: m.LeaveManagementView })));
 const BiometricsView         = lazy(() => import('./modules/workforce').then(m => ({ default: m.BiometricsView })));
 
 // ── Fingerprint kiosk (standalone, no layout) ────────────────────────────────
@@ -143,6 +144,7 @@ export const router = createHashRouter([
           { path: 'employees/:employeeId', element: <Lazy><EmployeeProfileView /></Lazy> },
           { path: 'attendance', element: <Lazy><WorkforceAttendanceView /></Lazy> },
           { path: 'payroll',    element: <Lazy><ProtectedRoute permission="canManagePayroll"><PayrollView /></ProtectedRoute></Lazy> },
+          { path: 'leave',      element: <Lazy><ProtectedRoute permission="canManageLeave"><LeaveManagementView /></ProtectedRoute></Lazy> },
           { path: 'biometrics', element: <Lazy><BiometricsView /></Lazy> },
         ],
       },

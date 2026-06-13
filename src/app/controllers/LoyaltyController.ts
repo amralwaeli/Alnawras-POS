@@ -1,33 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { Customer, LoyaltyTransaction } from '../models/types';
-
-function mapCustomer(row: any): Customer {
-  return {
-    id: row.id,
-    name: row.name,
-    phone: row.phone,
-    email: row.email ?? undefined,
-    pointsBalance: row.points_balance ?? 0,
-    totalSpent: Number(row.total_spent ?? 0),
-    totalVisits: row.total_visits ?? 0,
-    branchId: row.branch_id,
-    createdAt: row.created_at,
-  };
-}
-
-function mapTransaction(row: any): LoyaltyTransaction {
-  return {
-    id: row.id,
-    customerId: row.customer_id,
-    customerName: row.customers?.name ?? '',
-    orderId: row.order_id ?? undefined,
-    type: row.type,
-    points: row.points,
-    description: row.description,
-    branchId: row.branch_id,
-    createdAt: row.created_at,
-  };
-}
+import { mapCustomer, mapLoyaltyTransaction } from '../models/mappers';
 
 export class LoyaltyController {
   static async getCustomers(branchId: string): Promise<{ success: boolean; customers?: Customer[]; error?: string }> {
@@ -109,7 +82,7 @@ export class LoyaltyController {
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return { success: true, transactions: (data ?? []).map(mapTransaction) };
+      return { success: true, transactions: (data ?? []).map(mapLoyaltyTransaction) };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -124,7 +97,7 @@ export class LoyaltyController {
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return { success: true, transactions: (data ?? []).map(mapTransaction) };
+      return { success: true, transactions: (data ?? []).map(mapLoyaltyTransaction) };
     } catch (err: any) {
       return { success: false, error: err.message };
     }

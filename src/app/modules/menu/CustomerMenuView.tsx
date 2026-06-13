@@ -28,7 +28,6 @@ export function CustomerMenuView() {
     tables,
     orders,
     currentUser,
-    supabase,
     refreshData
   } = usePOS();
 
@@ -132,90 +131,40 @@ export function CustomerMenuView() {
 
     setIsSending(true);
     try {
-      let orderId = tables.find(t => t.id === finalTableId)?.currentOrderId;
+      const tableObj = tables.find(t => t.id === finalTableId);
 
-      if (!orderId) {
-        orderId = `order-${Date.now()}`;
-        console.log('[handleSendToKitchen] Creating new order:', orderId, 'Type:', orderType);
+      const result = await OrderController.submitOrder({
+        branchId: currentUser.branchId,
+        orderType,
+        table: orderType === 'dine-in' && tableObj ? { id: tableObj.id, number: tableObj.number } : null,
+        existingOrderId: tableObj?.currentOrderId,
+        items: newItemsOnly.map(i => ({
+          productId: i.productId,
+          productName: i.productName,
+          quantity: i.quantity,
+          price: i.price,
+          notes: i.notes,
+        })),
+        addedBy: currentUser.id,
+        addedByName: currentUser.name,
+        waiterId: currentUser.id,
+      });
 
-        // Generate bill number for takeaway at creation
-        let billNo: string | null = null;
-        if (orderType === 'takeaway') {
-          const { data: lastBill } = await supabase
-            .from('orders')
-            .select('bill_number')
-            .eq('branch_id', currentUser.branchId)
-            .eq('order_type', 'takeaway')
-            .not('bill_number', 'is', null)
-            .order('bill_number', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
-          billNo = String(lastNum + 1).padStart(4, '0');
-        }
-
-        const { error: orderError } = await supabase.from('orders').insert([{
-          id: orderId,
-          table_id: orderType === 'dine-in' ? finalTableId : null,
-          table_number: orderType === 'dine-in' ? tables.find(t => t.id === finalTableId)?.number : 0,
-          status: 'open',
-          branch_id: currentUser.branchId,
-          order_type: orderType,
-          ...(billNo ? { bill_number: billNo } : {}),
-        }]).select();
-        
-        if (orderError) {
-          console.error('[handleSendToKitchen] Failed to create order:', orderError);
-          throw new Error('Failed to create order: ' + orderError.message);
-        }
-        
-        console.log('[handleSendToKitchen] Order created successfully');
-        
-        if (orderType === 'dine-in') {
-          const { error: tableError } = await supabase
-            .from('tables')
-            .update({ status: 'occupied', current_order_id: orderId })
-            .eq('id', finalTableId);
-          
-          if (tableError) {
-            console.error('[handleSendToKitchen] Failed to update table:', tableError);
-            throw new Error('Failed to update table: ' + tableError.message);
-          }
-        }
+      if (!result.success) {
+        toast.error('Failed to send order: ' + result.error);
+        return;
       }
-
-      const payload = newItemsOnly.map(i => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        order_id: orderId, product_id: i.productId, product_name: i.productName,
-        quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity,
-        status: 'pending', added_by: currentUser.id,
-        added_by_name: currentUser.name
-      }));
-
-      console.log('[handleSendToKitchen] Inserting order items:', payload.length, 'items');
-      
-      const { error: itemsError } = await supabase.from('order_items').insert(payload);
-      
-      if (itemsError) {
-        console.error('[handleSendToKitchen] Failed to insert order items:', itemsError);
-        throw new Error('Failed to insert order items: ' + itemsError.message);
-      }
-      
-      console.log('[handleSendToKitchen] Order items inserted successfully');
 
       setShowSuccess(true);
       setTimeout(async () => {
         setShowSuccess(false);
-        setSelectedTableId(null); 
-        setCartItems([]);         
-        setOrderType('dine-in');  
-        await refreshData();      
+        setSelectedTableId(null);
+        setCartItems([]);
+        setOrderType('dine-in');
+        await refreshData();
       }, 2000);
-    } catch (e: any) { 
-      console.error('[handleSendToKitchen] Error:', e);
-      toast.error('Failed to send order: ' + (e.message || 'Unknown error'));
-    } finally { 
-      setIsSending(false); 
+    } finally {
+      setIsSending(false);
     }
   };
 

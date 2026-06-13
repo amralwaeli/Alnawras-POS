@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { Product, Category, Table } from '../../models/types';
+import { OrderController } from '../../controllers/OrderController';
 import { toast } from 'sonner';
 import {
   Plus, Minus, ShoppingCart, X, Search,
@@ -184,53 +185,39 @@ export function QROrderingView() {
     if (!table || cartItems.length === 0) { toast.error('Add items to your order first.'); return; }
     setSubmitting(true);
     try {
-      let oid = orderId || table.currentOrderId;
+      const result = await OrderController.submitOrder({
+        branchId: table.branchId,
+        orderType: 'dine-in',
+        table: { id: table.id, number: table.number },
+        existingOrderId: orderId || table.currentOrderId,
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+          station: item.station,
+        })),
+        addedBy: 'guest',
+        addedByName: 'Guest',
+      });
 
-      if (!oid) {
-        oid = `order-${Date.now()}`;
-        await supabase.from('tables')
-          .update({ status: 'occupied', current_order_id: oid })
-          .eq('id', table.id).is('current_order_id', null);
-        await supabase.from('orders').insert([{
-          id: oid, table_id: table.id, table_number: table.number,
-          subtotal: 0, tax: 0, discount: 0, total: 0,
-          status: 'open', payment_status: 'unpaid', order_type: 'dine-in',
-          branch_id: table.branchId, waiters: [],
-        }]);
-        setOrderId(oid);
-        setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: oid! } : prev);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
       }
 
-      const payload = cartItems.map(item => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        order_id: oid, product_id: item.productId, product_name: item.productName,
-        quantity: item.quantity, price: item.price, subtotal: item.price * item.quantity,
-        status: 'pending', notes: item.notes || null,
-        added_by: 'guest', added_by_name: 'Guest', sent_to_kitchen: true,
-      }));
-
-      const { error } = await supabase.from('order_items').insert(payload);
-      if (error) throw new Error(error.message);
-
-      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', oid);
-      const subtotal = (allItems || []).reduce((s: number, i: any) => s + Number(i.subtotal), 0);
-      await supabase.from('orders').update({ subtotal, total: subtotal }).eq('id', oid);
-
-      // Refresh existing items
-      const { data: orderData } = await supabase.from('orders').select('*, order_items(*)').eq('id', oid).single();
-      if (orderData) {
-        setExistingItems((orderData.order_items || []).map((item: any) => ({
-          id: item.id, productId: item.product_id, productName: item.product_name,
-          price: Number(item.price), quantity: Number(item.quantity), status: item.status,
-        })));
-      }
+      setOrderId(result.data.id);
+      setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: result.data.id } : prev);
+      setExistingItems(result.data.items.map(item => ({
+        id: item.id, productId: item.productId, productName: item.productName,
+        price: item.price, quantity: item.quantity, status: item.status,
+      })));
 
       setCartItems([]);
       setExpandedNotes(null);
       setSuccess(true);
       setTimeout(() => { setSuccess(false); setMobileView('menu'); }, 2500);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to submit order.');
     } finally {
       setSubmitting(false);
     }

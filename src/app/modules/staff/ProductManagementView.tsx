@@ -267,10 +267,10 @@ export function ProductManagementView() {
       const result = await importProducts(importData);
 
       if (result.success) {
-        toast.success(`Successfully imported ${result.imported} products`);
-        if (result.errors && result.errors.length > 0) {
-          console.warn('Import errors:', result.errors);
-          toast.warning(`${result.errors.length} rows had errors — check the console for details`);
+        toast.success(`Successfully imported ${result.data.imported} products`);
+        if (result.data.errors && result.data.errors.length > 0) {
+          console.warn('Import errors:', result.data.errors);
+          toast.warning(`${result.data.errors.length} rows had errors — check the console for details`);
         }
       } else {
         toast.error(result.error || 'Failed to import products');

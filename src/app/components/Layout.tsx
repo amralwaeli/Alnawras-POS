@@ -32,7 +32,6 @@ export function Layout() {
     path: string; label: string; icon: any;
     permission: keyof typeof ROLE_PERMISSIONS['admin'];
     adminOnly?: boolean;
-    allowedRoles?: string[];
   };
 
   const allNavItems: NavItem[] = [
@@ -51,28 +50,24 @@ export function Layout() {
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true },
-    { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const, allowedRoles: ['accounting'] },
-    { path: '/invoices',   label: 'Invoices',   icon: FileText, permission: 'canManageInvoicesQuotations' as const, allowedRoles: ['accounting'] },
+    { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const },
+    { path: '/invoices',   label: 'Invoices',   icon: FileText, permission: 'canManageInvoicesQuotations' as const },
     { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const },
   ];
 
   const navItems = allNavItems.filter(item => {
-    if (item.adminOnly && currentUser.role !== 'admin' && !item.allowedRoles?.includes(currentUser.role)) return false;
-    if (item.allowedRoles?.includes(currentUser.role)) return true;
+    if (item.adminOnly && currentUser.role !== 'admin') return false;
     return !!permissions[item.permission];
   });
 
   // Workforce sub-nav items
   const workforceSubItems = [
-    { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const,    allowedRoles: ['manager', 'supervisor'] },
-    { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const, allowedRoles: ['manager', 'supervisor'] },
-    { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const,  allowedRoles: [] as string[] },
-    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const,    allowedRoles: ['manager'] },
-    { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const,    allowedRoles: [] as string[] },
-  ].filter(item => {
-    if (item.allowedRoles?.includes(currentUser.role)) return true;
-    return !!permissions[item.permission];
-  });
+    { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const },
+    { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const },
+    { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const },
+    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const },
+    { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const },
+  ].filter(item => !!permissions[item.permission]);
 
   const showWorkforce = workforceSubItems.length > 0;
 

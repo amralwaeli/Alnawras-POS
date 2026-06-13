@@ -27,10 +27,7 @@ export class AuthController {
 
     return {
       success: true,
-      user: {
-        ...user,
-        lastLogin: new Date(),
-      },
+      user: { ...user },
     };
   }
 

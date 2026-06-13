@@ -1,23 +1,6 @@
-import { Staff, UserRole } from '../models/types';
+import { Staff } from '../models/types';
+import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
-
-function mapDbRowToStaff(row: any): Staff {
-  return {
-    id: row.id,
-    name: row.name,
-    employmentNumber: row.employment_number,
-    role: row.role as UserRole,
-    pin: row.pin,
-    email: row.email,
-    status: row.status,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
-    lastLogin: row.last_login ? new Date(row.last_login) : undefined,
-    hourlyRate: row.hourly_rate || 0,
-    position: row.position || row.role,
-    hireDate: row.hire_date ? new Date(row.hire_date) : new Date(row.created_at),
-  };
-}
 
 export class StaffController {
   static async getStaff(activeOnly: boolean = false): Promise<{ success: boolean; data?: Staff[]; error?: string }> {
@@ -26,7 +9,7 @@ export class StaffController {
       if (activeOnly) query = query.eq('status', 'active');
       const { data, error } = await query;
       if (error) return { success: false, error: error.message };
-      return { success: true, data: (data || []).map(mapDbRowToStaff) };
+      return { success: true, data: (data || []).map(mapStaff) };
     } catch (err) {
       return { success: false, error: 'Failed to fetch staff' };
     }
@@ -65,7 +48,7 @@ export class StaffController {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: mapDbRowToStaff(data) };
+      return { success: true, data: mapStaff(data) };
     } catch (err) {
       return { success: false, error: 'Failed to add staff member' };
     }
@@ -95,7 +78,7 @@ export class StaffController {
         .single();
 
       if (error) return { success: false, error: error.message };
-      return { success: true, data: mapDbRowToStaff(data) };
+      return { success: true, data: mapStaff(data) };
     } catch (err) {
       return { success: false, error: 'Failed to update staff member' };
     }

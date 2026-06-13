@@ -1,3 +1,8 @@
+// ==================== Shared result envelope ====================
+
+// Discriminated union returned by all async controller methods.
+export type Result<T> = { success: true; data: T } | { success: false; error: string };
+
 // ==================== User & Authentication ====================
 
 export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor';
@@ -12,7 +17,6 @@ export interface User {
   status: 'active' | 'inactive';
   branchId: string;
   createdAt: Date;
-  lastLogin?: Date;
 }
 
 export interface Staff extends User {
@@ -68,6 +72,7 @@ export interface Order {
   cashierId?: string;
   cashierName?: string;
   paymentMethod?: string;
+  billNumber?: string;
 }
 
 // ==================== Products & Inventory ====================
@@ -318,7 +323,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canProcessPayments: true,
     canManageInventory: true,
     canViewReports: true,
-    canManageStaff: false,
+    canManageStaff: true,
     canManageAccounting: false,
     canExportReports: true,
     canImportProducts: false,
@@ -335,7 +340,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canProcessPayments: false,
     canManageInventory: true,
     canViewReports: true,
-    canManageStaff: false,
+    canManageStaff: true,
     canManageAccounting: false,
     canExportReports: false,
     canImportProducts: false,
@@ -412,7 +417,6 @@ export interface Employee {
 // Unified view: employee + their user account data + live attendance snapshot
 export interface EmployeeWithUser extends Employee {
   pin?: string;
-  lastLogin?: Date;
   todayStatus?: 'present' | 'absent' | 'not-checked-in';
   todayCheckIn?: Date;
   todayCheckOut?: Date;

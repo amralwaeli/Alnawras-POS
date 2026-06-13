@@ -1,21 +1,15 @@
-import { Table, Order, User } from '../models/types';
+import { Table, User, Result } from '../models/types';
 import { AuthController } from './AuthController';
+import { mapTable } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 
 export class TableController {
   /**
    * Get all tables from database
    */
-  static async getTables(user: User): Promise<{
-    success: boolean;
-    tables?: Table[];
-    error?: string;
-  }> {
+  static async getTables(user: User): Promise<Result<Table[]>> {
     if (!AuthController.hasPermission(user, 'canViewTables')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot view tables',
-      };
+      return { success: false, error: 'Unauthorized: Cannot view tables' };
     }
 
     try {
@@ -26,28 +20,10 @@ export class TableController {
         .order('number');
 
       if (error) throw error;
-
-      const tables: Table[] = data.map(table => ({
-        id: table.id,
-        number: table.number,
-        capacity: table.capacity,
-        status: table.status,
-        branchId: table.branch_id,
-        currentOrderId: table.current_order_id,
-        assignedCashierId: table.assigned_cashier_id,
-        needsWaiter: table.needs_waiter ?? false,
-      }));
-
-      return {
-        success: true,
-        tables,
-      };
+      return { success: true, data: (data || []).map(mapTable) };
     } catch (error) {
       console.error('Error fetching tables:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch tables',
-      };
+      return { success: false, error: 'Failed to fetch tables' };
     }
   }
 
@@ -57,16 +33,9 @@ export class TableController {
   static async addTable(
     tableData: { number: number; capacity: number },
     user: User
-  ): Promise<{
-    success: boolean;
-    table?: Table;
-    error?: string;
-  }> {
+  ): Promise<Result<Table>> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage tables',
-      };
+      return { success: false, error: 'Unauthorized: Cannot manage tables' };
     }
 
     try {
@@ -83,28 +52,10 @@ export class TableController {
         .single();
 
       if (error) throw error;
-
-      const table: Table = {
-        id: data.id,
-        number: data.number,
-        capacity: data.capacity,
-        status: data.status,
-        branchId: data.branch_id,
-        currentOrderId: data.current_order_id,
-        assignedCashierId: data.assigned_cashier_id,
-        needsWaiter: data.needs_waiter ?? false,
-      };
-
-      return {
-        success: true,
-        table,
-      };
+      return { success: true, data: mapTable(data) };
     } catch (error) {
       console.error('Error adding table:', error);
-      return {
-        success: false,
-        error: 'Failed to add table',
-      };
+      return { success: false, error: 'Failed to add table' };
     }
   }
 
@@ -115,16 +66,9 @@ export class TableController {
     tableId: string,
     updates: Partial<{ number: number; capacity: number; status: string; assignedCashierId?: string }>,
     user: User
-  ): Promise<{
-    success: boolean;
-    table?: Table;
-    error?: string;
-  }> {
+  ): Promise<Result<Table>> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage tables',
-      };
+      return { success: false, error: 'Unauthorized: Cannot manage tables' };
     }
 
     try {
@@ -142,46 +86,19 @@ export class TableController {
         .single();
 
       if (error) throw error;
-
-      const table: Table = {
-        id: data.id,
-        number: data.number,
-        capacity: data.capacity,
-        status: data.status,
-        branchId: data.branch_id,
-        currentOrderId: data.current_order_id,
-        assignedCashierId: data.assigned_cashier_id,
-        needsWaiter: data.needs_waiter ?? false,
-      };
-
-      return {
-        success: true,
-        table,
-      };
+      return { success: true, data: mapTable(data) };
     } catch (error) {
       console.error('Error updating table:', error);
-      return {
-        success: false,
-        error: 'Failed to update table',
-      };
+      return { success: false, error: 'Failed to update table' };
     }
   }
 
   /**
    * Delete table
    */
-  static async deleteTable(
-    tableId: string,
-    user: User
-  ): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  static async deleteTable(tableId: string, user: User): Promise<Result<void>> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage tables',
-      };
+      return { success: false, error: 'Unauthorized: Cannot manage tables' };
     }
 
     try {
@@ -192,35 +109,19 @@ export class TableController {
         .eq('branch_id', user.branchId);
 
       if (error) throw error;
-
-      return {
-        success: true,
-      };
+      return { success: true, data: undefined };
     } catch (error) {
       console.error('Error deleting table:', error);
-      return {
-        success: false,
-        error: 'Failed to delete table',
-      };
+      return { success: false, error: 'Failed to delete table' };
     }
   }
 
   /**
    * Get table by ID
    */
-  static async getTableById(
-    tableId: string,
-    user: User
-  ): Promise<{
-    success: boolean;
-    table?: Table;
-    error?: string;
-  }> {
+  static async getTableById(tableId: string, user: User): Promise<Result<Table>> {
     if (!AuthController.hasPermission(user, 'canViewTables')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot view tables',
-      };
+      return { success: false, error: 'Unauthorized: Cannot view tables' };
     }
 
     try {
@@ -232,36 +133,17 @@ export class TableController {
         .single();
 
       if (error) throw error;
-
-      const table: Table = {
-        id: data.id,
-        number: data.number,
-        capacity: data.capacity,
-        status: data.status,
-        branchId: data.branch_id,
-        currentOrderId: data.current_order_id,
-        assignedCashierId: data.assigned_cashier_id,
-        needsWaiter: data.needs_waiter ?? false,
-      };
+      const table = mapTable(data);
 
       // Cashiers can only see their assigned tables
       if (user.role === 'cashier' && table.assignedCashierId !== user.id) {
-        return {
-          success: false,
-          error: 'Unauthorized: Cannot view this table',
-        };
+        return { success: false, error: 'Unauthorized: Cannot view this table' };
       }
 
-      return {
-        success: true,
-        table,
-      };
+      return { success: true, data: table };
     } catch (error) {
       console.error('Error fetching table:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch table',
-      };
+      return { success: false, error: 'Failed to fetch table' };
     }
   }
 }

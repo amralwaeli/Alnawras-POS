@@ -5,17 +5,15 @@ import { usePOS } from './context/POSContext';
 import { ROLE_PERMISSIONS } from './models/types';
 import { ProductManagementView } from './modules/staff';
 
-function ProtectedRoute({ children, permission, adminOnly, allowedRoles }: {
+function ProtectedRoute({ children, permission, adminOnly }: {
   children: React.ReactNode;
   permission?: keyof typeof ROLE_PERMISSIONS['admin'];
   adminOnly?: boolean;
-  allowedRoles?: string[];
 }) {
   const { currentUser } = usePOS();
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  const isAllowed = allowedRoles?.includes(currentUser.role) ?? false;
-  if (adminOnly && currentUser.role !== 'admin' && !isAllowed) return <Navigate to="/" replace />;
-  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission] && !isAllowed) return <Navigate to="/" replace />;
+  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
+  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -125,15 +123,15 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
-      { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><QuotationsView /></ProtectedRoute></Lazy> },
-      { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" allowedRoles={['accounting']}><InvoicesView /></ProtectedRoute></Lazy> },
+      { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><QuotationsView /></ProtectedRoute></Lazy> },
+      { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><InvoicesView /></ProtectedRoute></Lazy> },
 
       // ── Workforce (unified module) ──
       {
         path: 'workforce',
         element: (
           <Lazy>
-            <ProtectedRoute permission="canManageStaff" allowedRoles={['manager', 'supervisor']}>
+            <ProtectedRoute permission="canManageStaff">
               <WorkforceLayout />
             </ProtectedRoute>
           </Lazy>

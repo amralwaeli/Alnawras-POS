@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User } from '../models/types';
 import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
+import { mapStaff } from '../models/mappers';
+import { supabase } from '../../lib/supabase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -35,6 +37,23 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   }, []);
 
   const login = async (pin: string) => {
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return { success: false, error: 'PIN must be 4 digits' };
+    }
+
+    // Primary path: verify server-side so no PIN is ever sent to the client.
+    // Requires migration 0004 (verify_staff_pin). If that RPC is not yet
+    // present, fall back to the legacy in-memory compare so the app keeps
+    // working — remove this fallback once 0004 is applied (see SECURITY.md).
+    const { data, error } = await supabase.rpc('verify_staff_pin', { p_pin: pin });
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return { success: false, error: 'Invalid PIN or inactive account' };
+      const user = mapStaff(row);
+      setCurrentUser(user);
+      return { success: true, user };
+    }
+
     const result = AuthController.authenticate(pin, users);
     if (result.success) setCurrentUser(result.user!);
     return result;

@@ -106,8 +106,8 @@ export function DashboardView() {
   const todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today);
   const todayCompleted = todayOrders.filter(o => o.status === 'completed');
   const todayRevenue = todayCompleted.reduce((sum, o) => sum + orderTotal(o), 0);
-  const todayTakeaway = todayOrders.filter(o => o.order_type === 'takeaway').length;
-  const todayDineIn = todayOrders.filter(o => o.order_type === 'dine-in').length;
+  const todayTakeaway = todayOrders.filter(o => o.orderType === 'takeaway').length;
+  const todayDineIn = todayOrders.filter(o => o.orderType === 'dine-in').length;
 
   // Revenue data for last 7 days
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -253,13 +253,13 @@ export function DashboardView() {
                 <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className={`size-10 rounded-xl flex items-center justify-center ${
-                      order.order_type === 'takeaway' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'
+                      order.orderType === 'takeaway' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'
                     }`}>
-                      {order.order_type === 'takeaway' ? '🛍️' : order.tableNumber}
+                      {order.orderType === 'takeaway' ? '🛍️' : order.tableNumber}
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">
-                        {order.order_type === 'takeaway' ? 'Takeaway' : `Table ${order.tableNumber}`}
+                        {order.orderType === 'takeaway' ? 'Takeaway' : `Table ${order.tableNumber}`}
                         {order.billNumber ? ` #${order.billNumber}` : ''}
                       </p>
                       <p className="text-xs text-gray-500">

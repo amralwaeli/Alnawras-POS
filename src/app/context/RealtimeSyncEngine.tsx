@@ -1,7 +1,7 @@
 /**
  * RealtimeSyncProvider
- * 
- * Owns ALL Supabase real-time subscriptions and the polling heartbeat.
+ *
+ * Owns ALL Supabase real-time subscriptions and the initial load.
  * Writes to Orders, Tables, and Catalog state via context setters.
  * No feature module should import this directly — it runs as a root wrapper.
  */
@@ -9,8 +9,9 @@ import { useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
+import { mapOrder, mapOrderItem, mapProduct, mapTable } from '../models/mappers';
 import { useAuth } from './AuthContext';
-import { useOrders, mapOrder, mapOrderItem } from './OrdersContext';
+import { useOrders } from './OrdersContext';
 import { useTables } from './TablesContext';
 import { useCatalog } from './CatalogContext';
 
@@ -35,9 +36,9 @@ export function RealtimeSyncEngine() {
         .or(`status.eq.open,and(status.eq.completed,created_at.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()})`),
     ]);
 
-    if (prodRes.success)   setProducts(prodRes.products || []);
-    if (catRes.success)    setCategories(catRes.categories || []);
-    if (tableRes.success)  setTables(tableRes.tables || []);
+    if (prodRes.success)   setProducts(prodRes.data);
+    if (catRes.success)    setCategories(catRes.data);
+    if (tableRes.success)  setTables(tableRes.data);
     if (ordersRes.data)    setOrders(ordersRes.data.map(mapOrder));
   }, [currentUser, setProducts, setCategories, setTables, setOrders]);
 
@@ -50,26 +51,17 @@ export function RealtimeSyncEngine() {
       .channel('pos-ultra-sync')
       // Tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branchId}` }, (p) => {
-        const table = (p.new || p.old) as any;
-        setTables(prev => {
-          if (!prev.find(t => t.id === table.id))
-            return [...prev, { ...table, currentOrderId: table.current_order_id }];
-          return prev.map(t =>
-            t.id === table.id ? { ...t, ...table, currentOrderId: table.current_order_id } : t
-          );
-        });
+        const mapped = mapTable((p.new || p.old) as any);
+        setTables(prev =>
+          prev.some(t => t.id === mapped.id)
+            ? prev.map(t => t.id === mapped.id ? mapped : t)
+            : [...prev, mapped]
+        );
       })
       // Product updates
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
-        const up = p.new as any;
-        setProducts(prev => prev.map(prod =>
-          prod.id === up.id ? {
-            ...prod, ...up,
-            categoryId:        up.category_id,
-            availabilityStatus: up.availability_status || 'available',
-            kitchenStatus:     up.kitchen_status       || 'available',
-          } : prod
-        ));
+        const mapped = mapProduct(p.new as any);
+        setProducts(prev => prev.map(prod => prod.id === mapped.id ? mapped : prod));
       })
       // Orders
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, async (payload) => {
@@ -102,9 +94,9 @@ export function RealtimeSyncEngine() {
       // Categories
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `branch_id=eq.${branchId}` }, async () => {
         const res = await CategoryController.getCategories(currentUser);
-        if (res.success) setCategories(res.categories || []);
+        if (res.success) setCategories(res.data);
       })
-      // Order items — filtered by branch via order_id membership in state
+      // Order items — filtered by branch via the branch_id column
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `branch_id=eq.${branchId}` }, (payload) => {
         const item = (payload.new || payload.old) as any;
         if (!item?.order_id) return;

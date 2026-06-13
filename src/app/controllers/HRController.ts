@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
-import { Employee, EmployeeFingerprint, AttendanceLog, PayrollSummary } from '../models/types';
+import { Employee, AttendanceLog, PayrollSummary } from '../models/types';
+import { mapEmployee, mapFingerprint, mapAttendanceLog, mapPayroll } from '../models/mappers';
 
 // ─────────────────────────────────────────────
 // Utility: generate IDs
@@ -56,87 +57,6 @@ function minutesToTime(mins: number): string {
 function nowTimeString(): string {
   const n = new Date();
   return `${n.getHours().toString().padStart(2, '0')}:${n.getMinutes().toString().padStart(2, '0')}`;
-}
-
-// ─────────────────────────────────────────────
-// DB Row → App Type Mappers
-// ─────────────────────────────────────────────
-function mapEmployee(row: any): Employee {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    employeeId: row.employee_id,
-    fullName: row.full_name,
-    role: row.role,
-    monthlySalary: Number(row.monthly_salary),
-    shiftStart: row.shift_start,
-    shiftEnd: row.shift_end,
-    earlyCheckinMinutes: row.early_checkin_minutes,
-    lateCheckoutMinutes: row.late_checkout_minutes,
-    status: row.status,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
-
-function mapFingerprint(row: any): EmployeeFingerprint {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    templateData: row.template_data,
-    templateHash: row.template_hash,
-    fingerIndex: row.finger_index,
-    qualityScore: row.quality_score,
-    isActive: row.is_active,
-    enrolledBy: row.enrolled_by,
-    enrolledAt: new Date(row.enrolled_at),
-  };
-}
-
-function mapAttendanceLog(row: any): AttendanceLog {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    fullName: row.full_name,
-    logDate: row.log_date,
-    checkInTime: row.check_in_time ? new Date(row.check_in_time) : undefined,
-    checkOutTime: row.check_out_time ? new Date(row.check_out_time) : undefined,
-    scheduledStart: row.scheduled_start,
-    scheduledEnd: row.scheduled_end,
-    lateMinutes: row.late_minutes || 0,
-    earlyLeaveMinutes: row.early_leave_minutes || 0,
-    overtimeMinutes: row.overtime_minutes || 0,
-    status: row.status,
-    checkInMethod: row.check_in_method,
-    checkOutMethod: row.check_out_method,
-    notes: row.notes,
-    branchId: row.branch_id,
-  };
-}
-
-function mapPayroll(row: any): PayrollSummary {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    fullName: row.full_name,
-    month: row.month,
-    year: row.year,
-    monthlySalary: Number(row.monthly_salary),
-    workingDays: row.working_days,
-    presentDays: row.present_days,
-    absentDays: row.absent_days,
-    totalLateMinutes: row.total_late_minutes,
-    totalOvertimeMinutes: row.total_overtime_minutes,
-    lateDeduction: Number(row.late_deduction),
-    overtimeBonus: Number(row.overtime_bonus),
-    netSalary: Number(row.net_salary),
-    status: row.status,
-    approvedBy: row.approved_by,
-    approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
-  };
 }
 
 // ─────────────────────────────────────────────

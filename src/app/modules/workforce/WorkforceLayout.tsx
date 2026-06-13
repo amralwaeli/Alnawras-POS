@@ -4,11 +4,11 @@ import { usePOS } from '../../context/POSContext';
 import { ROLE_PERMISSIONS } from '../../models/types';
 
 const subNav = [
-  { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const,    allowedRoles: ['manager', 'supervisor'] },
-  { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const, allowedRoles: ['manager', 'supervisor'] },
-  { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const,  allowedRoles: [] as string[] },
-  { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const,    allowedRoles: ['manager'] },
-  { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const,    allowedRoles: [] as string[] },
+  { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const },
+  { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const },
+  { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const },
+  { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const },
+  { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const },
 ];
 
 export function WorkforceLayout() {
@@ -17,10 +17,7 @@ export function WorkforceLayout() {
 
   const perms = ROLE_PERMISSIONS[currentUser.role];
 
-  const visibleNav = subNav.filter(item => {
-    if (item.allowedRoles?.includes(currentUser.role)) return true;
-    return !!perms[item.permission];
-  });
+  const visibleNav = subNav.filter(item => !!perms[item.permission]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

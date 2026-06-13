@@ -1,8 +1,9 @@
 import { supabase } from '../../lib/supabase';
 import {
   Employee, EmployeeWithUser, CreateEmployeeInput, EmployeeFilters,
-  UserRole, LeaveRequest, LeaveFilters,
+  LeaveRequest, LeaveFilters, Result,
 } from '../models/types';
+import { mapEmployee, mapLeaveRequest } from '../models/mappers';
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -29,35 +30,6 @@ async function nextEmployeeNumber(branchId: string): Promise<string> {
   const seq = ((count ?? 0) + 1).toString().padStart(3, '0');
   return `EMP-${seq}`;
 }
-
-// ─── Mappers ──────────────────────────────────────────────────────────────────
-function mapEmployee(row: any): Employee {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    employeeId: row.employee_id,
-    employeeNumber: row.employee_number,
-    fullName: row.full_name,
-    email: row.email,
-    phone: row.phone,
-    role: row.role,
-    department: row.department,
-    hireDate: row.hire_date,
-    monthlySalary: Number(row.monthly_salary),
-    shiftStart: row.shift_start,
-    shiftEnd: row.shift_end,
-    earlyCheckinMinutes: row.early_checkin_minutes,
-    lateCheckoutMinutes: row.late_checkout_minutes,
-    status: row.status,
-    avatarUrl: row.avatar_url,
-    notes: row.notes,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
-
-type Result<T> = { success: true; data: T } | { success: false; error: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkforceController
@@ -131,7 +103,7 @@ export class WorkforceController {
     const employee = mapEmployee(empRow);
     return {
       success: true,
-      data: { ...employee, pin: userRow.pin, lastLogin: undefined },
+      data: { ...employee, pin: userRow.pin },
     };
   }
 
@@ -221,9 +193,7 @@ export class WorkforceController {
         return {
           ...emp,
           hasFingerprint: fpSet.has(emp.employeeId),
-          todayStatus: log
-            ? (log.check_out_time ? 'present' : 'present')
-            : 'not-checked-in',
+          todayStatus: log ? 'present' : 'not-checked-in',
           todayCheckIn: log?.check_in_time ? new Date(log.check_in_time) : undefined,
           todayCheckOut: log?.check_out_time ? new Date(log.check_out_time) : undefined,
         };
@@ -521,32 +491,10 @@ export class WorkforceController {
       const { data, error } = await query;
       if (error) throw error;
 
-      return {
-        success: true,
-        data: (data ?? []).map((r: any) => ({
-          ...mapLeaveRequest(r),
-          employeeName: r.employees?.full_name ?? undefined,
-        })),
-      };
+      return { success: true, data: (data ?? []).map(mapLeaveRequest) };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 }
 
-function mapLeaveRequest(row: any): LeaveRequest {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    leaveType: row.leave_type,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    daysCount: row.days_count,
-    reason: row.reason ?? undefined,
-    status: row.status,
-    reviewedBy: row.reviewed_by ?? undefined,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at) : undefined,
-    branchId: row.branch_id,
-    createdAt: new Date(row.created_at),
-  };
-}

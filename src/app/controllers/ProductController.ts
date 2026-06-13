@@ -1,26 +1,20 @@
-import { Product, Category, ProductImportData, User } from '../models/types';
+import { Product, Category, ProductImportData, User, Result } from '../models/types';
 import { AuthController } from './AuthController';
+import { mapProduct, mapCategory } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 
 export class ProductController {
   /**
-   * Get all products from database with strict mapping and defaults
+   * Get all products from database
    */
-  static async getProducts(user: User): Promise<{
-    success: boolean;
-    products?: Product[];
-    error?: string;
-  }> {
+  static async getProducts(user: User): Promise<Result<Product[]>> {
     // Kitchen needs canManageInventory, others need canViewTables
-    const canView = user.role === 'kitchen' 
+    const canView = user.role === 'kitchen'
       ? AuthController.hasPermission(user, 'canManageInventory')
       : AuthController.hasPermission(user, 'canViewTables');
-    
+
     if (!canView) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot view products',
-      };
+      return { success: false, error: 'Unauthorized: Cannot view products' };
     }
 
     try {
@@ -32,39 +26,10 @@ export class ProductController {
         .order('name');
 
       if (error) throw error;
-
-      // FIX: Ensure all database fields (snake_case) map correctly to Typescript (camelCase)
-      const products: Product[] = (data || []).map(product => ({
-        id: product.id,
-        name: product.name,
-        categoryId: product.category_id, // CRITICAL FIX: Mapping category_id
-        category: product.category,
-        price: Number(product.price),
-        stock: product.stock,
-        image: product.image,
-        sku: product.sku,
-        taxRate: product.tax_rate,
-        reorderPoint: product.reorder_point,
-        branchId: product.branch_id,
-        // STATION DEFAULTING: If NULL, default to 'kitchen'
-        station: product.station || 'kitchen',
-        // STATUS DEFAULTING: Ensure products aren't hidden by NULL statuses
-        kitchenStatus: product.kitchen_status || 'available',
-        availabilityStatus: product.availability_status || product.kitchen_status || 'available',
-        isActive: product.is_active ?? true, 
-        createdAt: new Date(product.created_at),
-      }));
-
-      return {
-        success: true,
-        products,
-      };
+      return { success: true, data: (data || []).map(mapProduct) };
     } catch (error) {
       console.error('Error fetching products:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch products',
-      };
+      return { success: false, error: 'Failed to fetch products' };
     }
   }
 
@@ -74,16 +39,9 @@ export class ProductController {
   static async addProduct(
     productData: Omit<Product, 'id' | 'createdAt'>,
     user: User
-  ): Promise<{
-    success: boolean;
-    product?: Product;
-    error?: string;
-  }> {
+  ): Promise<Result<Product>> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
-      return {
-        success: false,
-        error: 'Unauthorized: Cannot manage products',
-      };
+      return { success: false, error: 'Unauthorized: Cannot manage products' };
     }
 
     try {
@@ -110,27 +68,7 @@ export class ProductController {
         .single();
 
       if (error) throw error;
-
-      const product: Product = {
-        id: data.id,
-        name: data.name,
-        categoryId: data.category_id,
-        category: data.category,
-        price: data.price,
-        stock: data.stock,
-        image: data.image,
-        sku: data.sku,
-        taxRate: data.tax_rate,
-        reorderPoint: data.reorder_point,
-        branchId: data.branch_id,
-        station: data.station,
-        availabilityStatus: data.availability_status,
-        kitchenStatus: data.kitchen_status,
-        isActive: data.is_active,
-        createdAt: new Date(data.created_at),
-      };
-
-      return { success: true, product };
+      return { success: true, data: mapProduct(data) };
     } catch (error) {
       console.error('Error adding product:', error);
       return { success: false, error: 'Failed to add product' };
@@ -144,10 +82,7 @@ export class ProductController {
     productId: string,
     updates: Partial<Product>,
     user: User
-  ): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  ): Promise<Result<void>> {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
       return { success: false, error: 'Unauthorized: Cannot manage products' };
     }
@@ -177,12 +112,8 @@ export class ProductController {
         .eq('id', productId)
         .eq('branch_id', user.branchId);
 
-      if (error) {
-        console.error('updateProduct DB error:', error);
-        throw error;
-      }
-
-      return { success: true };
+      if (error) throw error;
+      return { success: true, data: undefined };
     } catch (error) {
       console.error('updateProduct failed:', error);
       return { success: false, error: 'Failed to update product' };
@@ -192,7 +123,7 @@ export class ProductController {
   /**
    * Delete product (soft delete)
    */
-  static async deleteProduct(productId: string, user: User) {
+  static async deleteProduct(productId: string, user: User): Promise<Result<void>> {
     try {
       const { error } = await supabase
         .from('products')
@@ -200,24 +131,19 @@ export class ProductController {
         .eq('id', productId)
         .eq('branch_id', user.branchId);
       if (error) throw error;
-      return { success: true };
+      return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: 'Failed to delete' };
     }
   }
 
   /**
-   * Import products from Excel data (Full batch logic)
+   * Import products from Excel data (creates missing categories, batched inserts)
    */
   static async importProducts(
     importData: ProductImportData[],
     user: User
-  ): Promise<{
-    success: boolean;
-    imported?: number;
-    errors?: string[];
-    error?: string;
-  }> {
+  ): Promise<Result<{ imported: number; errors?: string[] }>> {
     if (!AuthController.hasPermission(user, 'canImportProducts')) {
       return { success: false, error: 'Unauthorized: Cannot import products' };
     }
@@ -284,7 +210,7 @@ export class ProductController {
           branch_id: user.branchId,
           is_active: true,
           station: 'kitchen',
-          availability_status: 'available'
+          availability_status: 'available',
         });
       });
 
@@ -293,17 +219,13 @@ export class ProductController {
         const chunk = productRows.slice(i, i + CHUNK_SIZE);
         const { error: prodError } = await supabase.from('products').insert(chunk);
         if (prodError) {
-            errors.push(`Chunk error: ${prodError.message}`);
+          errors.push(`Chunk error: ${prodError.message}`);
         } else {
-            imported += chunk.length;
+          imported += chunk.length;
         }
       }
 
-      return {
-        success: true,
-        imported,
-        errors: errors.length > 0 ? errors : undefined,
-      };
+      return { success: true, data: { imported, errors: errors.length > 0 ? errors : undefined } };
     } catch (error) {
       return { success: false, error: 'Import failed' };
     }
@@ -311,7 +233,7 @@ export class ProductController {
 }
 
 export class CategoryController {
-  static async getCategories(user: User) {
+  static async getCategories(user: User): Promise<Result<Category[]>> {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -320,47 +242,42 @@ export class CategoryController {
         .eq('is_active', true)
         .order('display_order');
       if (error) throw error;
-      return { success: true, categories: data.map(c => ({
-          id: c.id,
-          name: c.name,
-          description: c.description,
-          color: c.color,
-          icon: c.icon,
-          displayOrder: c.display_order,
-          isActive: c.is_active,
-          branchId: c.branch_id,
-          createdAt: new Date(c.created_at)
-      }))};
-    } catch (e) { return { success: false }; }
+      return { success: true, data: (data || []).map(mapCategory) };
+    } catch (e: any) {
+      return { success: false, error: e?.message ?? 'Failed to fetch categories' };
+    }
   }
 
-  static async addCategory(data: any, user: User) {
+  static async addCategory(data: any, user: User): Promise<Result<Category>> {
     const { data: cat, error } = await supabase.from('categories').insert({
-        id: `cat-${Date.now()}`,
-        name: data.name,
-        description: data.description || null,
-        color: data.color || '#3B82F6',
-        icon: data.icon || null,
-        branch_id: user.branchId,
-        is_active: true,
-        display_order: data.displayOrder || 0
+      id: `cat-${Date.now()}`,
+      name: data.name,
+      description: data.description || null,
+      color: data.color || '#3B82F6',
+      icon: data.icon || null,
+      branch_id: user.branchId,
+      is_active: true,
+      display_order: data.displayOrder || 0,
     }).select().single();
-    return { success: !error, category: cat, error: error?.message };
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: mapCategory(cat) };
   }
 
-  static async updateCategory(id: string, updates: any, user: User) {
+  static async updateCategory(id: string, updates: any, _user: User): Promise<Result<Category>> {
     const { data: cat, error } = await supabase.from('categories').update({
-        name: updates.name,
-        description: updates.description,
-        color: updates.color,
-        icon: updates.icon,
-        display_order: updates.displayOrder
+      name: updates.name,
+      description: updates.description,
+      color: updates.color,
+      icon: updates.icon,
+      display_order: updates.displayOrder,
     }).eq('id', id).select().single();
-    return { success: !error, category: cat, error: error?.message };
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: mapCategory(cat) };
   }
 
-  static async deleteCategory(id: string, user: User) {
+  static async deleteCategory(id: string, _user: User): Promise<Result<void>> {
     const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
-    return { success: !error };
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: undefined };
   }
 }

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Product, Category, Table, Order, OrderItem } from '../../models/types';
+import { mapOrder } from '../../models/mappers';
+import { OrderController } from '../../controllers/OrderController';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -22,46 +24,6 @@ interface CartItem {
   price: number;
   quantity: number;
   notes: string;
-}
-
-function mapOrderItem(row: any): OrderItem {
-  return {
-    id: row.id,
-    productId: row.product_id,
-    productName: row.product_name,
-    quantity: Number(row.quantity),
-    price: Number(row.price),
-    subtotal: Number(row.subtotal),
-    addedBy: row.added_by ?? 'guest',
-    addedByName: row.added_by_name ?? 'Guest',
-    addedAt: row.created_at ? new Date(row.created_at) : new Date(),
-    station: row.station ?? 'kitchen',
-    status: row.status,
-    notes: row.notes ?? '',
-    sentToKitchen: row.sent_to_kitchen ?? true,
-  };
-}
-
-function mapOrder(row: any): Order {
-  return {
-    id: row.id,
-    tableId: row.table_id,
-    tableNumber: row.table_number,
-    items: (row.order_items || []).map(mapOrderItem),
-    subtotal: Number(row.subtotal),
-    tax: Number(row.tax || 0),
-    discount: Number(row.discount || 0),
-    total: Number(row.total),
-    status: row.status,
-    paymentStatus: row.payment_status ?? 'unpaid',
-    orderType: row.order_type ?? 'dine-in',
-    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-    completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-    waiters: row.waiters || [],
-    cashierId: row.cashier_id,
-    cashierName: row.cashier_name,
-    paymentMethod: row.payment_method,
-  };
 }
 
 function formatCurrency(value: number) {
@@ -248,99 +210,33 @@ export function TableOrderingView() {
     setSubmitting(true);
 
     try {
-      let orderId = order?.id || table.currentOrderId;
-      let shouldCreateOrder = false;
+      const result = await OrderController.submitOrder({
+        branchId: table.branchId,
+        orderType: 'dine-in',
+        table: { id: table.id, number: table.number },
+        existingOrderId: order?.id || table.currentOrderId,
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+        })),
+        addedBy: currentUser?.id ?? 'guest',
+        addedByName: currentUser?.name ?? 'Guest',
+        waiterId: currentUser?.id,
+      });
 
-      if (!orderId) {
-        orderId = `order-${Date.now()}`;
-        shouldCreateOrder = true;
+      if (!result.success) {
+        toast.error(result.error);
+        return;
       }
 
-      if (shouldCreateOrder) {
-        const { data: tableResponse, error: updateError } = await supabase
-          .from('tables')
-          .update({ status: 'occupied', current_order_id: orderId })
-          .eq('id', table.id)
-          .is('current_order_id', null)
-          .select('current_order_id, status')
-          .single();
-
-        if (updateError && updateError.details) {
-          const refreshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          if (refreshTable.data?.current_order_id) {
-            orderId = refreshTable.data.current_order_id;
-          } else {
-            throw new Error(updateError.message || 'Could not reserve table');
-          }
-        }
-
-        if (!tableResponse?.current_order_id) {
-          const freshTable = await supabase.from('tables').select('*').eq('id', table.id).single();
-          orderId = freshTable.data?.current_order_id || orderId;
-        }
-
-        const { error: createError } = await supabase.from('orders').insert([{ 
-          id: orderId,
-          table_id: table.id,
-          table_number: table.number,
-          subtotal: 0,
-          tax: 0,
-          discount: 0,
-          total: 0,
-          status: 'open',
-          payment_status: 'unpaid',
-          order_type: 'dine-in',
-          branch_id: table.branchId,
-          waiters: currentUser?.id ? [currentUser.id] : [],
-        }]);
-
-        if (createError) {
-          throw new Error(createError.message || 'Could not create order');
-        }
-      }
-
-      const newItems = cartItems.map(item => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        order_id: orderId,
-        product_id: item.productId,
-        product_name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.price * item.quantity,
-        status: 'pending',
-        notes: item.notes || null,
-        added_by: currentUser?.id ?? 'guest',
-        added_by_name: currentUser?.name ?? 'Guest',
-        sent_to_kitchen: true,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(newItems);
-      if (itemsError) {
-        throw new Error(itemsError.message || 'Could not send items to kitchen');
-      }
-
-      const { data: allItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-      const subtotal = (allItems || []).reduce((sum, item: any) => sum + Number(item.subtotal), 0);
-      const tax = 0;
-      const total = subtotal + tax;
-
-      const { error: orderUpdateError } = await supabase.from('orders').update({ subtotal, tax, total }).eq('id', orderId);
-      if (orderUpdateError) {
-        throw new Error(orderUpdateError.message || 'Could not update order totals');
-      }
-
-      const { data: savedOrder } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
-      if (savedOrder) {
-        setOrder(mapOrder(savedOrder));
-        setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: orderId } : prev);
-      }
-
+      setOrder(result.data);
+      setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: result.data.id } : prev);
       setCartItems([]);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error: any) {
-      console.error('[TableOrderingView]', error);
-      toast.error(error?.message || 'Failed to submit order.');
     } finally {
       setSubmitting(false);
     }

@@ -88,16 +88,10 @@ export function TablesView() {
 
   const openOrderModal = async (tableId: string) => {
     try {
-      console.log('[openOrderModal] Opening bill for table:', tableId);
-      
       const table = tables.find(t => t.id === tableId);
-      console.log('[openOrderModal] Table found:', table);
-      
       const localOrder = getOrder(tableId);
-      console.log('[openOrderModal] Local order:', localOrder);
 
       if (localOrder && localOrder.items?.length > 0) {
-        console.log('[openOrderModal] Using local order with items');
         setSelectedOrder({ ...localOrder, tableId, tableNumber: table?.number });
         return;
       }
@@ -108,7 +102,6 @@ export function TablesView() {
       let error: any = null;
 
       if (table?.currentOrderId) {
-        console.log('[openOrderModal] Fetching from Supabase by orderId:', table.currentOrderId);
         const result = await supabase
           .from('orders')
           .select(`*, order_items (${orderItemsSelect})`)
@@ -121,7 +114,6 @@ export function TablesView() {
 
       // Fallback: find any open order for this table by table_id
       if (!data) {
-        console.log('[openOrderModal] Fallback: fetching open order by table_id:', tableId);
         const result = await supabase
           .from('orders')
           .select(`*, order_items (${orderItemsSelect})`)
@@ -159,9 +151,6 @@ export function TablesView() {
         return;
       }
 
-      console.log('[openOrderModal] Order data from Supabase:', data);
-      console.log('[openOrderModal] Order items count:', data.order_items?.length || 0);
-
       const normalizedOrder = {
         id: data.id,
         tableId: data.table_id || tableId,
@@ -193,8 +182,6 @@ export function TablesView() {
         })),
       };
 
-      console.log('[openOrderModal] Normalized order:', normalizedOrder);
-
       setOrders(prev => {
         const exists = prev.some(o => o.id === normalizedOrder.id);
         return exists
@@ -205,9 +192,6 @@ export function TablesView() {
       setSelectedOrder(normalizedOrder);
       setPaymentMode(null);
       setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
-      
-      console.log('[openOrderModal] Successfully opened bill');
-
     } catch (err: any) {
       console.error('[openOrderModal] Unexpected error:', err);
       toast.error('Unable to open bill. Please try again.');
@@ -216,8 +200,6 @@ export function TablesView() {
 
   const openTakeawayOrderModal = async (order: any) => {
     try {
-      console.log('[openTakeawayOrderModal] Opening takeaway order:', order.id);
-      
       // If order is already in local state with items, use it
       const localOrder = orders.find(o => o.id === order.id);
       if (localOrder && localOrder.items?.length > 0) {
@@ -297,9 +279,6 @@ export function TablesView() {
       });
 
       setSelectedOrder(normalizedOrder);
-
-      console.log('[openTakeawayOrderModal] Successfully opened order');
-
     } catch (err: any) {
       console.error('[openTakeawayOrderModal] Unexpected error:', err);
       toast.error('Unable to open order. Please try again.');

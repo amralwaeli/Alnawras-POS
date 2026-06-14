@@ -3,8 +3,6 @@ import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import { jsPDF } from 'jspdf';
-import { toast } from 'sonner';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -17,7 +15,6 @@ export function InvoicesView() {
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', name: '', qty: 1, unitPrice: 0 }
   ]);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const { currentUser } = usePOS();
   const [catalogProducts, setCatalogProducts] = useState<{ id: string; name: string; price: number }[]>([]);
@@ -45,33 +42,34 @@ export function InvoicesView() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     const el = printRef.current;
     if (!el) return;
-    
-    setIsGenerating(true);
-    try {
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      pdf.html(el, {
-        margin: 0,
-        callback: (doc) => {
-          doc.save(`Invoice_${invoiceNo}.pdf`);
-          toast.success(`Invoice ${invoiceNo} downloaded`);
-        },
-        x: 0,
-        y: 0,
-      });
-    } catch (err) {
-      console.error('PDF generation error:', err);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setIsGenerating(false);
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
     }
+
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title></head><body>${el.innerHTML}</body></html>`);
+    doc.close();
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
   };
 
   const addItem = () => {
@@ -103,7 +101,8 @@ export function InvoicesView() {
   const canPrint = !!customerName && items.filter(i => i.name).length > 0;
 
   return (
-    <div className="min-h-full bg-gray-50 flex flex-col">
+    <>
+      <div className="min-h-full bg-gray-50 flex flex-col">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">
         <div>
@@ -115,12 +114,12 @@ export function InvoicesView() {
         </div>
         <button
           onClick={handlePrint}
-          disabled={!canPrint || isGenerating}
+          disabled={!canPrint}
           className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
         >
-          <Printer className={`size-4 ${isGenerating ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Download PDF'}</span>
-          <span className="sm:hidden">{isGenerating ? 'Wait...' : 'PDF'}</span>
+          <Printer className="size-4" />
+          <span className="hidden sm:inline">Download PDF</span>
+          <span className="sm:hidden">PDF</span>
         </button>
       </div>
 
@@ -321,10 +320,10 @@ export function InvoicesView() {
         </div>
       </div>
 
-      {/* Hidden print container */}
       <div className="hidden">
         <InvoiceTemplate ref={printRef} data={invoiceData} />
       </div>
     </div>
+    </>
   );
 }

@@ -297,10 +297,10 @@ export function InvoicesView() {
           </div>
         </div>
       </div>
+    </div>
 
-      <div className="print-only hidden">
-        <InvoiceTemplate ref={printRef} data={invoiceData} />
-      </div>
+    <div className="print-only hidden">
+      <InvoiceTemplate ref={printRef} data={invoiceData} />
     </div>
     </>
   );

@@ -79,7 +79,7 @@ export function QuotationsView() {
 
   return (
     <>
-      <style>{`@media print { body { margin: 0; padding: 0; } body * { visibility: hidden !important; } .print-only, .print-only * { visibility: visible !important; display: block !important; } .print-only { position: absolute !important; top: 0; left: 0; width: 190mm !important; margin: 0 auto !important; overflow: visible !important; } .no-print { display: none !important; } } @page { size: A4 portrait; margin: 6mm; }`}</style>
+      <style>{`@media print { @page { size: A4 portrait; margin: 0; } html, body { margin: 0; padding: 0; width: 100%; height: 100%; } body * { visibility: hidden !important; } .print-only, .print-only * { visibility: visible !important; } .print-only { display: block !important; position: fixed !important; top: 0; left: 0; width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; background: #fff !important; } .no-print { display: none !important; visibility: hidden !important; } }`}</style>
       <div className="min-h-full bg-gray-50 flex flex-col no-print">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">

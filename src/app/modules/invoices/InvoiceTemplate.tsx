@@ -35,12 +35,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     style={{
       fontFamily: 'Arial, Helvetica, sans-serif',
       fontSize: '12px',
+      lineHeight: 1.4,
       color: '#000',
       background: '#fff',
       width: '210mm',
       minHeight: '297mm',
       margin: '0 auto',
-      padding: '14mm 14mm 14mm 14mm',
+      padding: '10mm 12mm',
       boxSizing: 'border-box',
     }}
   >
@@ -48,21 +49,27 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
       @media print {
         @page { size: A4 portrait; margin: 0; }
         html, body {
+          width: 210mm;
+          height: 297mm;
           margin: 0 !important;
           padding: 0 !important;
+          background: #fff;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+        }
+        body > div {
+          box-shadow: none !important;
         }
       }
     `}</style>
 
     {/* ── Title ── */}
-    <div style={{ textAlign: 'center', marginBottom: 14 }}>
+    <div style={{ textAlign: 'center', marginBottom: 10 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Invoice</h1>
     </div>
 
     {/* ── From + Logo ── */}
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: 12 }}>
       <div>
         <p style={{ fontWeight: 700, textDecoration: 'underline', margin: '0 0 4px' }}>From</p>
         <p style={{ fontWeight: 600, margin: '0 0 2px' }}>AL-NAWRAS RESTAURANT (1496779-P)</p>
@@ -81,20 +88,20 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     </div>
 
     {/* ── Invoice To + Ref ── */}
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: 10 }}>
       <div>
         <p style={{ fontWeight: 700, textDecoration: 'underline', margin: '0 0 6px' }}>Invoice To</p>
-        <p style={{ fontWeight: 600, margin: '0 0 16px' }}>{data.invoiceTo.name || ''}</p>
+        <p style={{ fontWeight: 600, margin: '0 0 10px' }}>{data.invoiceTo.name || ''}</p>
         <p style={{ margin: 0 }}>Phone: {data.invoiceTo.phone || ''}</p>
       </div>
-      <div style={{ textAlign: 'right', paddingTop: 20 }}>
+      <div style={{ textAlign: 'right', paddingTop: 16 }}>
         <p style={{ margin: '0 0 2px' }}>Invoice No {data.invoiceNo}</p>
         <p style={{ margin: 0 }}>Invoice Date {data.date}</p>
       </div>
     </div>
 
     {/* ── Items Table ── */}
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 4 }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 10 }}>
       <thead>
         <tr style={{ background: '#f5f5f5' }}>
           <td style={{ border: '1px solid #ccc', padding: '5px 6px', width: 28, textAlign: 'center', fontWeight: 700 }}>No</td>
@@ -118,7 +125,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     </table>
 
     {/* ── Totals ── */}
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
       <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 220 }}>
         <tbody>
           <tr>
@@ -138,7 +145,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     </div>
 
     {/* ── Footer ── */}
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px' }}>
       <div style={{ width: '55%' }}>
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontWeight: 700, margin: '0 0 4px' }}>Pay To</p>

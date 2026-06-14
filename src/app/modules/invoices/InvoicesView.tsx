@@ -46,30 +46,7 @@ export function InvoicesView() {
     const el = printRef.current;
     if (!el) return;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      document.body.removeChild(iframe);
-      return;
-    }
-
-    doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title></head><body>${el.innerHTML}</body></html>`);
-    doc.close();
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
+    window.print();
   };
 
   const addItem = () => {
@@ -102,7 +79,8 @@ export function InvoicesView() {
 
   return (
     <>
-      <div className="min-h-full bg-gray-50 flex flex-col">
+      <style>{`@media print { body { margin: 0; padding: 0; } body > :not(.print-only):not(style) { display: none !important; } .print-only { display: block !important; visibility: visible !important; position: static !important; width: 190mm !important; margin: 0 auto !important; overflow: visible !important; } .print-only * { visibility: visible !important; } .no-print { display: none !important; } } @page { size: A4 portrait; margin: 6mm; }`}</style>
+      <div className="min-h-full bg-gray-50 flex flex-col no-print">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">
         <div>
@@ -320,7 +298,7 @@ export function InvoicesView() {
         </div>
       </div>
 
-      <div className="hidden">
+      <div className="print-only hidden">
         <InvoiceTemplate ref={printRef} data={invoiceData} />
       </div>
     </div>

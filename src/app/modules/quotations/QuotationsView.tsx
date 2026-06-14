@@ -297,10 +297,10 @@ export function QuotationsView() {
           </div>
         </div>
       </div>
+    </div>
 
-      <div className="print-only hidden">
-        <QuotationTemplate ref={printRef} data={quotationData} />
-      </div>
+    <div className="print-only hidden">
+      <QuotationTemplate ref={printRef} data={quotationData} />
     </div>
     </>
   );

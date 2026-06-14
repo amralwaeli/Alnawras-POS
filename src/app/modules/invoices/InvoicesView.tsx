@@ -3,6 +3,7 @@ import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
+import html2pdf from 'html2pdf.js';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -45,27 +46,16 @@ export function InvoicesView() {
   const handlePrint = () => {
     const el = printRef.current;
     if (!el) return;
-    const win = window.open('', '_blank');
-    if (!win) { alert('Allow pop-ups for this site to print'); return; }
-    win.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <base href="${window.location.origin}${import.meta.env.BASE_URL}">
-  <title>Invoice_${invoiceNo}</title>
-  <style>
-    *{box-sizing:border-box}
-    body{margin:0;padding:0;background:#fff;font-family:Arial,Helvetica,sans-serif}
-    @page{size:A4 portrait;margin:0}
-    @media print{html,body{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-  </style>
-</head>
-<body>${el.outerHTML}</body>
-</html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 350);
+    
+    const options = {
+      margin: 0,
+      filename: `Invoice_${invoiceNo}.pdf`,
+      image: { type: 'png', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { format: 'a4', orientation: 'portrait' },
+    };
+    
+    html2pdf().set(options).from(el).save();
   };
 
   const addItem = () => {

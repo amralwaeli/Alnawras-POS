@@ -52,13 +52,29 @@ export function InvoicesView() {
     
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(el, {
-        scale: 1,
+      // Clone the element so we can render it off-screen
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.style.position = 'fixed';
+      clone.style.left = '-9999px';
+      clone.style.top = '-9999px';
+      clone.style.width = '210mm';
+      clone.style.visibility = 'hidden';
+      document.body.appendChild(clone);
+      
+      // Wait for images and content to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const canvas = await html2canvas(clone, {
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        windowHeight: clone.scrollHeight,
       });
+      
+      // Clean up
+      document.body.removeChild(clone);
       
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');

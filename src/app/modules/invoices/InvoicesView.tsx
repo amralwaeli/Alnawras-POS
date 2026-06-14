@@ -79,7 +79,7 @@ export function InvoicesView() {
 
   return (
     <>
-      <style>{`@media print { body { margin: 0; padding: 0; } body > :not(.print-only):not(style) { display: none !important; } .print-only { display: block !important; visibility: visible !important; position: static !important; width: 190mm !important; margin: 0 auto !important; overflow: visible !important; } .print-only * { visibility: visible !important; } .no-print { display: none !important; } } @page { size: A4 portrait; margin: 6mm; }`}</style>
+      <style>{`@media print { body { margin: 0; padding: 0; } body * { visibility: hidden !important; } .print-only, .print-only * { visibility: visible !important; display: block !important; } .print-only { position: absolute !important; top: 0; left: 0; width: 190mm !important; margin: 0 auto !important; overflow: visible !important; } .no-print { display: none !important; } } @page { size: A4 portrait; margin: 6mm; }`}</style>
       <div className="min-h-full bg-gray-50 flex flex-col no-print">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">

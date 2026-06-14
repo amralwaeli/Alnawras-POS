@@ -4,7 +4,6 @@ import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemp
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
 
 export function QuotationsView() {
@@ -52,49 +51,21 @@ export function QuotationsView() {
     
     setIsGenerating(true);
     try {
-      // Clone the element so we can render it off-screen
-      const clone = el.cloneNode(true) as HTMLElement;
-      clone.style.position = 'fixed';
-      clone.style.left = '-9999px';
-      clone.style.top = '-9999px';
-      clone.style.width = '210mm';
-      clone.style.visibility = 'hidden';
-      document.body.appendChild(clone);
-      
-      // Wait for images and content to load
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowHeight: clone.scrollHeight,
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
       });
       
-      // Clean up
-      document.body.removeChild(clone);
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      while (heightLeft >= 0) {
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-        position -= pdfHeight;
-        if (heightLeft > 0) pdf.addPage();
-      }
-      
-      pdf.save(`Quotation_${quotationNo}.pdf`);
-      toast.success(`Quotation ${quotationNo} downloaded`);
+      pdf.html(el, {
+        margin: 0,
+        callback: (doc) => {
+          doc.save(`Quotation_${quotationNo}.pdf`);
+          toast.success(`Quotation ${quotationNo} downloaded`);
+        },
+        x: 0,
+        y: 0,
+      });
     } catch (err) {
       console.error('PDF generation error:', err);
       toast.error('Failed to generate PDF');

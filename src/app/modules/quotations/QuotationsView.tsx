@@ -3,7 +3,9 @@ import { Plus, Trash2, Printer, FileText } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { toast } from 'sonner';
 
 export function QuotationsView() {
   const [customerName, setCustomerName] = useState('');
@@ -16,6 +18,7 @@ export function QuotationsView() {
   const [items, setItems] = useState<QuotationItem[]>([
     { id: '1', name: '', qty: 1, unitPrice: 0 }
   ]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { currentUser } = usePOS();
   const [catalogProducts, setCatalogProducts] = useState<{ id: string; name: string; price: number }[]>([]);
@@ -43,19 +46,45 @@ export function QuotationsView() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const el = printRef.current;
     if (!el) return;
     
-    const options = {
-      margin: 0,
-      filename: `Quotation_${quotationNo}.pdf`,
-      image: { type: 'png', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { format: 'a4', orientation: 'portrait' },
-    };
-    
-    html2pdf().set(options).from(el).save();
+    setIsGenerating(true);
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      while (heightLeft >= 0) {
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+        position -= pdfHeight;
+        if (heightLeft > 0) pdf.addPage();
+      }
+      
+      pdf.save(`Quotation_${quotationNo}.pdf`);
+      toast.success(`Quotation ${quotationNo} downloaded`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const addItem = () => {
@@ -99,12 +128,12 @@ export function QuotationsView() {
         </div>
         <button
           onClick={handlePrint}
-          disabled={!canPrint}
+          disabled={!canPrint || isGenerating}
           className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
         >
-          <Printer className="size-4" />
-          <span className="hidden sm:inline">Print / Download PDF</span>
-          <span className="sm:hidden">Print PDF</span>
+          <Printer className={`size-4 ${isGenerating ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Download PDF'}</span>
+          <span className="sm:hidden">{isGenerating ? 'Wait...' : 'PDF'}</span>
         </button>
       </div>
 

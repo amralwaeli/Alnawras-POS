@@ -8,14 +8,12 @@ import { IngredientOrdersTab } from './IngredientOrdersTab';
 type KitchenStatus = 'available' | 'out-of-stock' | 'finished';
 
 const STATUS_FLOW: Record<string, string> = {
-  pending: 'preparing',
-  preparing: 'ready',
+  pending: 'ready',
   ready: 'served',
 };
 
 const STATUS_STYLE: Record<string, { badge: string; btn: string; label: string }> = {
-  pending:   { badge: 'bg-gray-800 text-amber-400 border-amber-900/50',           btn: 'bg-amber-500 hover:bg-amber-600 text-white',   label: 'Start Preparing' },
-  preparing: { badge: 'bg-amber-900/30 text-amber-200 border-amber-700/50',       btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', label: 'Mark Ready' },
+  pending:   { badge: 'bg-gray-800 text-amber-400 border-amber-900/50',           btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', label: 'Mark Ready' },
   ready:     { badge: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50', btn: 'bg-blue-500 hover:bg-blue-600 text-white',       label: 'Mark Served' },
   served:    { badge: 'bg-blue-900/20 text-blue-400 border-blue-900/30',          btn: '',                                               label: 'Done' },
 };

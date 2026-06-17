@@ -48,7 +48,7 @@ export interface OrderItem {
   addedBy: string;
   addedByName: string;
   addedAt: Date;
-  station: 'kitchen' | 'juice' | 'none';
+  station: 'kitchen' | 'juice' | 'shawarma' | 'none';
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
   sentToKitchen?: boolean;
@@ -101,7 +101,7 @@ export interface Product {
   taxRate: number;
   reorderPoint: number;
   branchId: string;
-  station: 'kitchen' | 'juice' | 'none';
+  station: 'kitchen' | 'juice' | 'shawarma' | 'none';
   kitchenStatus: 'available' | 'out-of-stock' | 'finished';
   availabilityStatus: 'available' | 'out-of-stock' | 'finished';
   isActive: boolean;

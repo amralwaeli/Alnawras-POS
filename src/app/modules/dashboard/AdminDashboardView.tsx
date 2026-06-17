@@ -446,6 +446,15 @@ export function AdminDashboardView() {
     return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   }, [orders]);
 
+  const peakHours = useMemo(() => {
+    const hours = Array(24).fill(0);
+    orders.filter(o => o.status === 'completed').forEach(o => {
+      const hour = new Date(o.createdAt).getHours();
+      hours[hour] += 1;
+    });
+    return hours.map((count, hour) => ({ hour, count }));
+  }, [orders]);
+
   const recentOrders = useMemo(() =>
     [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8),
     [orders]
@@ -651,6 +660,38 @@ export function AdminDashboardView() {
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Peak Hours */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">Peak Hours</h3>
+                <Clock className="size-4 text-gray-300" />
+              </div>
+              <div className="h-32 flex items-end gap-1 px-1">
+                {peakHours.map(({ hour, count }) => {
+                  const maxCount = Math.max(...peakHours.map(h => h.count)) || 1;
+                  const height = (count / maxCount) * 100;
+                  const isCurrentHour = new Date().getHours() === hour;
+                  return (
+                    <div key={hour} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div 
+                        className={`w-full rounded-t-sm transition-all duration-500 ${isCurrentHour ? 'bg-amber-500' : 'bg-blue-100 group-hover:bg-blue-200'}`}
+                        style={{ height: `${Math.max(4, height)}%` }}
+                      >
+                        {count > 0 && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {count} orders
+                          </div>
+                        )}
+                      </div>
+                      <span className={`text-[8px] ${isCurrentHour ? 'font-bold text-amber-600' : 'text-gray-400'}`}>
+                        {hour}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Waiter leaderboard */}

@@ -1,6 +1,7 @@
 import { Order, Result } from '../models/types';
 import { mapOrder } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
+import { PrintService } from '../services/PrintService';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -120,7 +121,49 @@ export class OrderController {
       const { data: saved } = await supabase
         .from('orders').select('*, order_items(*)').eq('id', orderId).single();
       if (!saved) return { success: false, error: 'Order saved but could not be reloaded.' };
-      return { success: true, data: mapOrder(saved) };
+      
+      const finalOrder = mapOrder(saved);
+
+      // ── AUTOMATED STATION-BASED PRINTING ──
+      // Split items by station and send to respective printers
+      try {
+        const printersRaw = localStorage.getItem('alnawras_printers');
+        if (printersRaw) {
+          const printers = JSON.parse(printersRaw);
+          const activePrinters = printers.filter((p: any) => p.isActive && p.type === 'network');
+          
+          // Group rows (new items) by their station
+          const itemsByStation: Record<string, any[]> = {};
+          rows.forEach(item => {
+            const station = item.station || 'kitchen';
+            if (!itemsByStation[station]) itemsByStation[station] = [];
+            itemsByStation[station].push(item);
+          });
+
+          // Send to each printer that covers the station
+          for (const printer of activePrinters) {
+            // A printer might cover multiple stations (e.g. 'kitchen' and 'shawarma')
+            const printerStations = printer.stations || ['kitchen']; 
+            
+            for (const station of printerStations) {
+              const stationItems = itemsByStation[station];
+              if (stationItems && stationItems.length > 0) {
+                const ticket = PrintService.formatKitchenTicket(finalOrder, stationItems, station);
+                await PrintService.sendToPrinter({
+                  printerIp: printer.ipAddress,
+                  printerPort: printer.port || 9100,
+                  content: ticket
+                });
+              }
+            }
+          }
+        }
+      } catch (printErr) {
+        console.warn('[AutoPrint] Failed to dispatch to station printers', printErr);
+      }
+      // -------------------------------
+
+      return { success: true, data: finalOrder };
     } catch (err: any) {
       console.error('[OrderController.submitOrder]', err);
       return { success: false, error: err?.message || 'Failed to submit order.' };

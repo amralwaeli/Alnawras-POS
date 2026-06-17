@@ -44,6 +44,13 @@ export class ProductController {
       return { success: false, error: 'Unauthorized: Cannot manage products' };
     }
 
+    // --- INPUT VALIDATION ---
+    if (!productData.name?.trim()) return { success: false, error: 'Product name is required' };
+    if (productData.price < 0) return { success: false, error: 'Price cannot be negative' };
+    if (productData.stock < 0) return { success: false, error: 'Stock cannot be negative' };
+    if (!productData.categoryId) return { success: false, error: 'Category is required' };
+    // ------------------------
+
     try {
       const { data, error } = await supabase
         .from('products')
@@ -86,6 +93,12 @@ export class ProductController {
     if (!AuthController.hasPermission(user, 'canManageInventory')) {
       return { success: false, error: 'Unauthorized: Cannot manage products' };
     }
+
+    // --- INPUT VALIDATION ---
+    if (updates.name !== undefined && !updates.name.trim()) return { success: false, error: 'Product name cannot be empty' };
+    if (updates.price !== undefined && updates.price < 0) return { success: false, error: 'Price cannot be negative' };
+    if (updates.stock !== undefined && updates.stock < 0) return { success: false, error: 'Stock cannot be negative' };
+    // ------------------------
 
     try {
       // Build payload explicitly — only include fields that were actually provided
@@ -263,20 +276,24 @@ export class CategoryController {
     return { success: true, data: mapCategory(cat) };
   }
 
-  static async updateCategory(id: string, updates: any, _user: User): Promise<Result<Category>> {
+  static async updateCategory(id: string, updates: any, user: User): Promise<Result<Category>> {
+    // --- INPUT VALIDATION ---
+    if (updates.name !== undefined && !updates.name.trim()) return { success: false, error: 'Category name cannot be empty' };
+    // ------------------------
+
     const { data: cat, error } = await supabase.from('categories').update({
       name: updates.name,
       description: updates.description,
       color: updates.color,
       icon: updates.icon,
       display_order: updates.displayOrder,
-    }).eq('id', id).select().single();
+    }).eq('id', id).eq('branch_id', user.branchId).select().single();
     if (error) return { success: false, error: error.message };
     return { success: true, data: mapCategory(cat) };
   }
 
-  static async deleteCategory(id: string, _user: User): Promise<Result<void>> {
-    const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
+  static async deleteCategory(id: string, user: User): Promise<Result<void>> {
+    const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id).eq('branch_id', user.branchId);
     if (error) return { success: false, error: error.message };
     return { success: true, data: undefined };
   }

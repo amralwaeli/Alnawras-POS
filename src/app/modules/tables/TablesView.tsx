@@ -50,14 +50,29 @@ export function TablesView() {
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  const handlePaid = (orderId: string, _billNo: string, _summary: string) => {
+  const handlePaid = async (orderId: string, _billNo: string, _summary: string) => {
+    // 1. Update local state
     setOrders(prev => prev.filter(o => o.id !== orderId));
+    const targetTable = tables.find(t => t.currentOrderId === orderId);
+    
     setTables(prev => prev.map(t =>
       t.currentOrderId === orderId
         ? { ...t, status: 'available', currentOrderId: undefined }
         : t
     ));
     setSelectedOrder(null);
+
+    // 2. Harden security: Expire the QR session for this table immediately after payment
+    if (targetTable) {
+      try {
+        await supabase
+          .from('qr_sessions')
+          .update({ active: false, last_activity_at: new Date().toISOString() })
+          .eq('table_id', targetTable.id);
+      } catch (err) {
+        console.warn('[QR Session] Failed to expire session on payment', err);
+      }
+    }
   };
 
   if (!currentUser) return null;

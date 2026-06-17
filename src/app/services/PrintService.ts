@@ -28,13 +28,22 @@ export class PrintService {
         return { success: true };
       }
 
-      // 2. Fallback: Use a local print relay (recommended for the "Best" setup)
-      // This expects a tiny service running on the local network (e.g. at the cashier PC)
-      const relayUrl = `http://localhost:9101/print`; // Standard local relay port
+      // 2. Fallback: Use the AlnawrasPOS Print Proxy running on the Cashier device
+      // We use the local network IP of your Cashier device here.
+      const cashierIp = 'localhost'; // Change this to the Cashier's IP for tablet access
+      const relayUrl = `http://${cashierIp}:3001/print`; 
+      
+      // Convert content to hex if it's not already
+      const payload = {
+        ip: job.printerIp,
+        port: job.printerPort,
+        data: Buffer.from(job.content).toString('hex')
+      };
+
       const response = await fetch(relayUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(job),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) return { success: true };

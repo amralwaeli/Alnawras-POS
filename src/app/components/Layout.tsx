@@ -48,6 +48,7 @@ export function Layout() {
     { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
+    { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true },
     { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const },

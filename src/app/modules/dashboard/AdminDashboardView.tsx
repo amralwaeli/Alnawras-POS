@@ -4,7 +4,7 @@ import {
   ShoppingCart, AlertTriangle, ArrowRight, Activity,
   TrendingUp, Package, Clock, ShoppingBag, Utensils,
   CreditCard, BarChart2, X, QrCode, UserCheck, Trophy, Star,
-  Users, Building2,
+  Users, Building2, Bell,
 } from 'lucide-react';
 import { orderTotal, fmt } from '../../../lib/currency';
 import { useMemo, useState, useEffect } from 'react';
@@ -421,7 +421,7 @@ export function AdminDashboardView() {
   const todayDineIn = todayOrders.filter(o => (o.order_type ?? o.orderType) === 'dine-in').length;
   const openOrders = orders.filter(o => o.status === 'open');
   const occupiedTables = tables.filter(t => t.status === 'occupied');
-  const lowStock = products.filter(p => p.stock <= p.reorderPoint);
+  const lowStock = products.filter(p => p.stock <= (p.reorder_point || 5));
 
   const last7Days = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -491,6 +491,23 @@ export function AdminDashboardView() {
             </div>
           </div>
         </div>
+
+        {lowStock.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center gap-4">
+              <div className="size-12 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                <Bell className="size-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-amber-900">Low Stock Alert</h3>
+                <p className="text-sm text-amber-700">{lowStock.length} items are below their reorder point.</p>
+              </div>
+            </div>
+            <Link to="/inventory" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition-colors">
+              Manage Stock
+            </Link>
+          </div>
+        )}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

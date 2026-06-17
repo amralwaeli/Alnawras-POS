@@ -117,16 +117,35 @@ export function TableOrderingView() {
         setOrder(mapOrder(orderData));
       }
 
-      await ensureQrSession(tableId, branchId);
+      const isSessionActive = await ensureQrSession(tableId, branchId);
+      if (!isSessionActive) {
+        setInvalidTable(true);
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
     };
 
     void load();
   }, [tableId]);
 
-  const ensureQrSession = async (tableId: string, branchId: string) => {
+  const ensureQrSession = async (tableId: string, branchId: string): Promise<boolean> => {
     try {
-      const { data: existing } = await supabase.from('qr_sessions').select('*').eq('table_id', tableId).single();
+      const { data: existing } = await supabase.from('qr_sessions').select('*').eq('table_id', tableId).maybeSingle();
+      
+      // If session exists but is inactive, don't allow ordering (bill was paid)
+      if (existing && !existing.active) {
+        // Only re-activate if there is no current open order on this table
+        const { data: tableNow } = await supabase.from('tables').select('current_order_id').eq('id', tableId).single();
+        if (tableNow?.current_order_id) {
+           // Someone is at the table, but the QR session was expired? Reactivate.
+           await supabase.from('qr_sessions').update({ active: true, last_activity_at: new Date().toISOString() }).eq('table_id', tableId);
+           return true;
+        }
+        return false;
+      }
+
       if (existing) {
         await supabase
           .from('qr_sessions')
@@ -135,8 +154,10 @@ export function TableOrderingView() {
       } else {
         await supabase.from('qr_sessions').insert([{ id: `qr-session-${tableId}`, table_id: tableId, active: true, started_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), branch_id: branchId }]);
       }
+      return true;
     } catch (err) {
-      console.warn('[QR Session] Could not create session', err);
+      console.warn('[QR Session] Could not verify session', err);
+      return true; // Fallback to allow ordering if session check fails
     }
   };
 

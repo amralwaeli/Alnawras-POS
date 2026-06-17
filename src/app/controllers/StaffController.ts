@@ -19,6 +19,28 @@ export class StaffController {
     newStaff: Omit<Staff, 'id' | 'createdAt'>
   ): Promise<{ success: boolean; data?: Staff; error?: string }> {
     try {
+      // --- INPUT VALIDATION ---
+      if (!newStaff.name?.trim()) return { success: false, error: 'Name is required' };
+      if (!newStaff.employmentNumber?.trim()) return { success: false, error: 'Employment number is required' };
+      if (!newStaff.pin || !/^\d{4}$/.test(newStaff.pin)) return { success: false, error: 'PIN must be exactly 4 digits' };
+      if (!newStaff.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newStaff.email)) {
+        return { success: false, error: 'A valid email is required' };
+      }
+      if (!newStaff.role) return { success: false, error: 'Role is required' };
+      if (!newStaff.branchId) return { success: false, error: 'Branch ID is required' };
+
+      // Check for existing employment number or email to prevent DB conflict errors
+      const { data: existing } = await supabase
+        .from('users')
+        .select('id')
+        .or(`employment_number.eq.${newStaff.employmentNumber},email.eq.${newStaff.email}`)
+        .maybeSingle();
+      
+      if (existing) {
+        return { success: false, error: 'Employment number or Email already exists' };
+      }
+      // ------------------------
+
       const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const staffData = {
@@ -59,6 +81,32 @@ export class StaffController {
     updates: Partial<Staff>
   ): Promise<{ success: boolean; data?: Staff; error?: string }> {
     try {
+      // --- INPUT VALIDATION ---
+      if (updates.name !== undefined && !updates.name.trim()) return { success: false, error: 'Name cannot be empty' };
+      if (updates.pin !== undefined && !/^\d{4}$/.test(updates.pin)) return { success: false, error: 'PIN must be exactly 4 digits' };
+      if (updates.email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
+        return { success: false, error: 'A valid email is required' };
+      }
+
+      // Check for existing employment number or email if they are being changed
+      if (updates.employmentNumber || updates.email) {
+        let filter = '';
+        if (updates.employmentNumber) filter += `employment_number.eq.${updates.employmentNumber}`;
+        if (updates.email) filter += (filter ? ',' : '') + `email.eq.${updates.email}`;
+
+        const { data: existing } = await supabase
+          .from('users')
+          .select('id')
+          .or(filter)
+          .neq('id', staffId)
+          .maybeSingle();
+        
+        if (existing) {
+          return { success: false, error: 'Employment number or Email already exists' };
+        }
+      }
+      // ------------------------
+
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.employmentNumber !== undefined) dbUpdates.employment_number = updates.employmentNumber;

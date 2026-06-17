@@ -77,6 +77,26 @@ export function ProductManagementView() {
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // UI-level validation
+    if (!productFormData.name?.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    const price = parseFloat(productFormData.price);
+    if (isNaN(price) || price < 0) {
+      toast.error('Please enter a valid price');
+      return;
+    }
+    const stock = parseInt(productFormData.stock);
+    if (isNaN(stock) || stock < 0) {
+      toast.error('Please enter a valid stock quantity');
+      return;
+    }
+    if (!productFormData.categoryId) {
+      toast.error('Please select a category');
+      return;
+    }
+
     const selectedCategory = categories.find(c => c.id === productFormData.categoryId);
     const productData = {
       name: productFormData.name,
@@ -120,6 +140,17 @@ export function ProductManagementView() {
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // UI-level validation
+    if (!categoryFormData.name?.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+    const displayOrder = parseInt(categoryFormData.displayOrder);
+    if (isNaN(displayOrder)) {
+      toast.error('Please enter a valid display order');
+      return;
+    }
 
     const categoryData = {
       name: categoryFormData.name,
@@ -596,9 +627,9 @@ export function ProductManagementView() {
                   <SelectValue placeholder="Select station" />
                 </SelectTrigger>
                 <SelectContent>
-                  {stations.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
+                  <SelectItem value="kitchen">Kitchen (Main)</SelectItem>
+                  <SelectItem value="juice">Beverage (Juice)</SelectItem>
+                  <SelectItem value="shawarma">Shawarma Station</SelectItem>
                   <SelectItem value="none">No Station (pre-made / external)</SelectItem>
                 </SelectContent>
               </Select>

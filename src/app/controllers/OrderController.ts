@@ -2,6 +2,7 @@ import { Order, Result } from '../models/types';
 import { mapOrder } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { PrintService } from '../services/PrintService';
+import { OfflineSyncEngine } from '../services/OfflineSyncEngine';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -9,7 +10,7 @@ export interface SubmitOrderItem {
   quantity: number;
   price: number;
   notes?: string;
-  station?: string;
+  station?: 'kitchen' | 'juice' | 'shawarma' | 'none';
 }
 
 export interface SubmitOrderParams {
@@ -27,102 +28,92 @@ export interface SubmitOrderParams {
 }
 
 /**
- * The single place that persists customer orders. Every order-creation surface
- * (staff table view, staff order-entry, customer QR) goes through submitOrder so
- * the money-touching write path lives in one auditable spot.
+ * The single place that persists customer orders. Every order-creation surface 
+ * (Waiter POS, Table QR Ordering, Admin POS) calls this.
  */
 export class OrderController {
   static async submitOrder(params: SubmitOrderParams): Promise<Result<Order>> {
-    const { branchId, orderType, table, items, addedBy, addedByName, waiterId } = params;
-
-    if (!items || items.length === 0) {
-      return { success: false, error: 'Add items before submitting the order.' };
-    }
-    if (orderType === 'dine-in' && !table) {
-      return { success: false, error: 'A table is required for dine-in orders.' };
-    }
-
     try {
-      let orderId = params.existingOrderId || undefined;
+      if (params.items.length === 0) {
+        return { success: false, error: 'Cannot submit an empty order.' };
+      }
 
-      // ── Create the order if one does not already exist ───────────────────────
+      let orderId = params.existingOrderId || undefined;
+      const branchId = params.branchId;
+
+      if (params.orderType === 'dine-in' && !params.table) {
+        return { success: false, error: 'Table selection is required for dine-in orders.' };
+      }
+
+      // ── Create the order if one does not already exist ─────────────────────
       if (!orderId) {
         orderId = `order-${Date.now()}`;
+        const billNum = params.orderType === 'takeaway' ? await this.nextBillNumber(branchId) : null;
+        
+        const { error: orderError } = await supabase.from('orders').insert({
+          id: orderId,
+          table_id: params.table?.id || null,
+          table_number: params.table?.number || null,
+          status: 'open',
+          order_type: params.orderType,
+          branch_id: branchId,
+          waiters: params.waiterId ? [params.waiterId] : [],
+          bill_number: billNum,
+          subtotal: 0,
+          tax: 0,
+          total: 0,
+        });
+        if (orderError) throw orderError;
 
-        // dine-in: atomically reserve the table, recovering the winner on a race.
-        if (orderType === 'dine-in' && table) {
-          const { data: reserved } = await supabase
-            .from('tables')
-            .update({ status: 'occupied', current_order_id: orderId })
-            .eq('id', table.id)
-            .is('current_order_id', null)
-            .select('current_order_id')
-            .maybeSingle();
-
-          if (!reserved?.current_order_id) {
-            const { data: fresh } = await supabase
-              .from('tables').select('current_order_id').eq('id', table.id).maybeSingle();
-            if (fresh?.current_order_id) orderId = fresh.current_order_id;
-          }
-        }
-
-        // Only insert a fresh order row if we still hold a brand-new id.
-        const { data: existing } = await supabase
-          .from('orders').select('id').eq('id', orderId).maybeSingle();
-
-        if (!existing) {
-          const billNumber = orderType === 'takeaway'
-            ? await OrderController.nextBillNumber(branchId)
-            : null;
-
-          const { error: createError } = await supabase.from('orders').insert([{
-            id: orderId,
-            table_id: orderType === 'dine-in' ? table!.id : null,
-            table_number: orderType === 'dine-in' ? table!.number : 0,
-            subtotal: 0, tax: 0, discount: 0, total: 0,
-            status: 'open', payment_status: 'unpaid', order_type: orderType,
-            branch_id: branchId,
-            waiters: waiterId ? [waiterId] : [],
-            ...(billNumber ? { bill_number: billNumber } : {}),
-          }]);
-          if (createError) return { success: false, error: createError.message };
+        // If it's a table order, update the table state
+        if (params.table?.id) {
+          await supabase.from('tables').update({ 
+            status: 'occupied', 
+            current_order_id: orderId 
+          }).eq('id', params.table.id);
         }
       }
 
-      // ── Insert the new items (branch_id is required for realtime fan-out) ─────
-      const rows = items.map(it => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      // ── Insert the new order items ──────────────────────────────────────────
+      const rows = params.items.map(item => ({
+        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         order_id: orderId,
-        product_id: it.productId,
-        product_name: it.productName,
-        quantity: it.quantity,
-        price: it.price,
-        subtotal: it.price * it.quantity,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.price * item.quantity,
+        notes: item.notes || null,
         status: 'pending',
-        notes: it.notes || null,
-        added_by: addedBy,
-        added_by_name: addedByName,
-        station: it.station ?? 'kitchen',
-        sent_to_kitchen: true,
+        added_by: params.addedBy,
+        added_by_name: params.addedByName,
+        station: item.station ?? 'kitchen',
         branch_id: branchId,
       }));
 
-      const { error: itemsError } = await supabase.from('order_items').insert(rows);
-      if (itemsError) return { success: false, error: itemsError.message };
+      // ── Attempt Database Sync ─────────────────────────────────────────────
+      let finalOrder: any = null;
+      try {
+        const { error: itemsError } = await supabase.from('order_items').insert(rows);
+        if (itemsError) throw itemsError;
 
-      // ── Recompute + persist totals from the full item set ────────────────────
-      const { data: allItems } = await supabase
-        .from('order_items').select('subtotal').eq('order_id', orderId);
-      const subtotal = (allItems || []).reduce((s, r: any) => s + Number(r.subtotal), 0);
-      const tax = 0;
-      await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
+        // Update Order Totals
+        const { data: allItems } = await supabase.from('order_items').select('subtotal').eq('order_id', orderId);
+        const subtotal = (allItems || []).reduce((s, r: any) => s + Number(r.subtotal), 0);
+        const tax = 0;
+        await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
 
-      // ── Return the saved, mapped order ───────────────────────────────────────
-      const { data: saved } = await supabase
-        .from('orders').select('*, order_items(*)').eq('id', orderId).single();
-      if (!saved) return { success: false, error: 'Order saved but could not be reloaded.' };
-      
-      const finalOrder = mapOrder(saved);
+        const { data: saved } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
+        if (saved) finalOrder = mapOrder(saved);
+      } catch (dbErr) {
+        console.warn('[OrderController] Offline detected, queuing order locally', dbErr);
+        // Queue for background sync
+        OfflineSyncEngine.addToQueue('order', { order: { id: orderId, branch_id: branchId, status: 'open' }, items: rows });
+        // Create a temporary order object for printing
+        finalOrder = { id: orderId, tableNumber: params.table?.number || 0, items: rows };
+      }
+
+      if (!finalOrder) return { success: false, error: 'Failed to process order.' };
 
       // ── AUTOMATED STATION-BASED PRINTING ──
       // Split items by station and send to respective printers
@@ -181,6 +172,7 @@ export class OrderController {
       .order('bill_number', { ascending: false })
       .limit(1)
       .maybeSingle();
+
     const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
     return String(lastNum + 1).padStart(4, '0');
   }

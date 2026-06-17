@@ -3,10 +3,11 @@
  * Extracted from TablesView so it can be reused independently.
  * Handles cash / card / QR / split payment flows + receipt printing.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   X, Clock, CheckCircle, CreditCard, Banknote, QrCode,
   SplitSquareHorizontal, Plus, Minus, Search, UserCheck, Star, Gift,
+  ShieldAlert
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
@@ -15,6 +16,7 @@ import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { loadLoyaltySettings } from '../../models/types';
 import type { Customer } from '../../models/types';
+import { DeviceService } from '../../services/DeviceService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -282,23 +284,25 @@ const itemStatusColors: Record<string, string> = {
   served:    'bg-blue-100 text-blue-700',
 };
 
-// ── PaymentModal ──────────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 interface PaymentModalProps {
-  order: any;
-  currentUser: any;
+  isOpen: boolean;
   onClose: () => void;
-  onPaid: (orderId: string, billNo: string, paymentSummary: string) => void;
+  order: any;
+  onPaid: (orderId: string, billNo: string, method: string) => void;
+  currentUser: any;
 }
 
-export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentModalProps) {
-  const [paymentMode, setPaymentMode]   = useState<PaymentMode | null>(null);
-  const [processing, setProcessing]     = useState(false);
-  const [showPrint, setShowPrint]       = useState(false);
-  const [lastBillNo, setLastBillNo]     = useState('');
-  const [lastSummary, setLastSummary]   = useState('');
-  const [splits, setSplits]             = useState<SplitEntry[]>([
-    { method: 'cash', amount: '' }, { method: 'card', amount: '' },
+export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: PaymentModalProps) {
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
+  const [splits, setSplits] = useState<SplitEntry[]>([
+    { method: 'cash', amount: '' }
   ]);
+  const [processing, setProcessing] = useState(false);
+  const [showPrint, setShowPrint] = useState(false);
+  const [lastBillNo, setLastBillNo] = useState('');
+  const [lastSummary, setLastSummary] = useState('');
+  
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
@@ -311,11 +315,38 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
     const total    = Math.max(0, baseTotals.subtotal + baseTotals.tax - discount);
     return { ...baseTotals, discount, total };
   }, [baseTotals, loyaltyDiscount]);
+  
   const splitTotal = splits.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  
   const handleRedemptionChange = (discount: number, points: number) => {
     setLoyaltyDiscount(discount);
     setLoyaltyPointsToRedeem(points);
   };
+
+  // ── Customer Monitor Sync ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!order || !isOpen) return;
+    const channel = supabase.channel('customer-monitor');
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.send({
+          type: 'broadcast',
+          event: 'update-bill',
+          payload: { 
+            order: { ...order, discount: baseTotals.discount + loyaltyDiscount },
+            paymentQR: paymentMode === 'qr' ? `ALNAWRAS-PAY-${order.id}-${totals.total}` : null
+          }
+        });
+      }
+    });
+    return () => { supabase.removeChannel(channel); };
+  }, [order, isOpen, loyaltyDiscount, paymentMode, totals.total, baseTotals.discount]);
+
+  if (!isOpen) return null;
+
+  // SECURITY: Check if this device is authorized to handle payments
+  const isAuthorized = DeviceService.isAuthorized('payment');
+
   const splitRemain = Math.max(0, totals.total - splitTotal);
   const splitExact  = Math.abs(totals.total - splitTotal) < 0.005;
 
@@ -397,6 +428,15 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
       setLastBillNo(billNo);
       setLastSummary(summary);
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
+      
+      // Notify customer monitor of success
+      const channel = supabase.channel('customer-monitor');
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.send({ type: 'broadcast', event: 'payment-success', payload: {} });
+        }
+      });
+
       onPaid(order.id, billNo, summary);
       setShowPrint(true);
     } catch (err: any) {
@@ -438,122 +478,147 @@ export function PaymentModal({ order, currentUser, onClose, onPaid }: PaymentMod
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
-
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <h2 className="font-bold text-lg">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : `Table ${order.tableNumber}`}</h2>
-            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-              <Clock className="size-3" />
-              {order.billNumber ? `Bill #${order.billNumber} • ` : ''}
-              {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
+        {!isAuthorized ? (
+          <div className="p-12 text-center">
+            <div className="size-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="size-8" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Unauthorized Device</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Payments can only be processed at the **Cashier Station**. This device is restricted to ordering only.
             </p>
+            <button onClick={onClose} className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold">
+              Close
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
-          {(order.items ?? []).length === 0 ? (
-            <p className="text-center text-gray-400 py-8">No items in this order</p>
-          ) : (order.items ?? []).map((item: any) => (
-            <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
-                <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="font-bold text-lg">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : `Table ${order.tableNumber}`}</h2>
+                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                  <Clock className="size-3" />
+                  {order.billNumber ? `Bill #${order.billNumber} • ` : ''}
+                  {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
+                </p>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
-                <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
-                <span className="text-sm font-semibold w-24 text-right">{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
-          <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
-          {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>Tax</span><span>{fmt(totals.tax)}</span></div>}
-          {baseTotals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(baseTotals.discount)}</span></div>}
-          {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
-          <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
-        </div>
-
-        {(currentUser.role === 'cashier' || currentUser.role === 'admin') && order.status !== 'completed' && (
-          <div className="px-6 py-4 border-t space-y-3">
-            <CustomerPanel
-              branchId={currentUser.branchId}
-              linkedCustomer={linkedCustomer}
-              loyaltyDiscount={loyaltyDiscount}
-              onCustomerChange={setLinkedCustomer}
-              onRedemptionChange={handleRedemptionChange}
-            />
-            <p className="text-sm font-semibold text-gray-700">Payment Method</p>
-            <div className="grid grid-cols-4 gap-2">
-              <button onClick={() => setPaymentMode('cash')} className={methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')}><Banknote className="size-4" />Cash</button>
-              <button onClick={() => setPaymentMode('card')} className={methodBtn('card', 'border-blue-500 bg-blue-50 text-blue-700')}><CreditCard className="size-4" />Card</button>
-              <button onClick={() => setPaymentMode('qr')} className={methodBtn('qr', 'border-violet-500 bg-violet-50 text-violet-700')}><QrCode className="size-4" />QR</button>
-              <button onClick={() => setPaymentMode('mix')} className={methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')}><SplitSquareHorizontal className="size-4" />Mix</button>
+              <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
             </div>
 
-            {paymentMode === 'cash' && <CashChangeRow total={totals.total} />}
-
-            {paymentMode === 'mix' && (
-              <div className="space-y-2 bg-orange-50 rounded-xl p-3 border border-orange-100">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-medium text-orange-800">Split Payment</span>
-                  <span className={`font-semibold ${splitExact ? 'text-emerald-600' : splitRemain > 0 ? 'text-amber-600' : 'text-red-500'}`}>
-                    {splitExact ? '✓ Balanced' : splitRemain > 0 ? `${fmt(splitRemain)} remaining` : `${fmt(splitTotal - totals.total)} over`}
-                  </span>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+              {(order.items ?? []).length === 0 ? (
+                <p className="text-center text-gray-400 py-8">No items in this order</p>
+              ) : (order.items ?? []).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
+                    <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
+                    <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
+                    <span className="text-sm font-semibold w-24 text-right">{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
+                  </div>
                 </div>
-                {splits.map((entry, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <select value={entry.method} onChange={e => updateSplit(idx, 'method', e.target.value as SimpleMethod)}
-                      className="flex-none w-24 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none" disabled={processing}>
-                      {(['cash','card','qr'] as SimpleMethod[]).map(m => (
-                        <option key={m} value={m} disabled={splits.some((s,i) => i !== idx && s.method === m)}>
-                          {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : '📱 QR'}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex-1 relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">{CURRENCY}</span>
-                      <input type="number" min="0" step="0.01" placeholder="0.00" value={entry.amount}
-                        onChange={e => updateSplit(idx, 'amount', e.target.value)}
-                        className="w-full pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none" disabled={processing} />
+              ))}
+            </div>
+
+            <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
+              <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
+              {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>Tax</span><span>{fmt(totals.tax)}</span></div>}
+              {baseTotals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(baseTotals.discount)}</span></div>}
+              {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
+              <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
+            </div>
+
+            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && order.status !== 'completed' && (
+              <div className="px-6 py-4 border-t space-y-3">
+                <CustomerPanel
+                  branchId={currentUser.branchId}
+                  linkedCustomer={linkedCustomer}
+                  loyaltyDiscount={loyaltyDiscount}
+                  onCustomerChange={setLinkedCustomer}
+                  onRedemptionChange={handleRedemptionChange}
+                />
+                <p className="text-sm font-semibold text-gray-700">Payment Method</p>
+                <div className="grid grid-cols-4 gap-2">
+                  <button onClick={() => setPaymentMode('cash')} className={methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')}><Banknote className="size-4" />Cash</button>
+                  <button onClick={() => setPaymentMode('card')} className={methodBtn('card', 'border-blue-500 bg-blue-50 text-blue-700')}><CreditCard className="size-4" />Card</button>
+                  <button onClick={() => setPaymentMode('qr')} className={methodBtn('qr', 'border-violet-500 bg-violet-50 text-violet-700')}><QrCode className="size-4" />QR</button>
+                  <button onClick={() => setPaymentMode('mix')} className={methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')}><SplitSquareHorizontal className="size-4" />Mix</button>
+                </div>
+
+                {paymentMode === 'cash' && <CashChangeRow total={totals.total} />}
+
+                {paymentMode === 'qr' && (
+                  <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 flex flex-col items-center text-center space-y-3 animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white p-2 rounded-lg shadow-sm border border-violet-100">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`ALNAWRAS-PAY-${order.id}-${totals.total}`)}`} 
+                        alt="Payment QR"
+                        className="size-32"
+                      />
                     </div>
-                    <button onClick={() => updateSplit(idx, 'amount', splitRemain > 0 ? splitRemain.toFixed(2) : entry.amount)}
-                      className="text-xs px-2 py-2 bg-white border border-orange-200 hover:bg-orange-100 rounded-lg text-orange-700" disabled={processing}>Fill</button>
-                    {splits.length > 2 && (
-                      <button onClick={() => setSplits(p => p.filter((_,i) => i !== idx))}
-                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50" disabled={processing}>
-                        <Minus className="size-3.5" />
+                    <div>
+                      <p className="text-xs font-bold text-violet-700 uppercase tracking-tight">Scan to Pay</p>
+                      <p className="text-[10px] text-violet-600/70">Dynamic QR generated for {fmt(totals.total)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMode === 'mix' && (
+                  <div className="space-y-2 bg-orange-50 rounded-xl p-3 border border-orange-100">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-medium text-orange-800">Split Payment</span>
+                      <span className={`font-semibold ${splitExact ? 'text-emerald-600' : splitRemain > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                        {splitExact ? '✓ Balanced' : splitRemain > 0 ? `${fmt(splitRemain)} remaining` : `${fmt(splitTotal - totals.total)} over`}
+                      </span>
+                    </div>
+                    {splits.map((entry, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <select value={entry.method} onChange={e => updateSplit(idx, 'method', e.target.value as SimpleMethod)}
+                          className="flex-none w-24 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none" disabled={processing}>
+                          {(['cash','card','qr'] as SimpleMethod[]).map(m => (
+                            <option key={m} value={m} disabled={splits.some((s,i) => i !== idx && s.method === m)}>
+                              {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : '📱 QR'}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex-1 relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">{CURRENCY}</span>
+                          <input type="number" min="0" step="0.01" placeholder="0.00" value={entry.amount}
+                            onChange={e => updateSplit(idx, 'amount', e.target.value)}
+                            className="w-full pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none focus:border-orange-400" disabled={processing} />
+                        </div>
+                        {splits.length > 1 && (
+                          <button onClick={() => setSplits(prev => prev.filter((_, i) => i !== idx))} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
+                            <Minus className="size-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {splits.length < 3 && !splitExact && (
+                      <button onClick={addSplitRow} className="w-full py-2 border border-dashed border-orange-300 rounded-lg text-orange-600 text-xs font-medium hover:bg-orange-100/50 flex items-center justify-center gap-1.5 transition-colors">
+                        <Plus className="size-3.5" /> Add Payment Method
                       </button>
                     )}
                   </div>
-                ))}
-                {splits.length < 3 && (
-                  <button onClick={addSplitRow} className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-800 py-1" disabled={processing}>
-                    <Plus className="size-3.5" /> Add payment method
-                  </button>
                 )}
+
+                <button
+                  onClick={handlePayment}
+                  disabled={processing || (paymentMode === 'mix' && !splitExact)}
+                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {processing ? (
+                    <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>Complete Payment • {fmt(totals.total)}</>
+                  )}
+                </button>
               </div>
             )}
-
-            <button onClick={handlePayment}
-              disabled={!paymentMode || processing || (paymentMode === 'mix' && !splitExact)}
-              className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
-              <CheckCircle className="size-4" />
-              {processing ? 'Processing…' : `Confirm Payment — ${fmt(totals.total)}`}
-            </button>
-          </div>
-        )}
-
-        {order.status === 'completed' && (
-          <div className="px-6 py-4 border-t bg-emerald-50">
-            <div className="flex items-center justify-center gap-2 text-emerald-700 font-medium">
-              <CheckCircle className="size-4" />
-              <span>Bill already paid via {order.paymentMethod}</span>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>

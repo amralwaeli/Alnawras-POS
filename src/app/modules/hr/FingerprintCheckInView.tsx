@@ -82,8 +82,8 @@ function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Da
           <p className="font-semibold text-white">
             {scannerReady ? 'Place Finger to Scan' : 'Scanner Not Ready'}
           </p>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {scannerReady ? 'Touch the fingerprint sensor' : 'Click "Connect Scanner" in the top bar'}
+          <p className="text-sm text-gray-500 mt-0.5 italic">
+            {scannerReady ? 'Attendance active within 30 min of shift start/end' : 'Click "Connect Scanner" in the top bar'}
           </p>
         </div>
       </button>

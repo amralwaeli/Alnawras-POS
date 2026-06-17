@@ -328,8 +328,8 @@ export class HRController {
       const nowMins = now.getHours() * 60 + now.getMinutes();
       const shiftStartMins = timeToMinutes(employee.shiftStart);
       const shiftEndMins = timeToMinutes(employee.shiftEnd);
-      const allowedInMins = shiftStartMins - employee.earlyCheckinMinutes;
-      const allowedOutMins = shiftEndMins + employee.lateCheckoutMinutes;
+      const allowedInMins = shiftStartMins - 30; // 30-minute rule
+      const allowedOutMins = shiftEndMins + 30; // 30-minute rule
 
       // Fetch existing log for today
       const { data: existingLog } = await supabase
@@ -340,13 +340,15 @@ export class HRController {
         .maybeSingle();
 
       if (!existingLog) {
-        // ── CHECK IN ──
+        // ── AUTOMATED CHECK IN ──
         if (nowMins < allowedInMins) {
-          return { success: false, error: `Check-in not allowed before ${minutesToTime(allowedInMins)}` };
+          return { success: false, error: `Too early. You can scan starting at ${minutesToTime(allowedInMins)}` };
         }
+        
         const lateMinutes = Math.max(0, nowMins - shiftStartMins);
         const status = lateMinutes > 0 ? 'late' : 'on-time';
         const id = uid('att');
+        
         const { data: newLog, error } = await supabase
           .from('attendance_logs')
           .insert({
@@ -371,26 +373,30 @@ export class HRController {
           success: true,
           action: 'check-in',
           log: mapAttendanceLog(newLog),
-          statusLabel: lateMinutes > 0 ? `Late by ${lateMinutes} min` : 'On Time',
+          statusLabel: lateMinutes > 0 ? `Late by ${lateMinutes} min` : 'Clocked In',
         };
       } else {
-        // ── CHECK OUT ──
+        // ── AUTOMATED CHECK OUT ──
         if (existingLog.check_out_time) {
-          return { success: false, error: 'Already checked out today' };
-        }
-        if (nowMins < timeToMinutes(employee.shiftStart)) {
-          return { success: false, error: 'Cannot check out before shift starts' };
+          return { success: false, error: 'Already clocked out for today' };
         }
 
-        const checkInMins = (() => {
-          const ci = new Date(existingLog.check_in_time);
-          return ci.getHours() * 60 + ci.getMinutes();
-        })();
-        const workedMins = nowMins - checkInMins;
-        const scheduledWorkMins = shiftEndMins - shiftStartMins;
+        const checkInTime = new Date(existingLog.check_in_time);
+        const minsSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
+        
+        // Prevent accidental double-scan (ignore scans within 5 minutes of check-in)
+        if (minsSinceCheckIn < 5) {
+          return { success: false, error: 'Recently clocked in. Please wait a few minutes before clocking out.' };
+        }
+
+        const workedMins = Math.round(minsSinceCheckIn);
         const earlyLeaveMinutes = Math.max(0, shiftEndMins - nowMins);
-        const overtimeMinutes = Math.max(0, nowMins - allowedOutMins);
-        const status = earlyLeaveMinutes > 0 ? 'early-leave' : existingLog.status;
+        const overtimeMinutes = Math.max(0, nowMins - shiftEndMins);
+        
+        // ── AUTOMATED CHECK OUT WINDOW ENFORCEMENT ──
+        if (nowMins > allowedOutMins) {
+          return { success: false, error: `Too late. Clock-out was only allowed until ${minutesToTime(allowedOutMins)}` };
+        }
 
         const { data: updatedLog, error } = await supabase
           .from('attendance_logs')
@@ -398,25 +404,19 @@ export class HRController {
             check_out_time: now.toISOString(),
             early_leave_minutes: earlyLeaveMinutes,
             overtime_minutes: overtimeMinutes,
-            check_out_method: method,
-            status,
+            total_hours: (workedMins / 60).toFixed(2),
+            status: earlyLeaveMinutes > 0 ? 'left-early' : 'completed'
           })
           .eq('id', existingLog.id)
           .select()
           .single();
+
         if (error) throw error;
-
-        const label = earlyLeaveMinutes > 0
-          ? `Early leave by ${earlyLeaveMinutes} min`
-          : overtimeMinutes > 0
-          ? `Overtime: ${overtimeMinutes} min`
-          : 'Full shift completed';
-
         return {
           success: true,
           action: 'check-out',
           log: mapAttendanceLog(updatedLog),
-          statusLabel: label,
+          statusLabel: `Clocked Out. Worked: ${(workedMins / 60).toFixed(1)} hrs`,
         };
       }
     } catch (err: any) {

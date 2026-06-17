@@ -51,12 +51,14 @@ const ReportsView            = lazy(() => import('./modules/reports').then(m => 
 
 const AccountingView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.AccountingView })));
 const BillFormatView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.BillFormatView })));
+const ShiftManagementView    = lazy(() => import('./modules/accounting/ShiftManagementView').then(m => ({ default: m.ShiftManagementView })));
 const QuotationsView         = lazy(() => import('./modules/quotations').then(m => ({ default: m.QuotationsView })));
 const InvoicesView           = lazy(() => import('./modules/invoices').then(m => ({ default: m.InvoicesView })));
 
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
+const CustomerMonitorView    = lazy(() => import('./modules/shared/CustomerMonitorView').then(m => ({ default: m.CustomerMonitorView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 function PageLoader() {
@@ -123,6 +125,7 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
+      { path: 'shifts',              element: <Lazy><ProtectedRoute permission="canManageAccounting"><ShiftManagementView /></ProtectedRoute></Lazy> },
       { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><QuotationsView /></ProtectedRoute></Lazy> },
       { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><InvoicesView /></ProtectedRoute></Lazy> },
 
@@ -164,4 +167,5 @@ export const router = createHashRouter([
   { path: '/table/:tableId',      element: <Lazy><QROrderingView /></Lazy> },
   { path: '/order/table-:tableNumber', element: <Lazy><TableRedirectView /></Lazy> },
   { path: '/order/:tableSlug',    element: <Lazy><TableRedirectView /></Lazy> },
+  { path: '/customer-monitor',    element: <Lazy><CustomerMonitorView /></Lazy> },
 ]);

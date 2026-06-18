@@ -14,7 +14,17 @@
 -- types.ts references columns prod lacks.
 -- ============================================================
 
--- ─── 1. employees: add the columns the application requires ──
+-- ─── 1. users: Rename 'position' to 'job_role' ───────────────
+-- This fixes the reserved keyword conflict.
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_name = 'users' AND column_name = 'position') THEN
+    ALTER TABLE users RENAME COLUMN "position" TO job_role;
+  END IF;
+END $$;
+
+-- ─── 2. employees: add the columns the application requires ──
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS employee_number TEXT,
   ADD COLUMN IF NOT EXISTS email           TEXT,
@@ -33,13 +43,13 @@ ALTER TABLE employees ALTER COLUMN employee_number SET NOT NULL;
 ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_no_admin;
 ALTER TABLE employees ADD  CONSTRAINT employees_no_admin CHECK (role <> 'admin');
 
--- ─── 2. users: extend the role CHECK to the full role set ────
+-- ─── 3. users: extend the role CHECK to the full role set ────
 -- UserRole in types.ts defines 10 roles; prod allowed only 8.
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD  CONSTRAINT users_role_check CHECK (role IN
   ('admin','cashier','waiter','kitchen','hr','juice','staff','accounting','manager','supervisor'));
 
--- ─── 3. leave_requests: create the missing table ─────────────
+-- ─── 4. leave_requests: create the missing table ─────────────
 CREATE TABLE IF NOT EXISTS leave_requests (
   id          TEXT PRIMARY KEY,
   employee_id TEXT NOT NULL,

@@ -55,14 +55,14 @@ CREATE OR REPLACE FUNCTION public.verify_staff_pin(p_pin TEXT)
 RETURNS TABLE (
   id TEXT, name TEXT, employment_number TEXT, role TEXT, email TEXT,
   status TEXT, branch_id TEXT, created_at TIMESTAMPTZ,
-  hire_date DATE, hourly_rate NUMERIC, position TEXT
+  hire_date DATE, hourly_rate NUMERIC, job_role TEXT
 )
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
   SELECT u.id, u.name, u.employment_number, u.role, u.email, u.status,
-         u.branch_id, u.created_at, u.hire_date, u.hourly_rate, u.position
+         u.branch_id, u.created_at, u.hire_date, u.hourly_rate, u.job_role
   FROM users u
   WHERE u.status = 'active'
     AND u.pin_hash IS NOT NULL

@@ -25,6 +25,7 @@ const TablesView             = lazy(() => import('./modules/tables').then(m => (
 const TableManagementView    = lazy(() => import('./modules/tables').then(m => ({ default: m.TableManagementView })));
 const TableOrderingView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableOrderingView })));
 const QROrderingView         = lazy(() => import('./modules/tables').then(m => ({ default: m.QROrderingView })));
+const SecureQROrderingView   = lazy(() => import('./modules/tables').then(m => ({ default: m.SecureQROrderingView })));
 const TableQRView            = lazy(() => import('./modules/tables').then(m => ({ default: m.TableQRView })));
 const TableRedirectView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableRedirectView })));
 
@@ -164,8 +165,14 @@ export const router = createHashRouter([
   },
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
+
+  // ── Secure QR ordering (new) — token-based, no table ID in URL ──
+  { path: '/order/qr/:token',     element: <Lazy><SecureQROrderingView /></Lazy> },
+
+  // ── Legacy QR routes — kept for backward compatibility ──
   { path: '/table/:tableId',      element: <Lazy><QROrderingView /></Lazy> },
   { path: '/order/table-:tableNumber', element: <Lazy><TableRedirectView /></Lazy> },
   { path: '/order/:tableSlug',    element: <Lazy><TableRedirectView /></Lazy> },
+
   { path: '/customer-monitor',    element: <Lazy><CustomerMonitorView /></Lazy> },
 ]);

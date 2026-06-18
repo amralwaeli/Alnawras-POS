@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
   branch_id         TEXT NOT NULL,
   hire_date         DATE,
   hourly_rate       DECIMAL(10,2) DEFAULT 0,
-  position          TEXT,
+  job_role          TEXT,
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 

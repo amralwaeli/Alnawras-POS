@@ -4,7 +4,7 @@ import {
   ShoppingCart, AlertTriangle, ArrowRight, Activity,
   TrendingUp, Package, Clock, ShoppingBag, Utensils,
   CreditCard, BarChart2, X, QrCode, UserCheck, Trophy, Star,
-  Users, Building2, Bell,
+  Users, Building2, Bell, Download,
 } from 'lucide-react';
 import { orderTotal, fmt } from '../../../lib/currency';
 import { useMemo, useState, useEffect } from 'react';
@@ -281,463 +281,267 @@ function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
 // ─── Waiter Leaderboard ───────────────────────────────────────────────────────
 function WaiterLeaderboard({ orders, users }: { orders: any[]; users: any[] }) {
   const waiters = users.filter(u => u.role === 'waiter');
+  const performance = waiters.map(w => {
+    const wOrders = orders.filter(o =>
+      (o.items ?? o.order_items ?? []).some((i: any) => i.addedBy === w.id)
+    );
+    return {
+      id: w.id,
+      name: w.name,
+      count: wOrders.length,
+      total: wOrders.reduce((acc, o) => acc + orderTotal(o), 0),
+    };
+  }).sort((a, b) => b.total - a.total).slice(0, 5);
 
-  const stats = useMemo(() => {
-    return waiters.map(w => {
-      const myItems = orders.flatMap(o => (o.items ?? []).filter((i: any) => i.addedBy === w.id));
-      const myOrders = orders.filter(o => (o.items ?? []).some((i: any) => i.addedBy === w.id));
-      const totalQty = myItems.reduce((s: number, i: any) => s + (i.quantity ?? 1), 0);
-      const totalRevenue = myItems.reduce((s: number, i: any) => s + ((i.price ?? 0) * (i.quantity ?? 1)), 0);
+  if (performance.length === 0) return <p className="text-xs text-gray-400 py-4 text-center">No waiter activity yet today.</p>;
 
-      const responseTimes = myOrders.map(o => {
-        const firstItem = (o.items ?? [])
-          .filter((i: any) => i.addedBy === w.id)
-          .map((i: any) => i.addedAt instanceof Date ? i.addedAt.getTime() : (i.created_at ? new Date(i.created_at).getTime() : null))
-          .filter(Boolean)
-          .sort((a: number, b: number) => a - b)[0];
-        const orderTime = o.createdAt instanceof Date ? o.createdAt.getTime() : new Date(o.createdAt).getTime();
-        return firstItem ? (firstItem - orderTime) / 1000 / 60 : null;
-      }).filter((t): t is number => t !== null && t >= 0 && t < 60);
-
-      const avgResponse = responseTimes.length
-        ? responseTimes.reduce((s, t) => s + t, 0) / responseTimes.length
-        : null;
-
-      return { waiter: w, ordersCount: myOrders.length, itemsCount: totalQty, revenue: totalRevenue, avgResponse };
-    }).sort((a, b) => b.ordersCount - a.ordersCount);
-  }, [orders, users]);
-
-  const medals = ['🥇', '🥈', '🥉'];
+  const maxTotal = Math.max(...performance.map(p => p.total), 1);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Trophy className="size-4 text-amber-500" />
-        <h3 className="font-bold text-gray-900">Waiter Performance</h3>
-      </div>
-
-      {stats.length === 0 ? (
-        <p className="text-xs text-gray-400 text-center py-4">No waiter data yet</p>
-      ) : (
-        <div className="space-y-3">
-          {stats.map((s, i) => (
-            <div key={s.waiter.id} className={`rounded-xl p-3 ${i === 0 && s.ordersCount > 0 ? 'bg-amber-50 border border-amber-100' : 'bg-gray-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-base leading-none">{medals[i] ?? '·'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-gray-900 truncate">{s.waiter.name}</p>
-                  <p className="text-[10px] text-gray-400 font-medium">{s.waiter.email ?? ''}</p>
-                </div>
-                {i === 0 && s.ordersCount > 0 && (
-                  <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                    <Star className="size-2.5" /> BEST
-                  </span>
-                )}
+    <div className="space-y-4">
+      {performance.map((p, i) => (
+        <div key={p.id} className="group">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <div className={`size-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                {i === 0 ? <Trophy className="size-3" /> : i + 1}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-white rounded-lg py-1.5">
-                  <p className="text-base font-bold text-blue-600">{s.ordersCount}</p>
-                  <p className="text-[9px] text-gray-400 font-medium">Orders</p>
-                </div>
-                <div className="bg-white rounded-lg py-1.5">
-                  <p className="text-base font-bold text-emerald-600">{s.itemsCount}</p>
-                  <p className="text-[9px] text-gray-400 font-medium">Items</p>
-                </div>
-                <div className="bg-white rounded-lg py-1.5">
-                  {s.avgResponse !== null ? (
-                    <>
-                      <p className="text-base font-bold text-purple-600">{s.avgResponse.toFixed(0)}m</p>
-                      <p className="text-[9px] text-gray-400 font-medium">Avg Speed</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-base font-bold text-gray-300">—</p>
-                      <p className="text-[9px] text-gray-400 font-medium">Speed</p>
-                    </>
-                  )}
-                </div>
-              </div>
-              {s.revenue > 0 && (
-                <p className="text-[11px] text-gray-500 mt-2 text-right">
-                  Generated <span className="font-bold text-gray-700">{fmt(s.revenue)}</span>
-                </p>
-              )}
+              <span className="text-xs font-bold text-gray-700">{p.name}</span>
             </div>
-          ))}
-        </div>
-      )}
-
-      <div className="border-t mt-4 pt-3 grid grid-cols-2 gap-2 text-center">
-        {[
-          { role: 'cashier', label: 'Cashiers', color: 'text-emerald-600' },
-          { role: 'admin',   label: 'Admins',   color: 'text-purple-600' },
-        ].map(({ role, label, color }) => (
-          <div key={role} className="bg-gray-50 rounded-xl py-2">
-            <p className={`text-lg font-bold ${color}`}>{users.filter(u => u.role === role).length}</p>
-            <p className="text-[10px] text-gray-500 font-medium">{label}</p>
+            <span className="text-xs font-bold text-gray-900">{fmt(p.total)}</span>
           </div>
-        ))}
-      </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${(p.total / maxTotal) * 100}%` }} />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-[10px] text-gray-400">{p.count} orders</span>
+            <span className="text-[10px] text-gray-400">{Math.round((p.total / maxTotal) * 100)}% of top</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ─── Live Clock ───────────────────────────────────────────────────────────────
-function LiveClock() {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <span className="text-sm font-mono text-gray-500">
-      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-    </span>
-  );
-}
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
 export function AdminDashboardView() {
-  const { currentUser, orders, tables, products, users } = usePOS();
+  const { orders, products, users, supabase } = usePOS();
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [workforce, setWorkforce] = useState<{
-    total: number; present: number; absent: number;
-    late: number; onLeave: number; clockedOut: number;
-  } | null>(null);
+  const [lowStock, setLowStock] = useState<any[]>([]);
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
-  useEffect(() => {
-    if (!currentUser) return;
-    WorkforceController.getTodaySnapshot(currentUser.branchId ?? 'branch-1')
-      .then(r => { if (r.success) setWorkforce(r.data); });
-  }, [currentUser?.branchId]);
-
-  if (!currentUser) return null;
-
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today);
-  const todayCompleted = todayOrders.filter(o => o.status === 'completed');
-  const todayRevenue = todayCompleted.reduce((s, o) => s + orderTotal(o), 0);
-  const todayTakeaway = todayOrders.filter(o => (o.order_type ?? o.orderType) === 'takeaway').length;
-  const todayDineIn = todayOrders.filter(o => (o.order_type ?? o.orderType) === 'dine-in').length;
-  const openOrders = orders.filter(o => o.status === 'open');
-  const occupiedTables = tables.filter(t => t.status === 'occupied');
-  const lowStock = products.filter(p => p.stock <= (p.reorder_point || 5));
-
-  const last7Days = useMemo(() => Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const ds = d.toDateString();
-    const rev = orders
-      .filter(o => new Date(o.createdAt).toDateString() === ds && o.status === 'completed')
-      .reduce((s, o) => s + orderTotal(o), 0);
-    return { label: d.toLocaleDateString('en', { weekday: 'short' }), value: rev };
-  }), [orders]);
-
-  const revenueSpark = last7Days.map(d => d.value);
-
-  const topItems = useMemo(() => {
-    const map = new Map<string, number>();
-    orders.filter(o => o.status === 'completed').forEach(o => {
-      o.items?.forEach((item: any) => {
-        const n = item.productName || item.product_name || 'Item';
-        map.set(n, (map.get(n) || 0) + (item.quantity || 1));
-      });
-    });
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [orders]);
-
-  const peakHours = useMemo(() => {
-    const hours = Array(24).fill(0);
-    orders.filter(o => o.status === 'completed').forEach(o => {
-      const hour = new Date(o.createdAt).getHours();
-      hours[hour] += 1;
-    });
-    return hours.map((count, hour) => ({ hour, count }));
-  }, [orders]);
-
-  const recentOrders = useMemo(() =>
-    [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8),
-    [orders]
+  // Filter for today's data
+  const today = new Date().toISOString().split('T')[0];
+  const todayOrders = useMemo(() =>
+    orders.filter(o => o.createdAt.startsWith(today)),
+    [orders, today]
   );
 
-  const paymentBreakdown = useMemo(() => {
-    const map = new Map<string, number>();
-    orders.filter(o => o.status === 'completed' && o.paymentMethod).forEach(o => {
-      const method = (o.paymentMethod as string).split(' ')[0].toLowerCase();
-      map.set(method, (map.get(method) || 0) + orderTotal(o));
-    });
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  }, [orders]);
+  const stats = useMemo(() => {
+    const revenue = todayOrders.reduce((acc, o) => acc + orderTotal(o), 0);
+    const count = todayOrders.length;
+    const avg = count > 0 ? revenue / count : 0;
+    const completed = todayOrders.filter(o => o.status === 'completed').length;
 
-  const totalRevenue = orders.filter(o => o.status === 'completed').reduce((s, o) => s + orderTotal(o), 0);
+    // Peak Hours calculation
+    const hourMap = new Array(24).fill(0);
+    todayOrders.forEach(o => {
+      const hour = new Date(o.createdAt).getHours();
+      hourMap[hour]++;
+    });
+    const peakHour = hourMap.indexOf(Math.max(...hourMap));
+
+    return { revenue, count, avg, completed, peakHour, hourMap };
+  }, [todayOrders]);
+
+  // Low stock calculation
+  useEffect(() => {
+    const low = products.filter(p => p.stock <= (p.reorder_point || 5));
+    setLowStock(low);
+  }, [products]);
+
+  // Backup function for Android
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      const tables = ['users', 'products', 'orders', 'order_items', 'employees', 'attendance_logs', 'shifts'];
+      const backupData: any = {};
+
+      for (const table of tables) {
+        const { data } = await supabase.from(table).select('*');
+        backupData[table] = data;
+      }
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alnawras-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Backup failed:', err);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
 
   return (
-    <div className="h-full overflow-y-auto" style={{ background: '#f8fafc' }}>
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Admin Dashboard</h1>
+          <p className="text-gray-500 font-medium flex items-center gap-2 mt-1">
+            <Building2 className="size-4" /> Alnawras Restaurant · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBackup}
+            disabled={isBackingUp}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+          >
+            <Download className={`size-4 ${isBackingUp ? 'animate-bounce' : ''}`} />
+            {isBackingUp ? 'Backing up...' : 'Download Backup'}
+          </button>
+          <Link to="/inventory" className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
+            <Package className="size-4" /> Manage Inventory
+          </Link>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
+      {/* Low Stock Alert */}
+      {lowStock.length > 0 && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center justify-between animate-pulse">
           <div className="flex items-center gap-3">
-            <LiveClock />
-            <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl">
-              <Activity className="size-3.5 text-emerald-500 animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-700">Live</span>
+            <div className="bg-red-100 p-2 rounded-xl">
+              <AlertTriangle className="size-5 text-red-600" />
             </div>
-          </div>
-        </div>
-
-        {lowStock.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex items-center gap-4">
-              <div className="size-12 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
-                <Bell className="size-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-900">Low Stock Alert</h3>
-                <p className="text-sm text-amber-700">{lowStock.length} items are below their reorder point.</p>
-              </div>
-            </div>
-            <Link to="/inventory" className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition-colors">
-              Manage Stock
-            </Link>
-          </div>
-        )}
-
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Today's Revenue" value={fmt(todayRevenue)} sub={`${todayCompleted.length} paid orders`}
-            icon={TrendingUp} accent="#10b981"
-            trend={revenueSpark[revenueSpark.length-1] >= revenueSpark[revenueSpark.length-2] ? '↑' : '↓'}
-            sparkData={revenueSpark} />
-          <KpiCard label="Orders Today" value={todayOrders.length}
-            sub={`${todayDineIn} dine-in · ${todayTakeaway} takeaway`}
-            icon={ShoppingCart} accent="#3b82f6" />
-          <KpiCard label="Tables Occupied" value={`${occupiedTables.length} / ${tables.length}`}
-            sub={`${tables.filter(t => t.status === 'available').length} available`}
-            icon={Utensils} accent="#8b5cf6" />
-          <KpiCard label="Low Stock" value={lowStock.length}
-            sub={lowStock.length > 0 ? lowStock.slice(0,2).map(p=>p.name).join(', ') : 'All items stocked'}
-            icon={AlertTriangle} accent={lowStock.length > 0 ? '#f59e0b' : '#10b981'} />
-        </div>
-
-        {/* Middle Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-bold text-gray-900">Revenue — Last 7 Days</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Completed orders only</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400">Total</p>
-                <p className="text-lg font-bold text-gray-900">{fmt(totalRevenue)}</p>
-              </div>
-            </div>
-            <RevenueChart days={last7Days} />
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-4">
             <div>
-              <h3 className="font-bold text-gray-900">Today's Mix</h3>
-              <p className="text-xs text-gray-400 mt-0.5">By order type</p>
-            </div>
-            <div className="space-y-3">
-              {[
-                { label: 'Dine-in',  count: todayDineIn,    total: todayOrders.length, color: '#3b82f6', icon: Utensils },
-                { label: 'Takeaway', count: todayTakeaway,  total: todayOrders.length, color: '#8b5cf6', icon: ShoppingBag },
-              ].map(({ label, count, total, color, icon: Icon }) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <Icon className="size-3.5" style={{ color }} />
-                      <span className="text-sm font-medium text-gray-700">{label}</span>
-                    </div>
-                    <span className="text-sm font-bold text-gray-900">{count}</span>
-                  </div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${total ? (count / total) * 100 : 0}%`, background: color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="border-t pt-3 mt-auto">
-              <p className="text-xs text-gray-500 font-medium mb-2">Payment Methods</p>
-              <div className="space-y-2">
-                {paymentBreakdown.length === 0 ? (
-                  <p className="text-xs text-gray-400">No completed payments yet</p>
-                ) : paymentBreakdown.slice(0,3).map(([method, amount]) => (
-                  <div key={method} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <CreditCard className="size-3 text-gray-400" />
-                      <span className="text-xs text-gray-600 capitalize">{method}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-gray-800">{fmt(amount)}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm font-bold text-red-900">{lowStock.length} Items Running Low</p>
+              <p className="text-xs text-red-600">Restock soon to avoid service interruptions.</p>
             </div>
           </div>
+          <Link to="/inventory" className="text-xs font-bold text-red-700 hover:underline">View Items →</Link>
         </div>
+      )}
 
-        {/* Today's Workforce */}
-        {workforce && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KpiCard
+          label="Today's Revenue"
+          value={fmt(stats.revenue)}
+          sub={`${stats.completed} paid orders`}
+          icon={TrendingUp}
+          accent="#10b981"
+          trend="+12%"
+        />
+        <KpiCard
+          label="Total Orders"
+          value={stats.count}
+          sub="Dine-in & Takeaway"
+          icon={ShoppingBag}
+          accent="#3b82f6"
+          trend="+5%"
+        />
+        <KpiCard
+          label="Average Bill"
+          value={fmt(stats.avg)}
+          sub="Per customer"
+          icon={CreditCard}
+          accent="#f59e0b"
+        />
+        <KpiCard
+          label="Peak Hour"
+          value={`${stats.peakHour}:00`}
+          sub="Busiest time today"
+          icon={Clock}
+          accent="#8b5cf6"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Recent Activity */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Revenue Chart */}
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="font-bold text-gray-900">Revenue Flow</h3>
+                <p className="text-xs text-gray-400">Hourly order volume today</p>
+              </div>
               <div className="flex items-center gap-2">
-                <div className="size-8 rounded-xl bg-violet-50 flex items-center justify-center">
-                  <Building2 className="size-4 text-violet-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Today's Workforce</h3>
-                  <p className="text-xs text-gray-400">{workforce.total} employees scheduled</p>
-                </div>
+                <span className="size-2 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Live</span>
               </div>
-              <Link to="/workforce/attendance"
-                className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700">
-                Full View <ArrowRight className="size-3.5" />
-              </Link>
             </div>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {[
-                { label: 'Present',     value: workforce.present,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Clocked Out', value: workforce.clockedOut,  color: 'text-blue-600',   bg: 'bg-blue-50' },
-                { label: 'Absent',      value: workforce.absent,      color: 'text-red-600',    bg: 'bg-red-50' },
-                { label: 'Late',        value: workforce.late,        color: 'text-amber-600',  bg: 'bg-amber-50' },
-                { label: 'On Leave',    value: workforce.onLeave,     color: 'text-purple-600', bg: 'bg-purple-50' },
-                { label: 'Total',       value: workforce.total,       color: 'text-gray-700',   bg: 'bg-gray-50' },
-              ].map(s => (
-                <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
-                  <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Recent Orders — clickable */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <div>
-                <h3 className="font-bold text-gray-900">Recent Orders</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{openOrders.length} currently open · tap a row to see full details</p>
-              </div>
-              <Link to="/tables" className="flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700">
-                All tables <ArrowRight className="size-3.5" />
-              </Link>
-            </div>
-            <div>
-              {recentOrders.length === 0 ? (
-                <div className="text-center py-10 text-gray-300">
-                  <Clock className="size-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No orders yet</p>
-                </div>
-              ) : recentOrders.map(o => (
-                <OrderRow key={o.id} order={o} onClick={() => setSelectedOrder(o)} />
-              ))}
-            </div>
+            <RevenueChart days={stats.hourMap.map((v, i) => ({ label: `${i}h`, value: v }))} />
           </div>
 
-          {/* Right column */}
-          <div className="space-y-4">
-            {/* Top items */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-900">Top Items</h3>
-                <BarChart2 className="size-4 text-gray-300" />
-              </div>
-              {topItems.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">No sales data yet</p>
+          {/* Recent Orders */}
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-gray-900">Recent Orders</h3>
+              <Link to="/reports" className="text-xs font-bold text-blue-600 hover:underline">View All</Link>
+            </div>
+            <div className="space-y-1">
+              {todayOrders.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Activity className="size-8 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-400 font-medium">No orders yet today</p>
+                </div>
               ) : (
-                <div className="space-y-2.5">
-                  {topItems.map(([name, qty], i) => {
-                    const maxQty = topItems[0][1];
-                    return (
-                      <div key={name}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-medium text-gray-700 truncate max-w-[70%]">{name}</span>
-                          <span className="text-xs font-bold text-gray-900">{qty}×</span>
-                        </div>
-                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full"
-                            style={{ width: `${(qty / maxQty) * 100}%`, background: ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444'][i] }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                todayOrders.slice(0, 8).map(order => (
+                  <OrderRow key={order.id} order={order} onClick={() => setSelectedOrder(order)} />
+                ))
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Peak Hours */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-900">Peak Hours</h3>
-                <Clock className="size-4 text-gray-300" />
-              </div>
-              <div className="h-32 flex items-end gap-1 px-1">
-                {peakHours.map(({ hour, count }) => {
-                  const maxCount = Math.max(...peakHours.map(h => h.count)) || 1;
-                  const height = (count / maxCount) * 100;
-                  const isCurrentHour = new Date().getHours() === hour;
-                  return (
-                    <div key={hour} className="flex-1 flex flex-col items-center gap-1 group relative">
-                      <div 
-                        className={`w-full rounded-t-sm transition-all duration-500 ${isCurrentHour ? 'bg-amber-500' : 'bg-blue-100 group-hover:bg-blue-200'}`}
-                        style={{ height: `${Math.max(4, height)}%` }}
-                      >
-                        {count > 0 && (
-                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                            {count} orders
-                          </div>
-                        )}
-                      </div>
-                      <span className={`text-[8px] ${isCurrentHour ? 'font-bold text-amber-600' : 'text-gray-400'}`}>
-                        {hour}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        {/* Right Column: Insights */}
+        <div className="space-y-8">
+          {/* Waiter Performance */}
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Star className="size-4 text-amber-500" /> Top Performers
+            </h3>
+            <WaiterLeaderboard orders={todayOrders} users={users} />
+          </div>
 
-            {/* Waiter leaderboard */}
-            <WaiterLeaderboard orders={orders} users={users} />
-
-            {/* Quick links */}
-            <div className="bg-gray-900 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-white mb-3 text-sm">Quick Actions</h3>
-              <div className="space-y-2">
-                {[
-                  { to: '/tables',    label: 'Tables',    icon: Utensils  },
-                  { to: '/inventory', label: 'Inventory', icon: Package   },
-                  { to: '/reports',   label: 'Reports',   icon: BarChart2 },
-                ].map(({ to, label, icon: Icon }) => (
-                  <Link key={to} to={to}
-                    className="flex items-center justify-between bg-white/8 hover:bg-white/15 px-3 py-2.5 rounded-xl transition-colors group">
-                    <div className="flex items-center gap-2">
-                      <Icon className="size-3.5 text-gray-400 group-hover:text-white transition-colors" />
-                      <span className="text-xs font-semibold text-gray-300 group-hover:text-white transition-colors">{label}</span>
-                    </div>
-                    <ArrowRight className="size-3.5 text-gray-600 group-hover:text-white transition-colors" />
-                  </Link>
-                ))}
+          {/* Quick Actions */}
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 text-white shadow-xl shadow-gray-200">
+            <h3 className="font-bold mb-4">Quick Insights</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-white/10 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <Users className="size-4 text-blue-300" />
+                  </div>
+                  <span className="text-xs font-medium">Active Staff</span>
+                </div>
+                <span className="text-sm font-bold">{users.filter(u => u.status === 'active').length}</span>
               </div>
+              <div className="flex items-center justify-between p-3 bg-white/10 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <Package className="size-4 text-emerald-300" />
+                  </div>
+                  <span className="text-xs font-medium">Total Products</span>
+                </div>
+                <span className="text-sm font-bold">{products.length}</span>
+              </div>
+              <button className="w-full mt-2 py-3 bg-white text-gray-900 rounded-2xl font-black text-sm hover:bg-gray-100 transition-colors">
+                View Detailed Reports
+              </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Order Detail Modal */}
       {selectedOrder && (
         <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       )}

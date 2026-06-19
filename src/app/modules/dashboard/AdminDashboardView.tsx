@@ -330,10 +330,17 @@ export function AdminDashboardView() {
   const [isBackingUp, setIsBackingUp] = useState(false);
 
   // Filter for today's data
-  const today = new Date().toISOString().split('T')[0];
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   const todayOrders = useMemo(() =>
-    orders.filter(o => o.createdAt.startsWith(today)),
-    [orders, today]
+    orders.filter(o => {
+      const date = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+      return date >= todayStart;
+    }),
+    [orders, todayStart]
   );
 
   const stats = useMemo(() => {
@@ -345,7 +352,7 @@ export function AdminDashboardView() {
     // Peak Hours calculation
     const hourMap = new Array(24).fill(0);
     todayOrders.forEach(o => {
-      const hour = new Date(o.createdAt).getHours();
+      const hour = (o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt)).getHours();
       hourMap[hour]++;
     });
     const peakHour = hourMap.indexOf(Math.max(...hourMap));

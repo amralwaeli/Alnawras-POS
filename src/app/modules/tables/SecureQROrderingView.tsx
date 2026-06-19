@@ -1,52 +1,48 @@
 /**
  * SecureQROrderingView.tsx
  *
- * The customer-facing ordering page reached via a secure QR code.
- * The URL contains only a random token — never the real table ID.
+ * Customer-facing ordering page reached via a secure QR code.
+ * The URL contains only a random token — the real table ID is never exposed.
  *
- * On load it:
- *   1. Validates the token against `qr_sessions` in Supabase.
- *   2. Checks the token has not expired (TTL = 12 h).
- *   3. Resolves the real tableId internally — the customer never sees it.
- *   4. Renders the full ordering UI (identical to QROrderingView).
- *
- * If the token is invalid, expired, or tampered with, the customer sees
- * a friendly "Invalid QR Code" screen with no further information.
+ * Flow:
+ *   1. Read token from URL param.
+ *   2. Validate token against qr_sessions in Supabase (checks active + expiry).
+ *   3. Resolve the real tableId internally.
+ *   4. Render the full ordering UI with the resolved tableId.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router';
+import { supabase } from '../../../lib/supabase';
 import { validateQrToken, QrSession } from '../../services/QrService';
-import { QROrderingView } from './QROrderingView';
-import { X, UtensilsCrossed, ShieldAlert } from 'lucide-react';
+import { Product, Category, Table } from '../../models/types';
+import { OrderController } from '../../controllers/OrderController';
+import { toast } from 'sonner';
+import {
+  Plus, Minus, ShoppingCart, Search, X,
+  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, ShieldAlert,
+} from 'lucide-react';
 
-type State = 'loading' | 'valid' | 'invalid' | 'expired';
+// ─── Token validation wrapper ─────────────────────────────────────────────────
+
+type ValidationState = 'loading' | 'valid' | 'invalid';
 
 export function SecureQROrderingView() {
   const { token } = useParams<{ token: string }>();
-  const [state, setState] = useState<State>('loading');
+  const [state, setState] = useState<ValidationState>('loading');
   const [session, setSession] = useState<QrSession | null>(null);
 
   useEffect(() => {
     const validate = async () => {
       if (!token) { setState('invalid'); return; }
-
       const result = await validateQrToken(token);
-
-      if (!result) {
-        // Could be invalid OR expired — we don't tell the customer which.
-        setState('invalid');
-        return;
-      }
-
+      if (!result) { setState('invalid'); return; }
       setSession(result);
       setState('valid');
     };
-
     void validate();
   }, [token]);
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (state === 'loading') {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3]">
@@ -61,118 +57,69 @@ export function SecureQROrderingView() {
     );
   }
 
-  // ── Invalid / Expired ─────────────────────────────────────────────────────
-  if (state === 'invalid' || state === 'expired') {
+  if (state === 'invalid') {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
         <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
           <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5">
-            {state === 'expired'
-              ? <ShieldAlert className="size-10 text-red-500" />
-              : <X className="size-10 text-red-500" />}
+            <ShieldAlert className="size-10 text-red-500" />
           </div>
-          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">
-            {state === 'expired' ? 'QR Code Expired' : 'Invalid QR Code'}
-          </h2>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Invalid QR Code</h2>
           <p className="text-sm text-gray-400">
-            {state === 'expired'
-              ? 'This QR code has expired. Please ask a team member to generate a new one for your table.'
-              : 'This QR code is not valid. Please scan the QR code on your table or ask a team member for help.'}
+            This QR code is invalid or has expired. Please scan the QR code on your table
+            or ask a team member for help.
           </p>
         </div>
       </div>
     );
   }
 
-  // ── Valid — render the full ordering UI using the resolved tableId ────────
-  // We pass the tableId via a URL-param-compatible wrapper so QROrderingView
-  // can use its existing `useParams({ tableId })` hook without modification.
   if (session) {
-    return <QROrderingViewWithId tableId={session.tableId} />;
+    return <SecureOrderingUI tableId={session.tableId} />;
   }
 
   return null;
 }
 
-/**
- * Thin wrapper that injects the resolved tableId into QROrderingView
- * without exposing it in the URL.
- */
-function QROrderingViewWithId({ tableId }: { tableId: string }) {
-  // We monkey-patch useParams by rendering QROrderingView inside a fake
-  // route context. The cleanest approach is to extract the core logic of
-  // QROrderingView into a prop-based component, but to avoid a large
-  // refactor we use a hidden route trick: render a child router with the
-  // resolved tableId baked into the path.
-  //
-  // Alternative (simpler): just re-render QROrderingView with a key that
-  // forces it to re-initialize, passing the tableId via state.
-  // Since QROrderingView reads `useParams().tableId`, we wrap it in a
-  // mini-router that provides that param.
+// ─── Full ordering UI (receives tableId as prop, never from URL) ──────────────
 
-  const { createHashRouter, RouterProvider } = require('react-router');
-  const innerRouter = createHashRouter([
-    {
-      path: '*',
-      element: <QROrderingView />,
-    },
-  ], {
-    // Provide the tableId as if it came from the URL
-    basename: `/table/${tableId}`,
-  });
-
-  // Simpler approach: render QROrderingView and override useParams via context
-  // Since we cannot easily override useParams, we use the direct approach:
-  // render the component inside a path that has the correct param.
-  return <_SecureOrderingBridge tableId={tableId} />;
+interface CartItem {
+  id: string;
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+  station: string;
+  notes: string;
 }
 
-/**
- * Renders the QR ordering UI directly, bypassing the router param,
- * by duplicating the minimal shell needed to pass tableId as a prop.
- * This avoids any router gymnastics.
- */
-import { useEffect as _useEffect, useMemo as _useMemo, useState as _useState } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { Product, Category, Table } from '../../models/types';
-import { OrderController } from '../../controllers/OrderController';
-import { toast } from 'sonner';
-import {
-  Plus, Minus, ShoppingCart, Search,
-  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed as _UtensilsCrossed,
-} from 'lucide-react';
+interface ExistingItem {
+  id: string;
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+  status: string;
+}
 
-function _SecureOrderingBridge({ tableId }: { tableId: string }) {
-  // This is a direct copy of QROrderingView's logic, but receiving
-  // tableId as a prop instead of from useParams.
-  // This ensures the real tableId is NEVER in the browser URL.
+function SecureOrderingUI({ tableId }: { tableId: string }) {
+  const [table, setTable]                 = useState<Table | null>(null);
+  const [orderId, setOrderId]             = useState<string | null>(null);
+  const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
+  const [products, setProducts]           = useState<Product[]>([]);
+  const [categories, setCategories]       = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [searchQuery, setSearchQuery]     = useState('');
+  const [cartItems, setCartItems]         = useState<CartItem[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [submitting, setSubmitting]       = useState(false);
+  const [success, setSuccess]             = useState(false);
+  const [invalidTable, setInvalidTable]   = useState(false);
+  const [callingWaiter, setCallingWaiter] = useState(false);
+  const [mobileView, setMobileView]       = useState<'menu' | 'cart'>('menu');
+  const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
 
-  interface CartItem {
-    id: string; productId: string; productName: string;
-    price: number; quantity: number; station: string; notes: string;
-  }
-  interface ExistingItem {
-    id: string; productId: string; productName: string;
-    price: number; quantity: number; status: string;
-  }
-
-  const [table, setTable]               = _useState<Table | null>(null);
-  const [orderId, setOrderId]           = _useState<string | null>(null);
-  const [existingItems, setExistingItems] = _useState<ExistingItem[]>([]);
-  const [products, setProducts]         = _useState<Product[]>([]);
-  const [categories, setCategories]     = _useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = _useState('');
-  const [searchQuery, setSearchQuery]   = _useState('');
-  const [cartItems, setCartItems]       = _useState<CartItem[]>([]);
-  const [loading, setLoading]           = _useState(true);
-  const [submitting, setSubmitting]     = _useState(false);
-  const [success, setSuccess]           = _useState(false);
-  const [invalidTable, setInvalidTable] = _useState(false);
-  const [callingWaiter, setCallingWaiter] = _useState(false);
-  const [mobileView, setMobileView]     = _useState<'menu' | 'cart'>('menu');
-  const [expandedNotes, setExpandedNotes] = _useState<string | null>(null);
-
-  _useEffect(() => {
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       const { data: tableRow, error } = await supabase
@@ -182,7 +129,8 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
       const branchId = tableRow.branch_id;
       setTable({
         id: tableRow.id, number: tableRow.number, capacity: tableRow.capacity,
-        status: tableRow.status, branchId, currentOrderId: tableRow.current_order_id,
+        status: tableRow.status, branchId,
+        currentOrderId: tableRow.current_order_id,
         assignedCashierId: tableRow.assigned_cashier_id,
         needsWaiter: tableRow.needs_waiter ?? false,
       });
@@ -192,7 +140,7 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
         supabase.from('categories').select('*').eq('branch_id', branchId).eq('is_active', true).order('display_order'),
       ]);
 
-      const prods: Product[] = (productsRes.data || []).map((p: any) => ({
+      const prods: Product[] = (productsRes.data ?? []).map((p: any) => ({
         id: p.id, name: p.name, category: p.category ?? '', categoryId: p.category_id,
         price: Number(p.price), stock: p.stock ?? 0, image: p.image,
         sku: p.sku, taxRate: Number(p.tax_rate ?? 0), reorderPoint: p.reorder_point ?? 0,
@@ -203,23 +151,24 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
       }));
       setProducts(prods);
 
-      const cats: Category[] = (categoriesRes.data || [])
+      const cats: Category[] = (categoriesRes.data ?? [])
         .map((c: any) => ({
           id: c.id, name: c.name, description: c.description,
           color: c.color ?? '#f97316', icon: c.icon,
           displayOrder: Number(c.display_order ?? 0), isActive: c.is_active ?? true,
           branchId: c.branch_id, createdAt: new Date(c.created_at),
         }))
-        .filter((c: any) => c.isActive);
+        .filter((c: Category) => c.isActive);
       setCategories(cats);
       if (cats.length) setSelectedCategory(cats[0].id);
 
       if (tableRow.current_order_id) {
         const { data: orderData } = await supabase
-          .from('orders').select('*, order_items(*)').eq('id', tableRow.current_order_id).single();
+          .from('orders').select('*, order_items(*)')
+          .eq('id', tableRow.current_order_id).single();
         if (orderData) {
           setOrderId(orderData.id);
-          setExistingItems((orderData.order_items || []).map((item: any) => ({
+          setExistingItems((orderData.order_items ?? []).map((item: any) => ({
             id: item.id, productId: item.product_id, productName: item.product_name,
             price: Number(item.price), quantity: Number(item.quantity), status: item.status,
           })));
@@ -230,7 +179,24 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
     void load();
   }, [tableId]);
 
-  const filteredProducts = _useMemo(() => {
+  // Realtime product availability sync
+  useEffect(() => {
+    if (!table?.branchId) return;
+    const channel = supabase
+      .channel(`secure-qr-products-${table.branchId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${table.branchId}` }, (payload) => {
+        const up = payload.new as any;
+        setProducts(prev => prev.map(p =>
+          p.id === up.id
+            ? { ...p, kitchenStatus: up.kitchen_status ?? 'available', availabilityStatus: up.availability_status ?? 'available' }
+            : p
+        ));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [table?.branchId]);
+
+  const filteredProducts = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     const activeCategory = categories.find(c => c.id === selectedCategory);
     return products.filter(p => {
@@ -262,7 +228,10 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
     setCallingWaiter(true);
     const { error } = await supabase.from('tables').update({ needs_waiter: true }).eq('id', table.id);
     if (error) toast.error('Could not call waiter. Try again.');
-    else { setTable(prev => prev ? { ...prev, needsWaiter: true } : prev); toast.success('Waiter has been notified!'); }
+    else {
+      setTable(prev => prev ? { ...prev, needsWaiter: true } : prev);
+      toast.success('Waiter has been notified!');
+    }
     setCallingWaiter(false);
   };
 
@@ -274,7 +243,7 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
         branchId: table.branchId,
         orderType: 'dine-in',
         table: { id: table.id, number: table.number },
-        existingOrderId: orderId || table.currentOrderId,
+        existingOrderId: orderId ?? table.currentOrderId,
         items: cartItems.map(item => ({
           productId: item.productId, productName: item.productName,
           quantity: item.quantity, price: item.price,
@@ -286,7 +255,7 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
       if (!result.success) { toast.error(result.error); return; }
       setOrderId(result.data.id);
       setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: result.data.id } : prev);
-      setExistingItems(result.data.items.map((item: any) => ({
+      setExistingItems((result.data.items ?? []).map((item: any) => ({
         id: item.id, productId: item.productId, productName: item.productName,
         price: item.price, quantity: item.quantity, status: item.status,
       })));
@@ -304,7 +273,7 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
       <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3]">
         <div className="flex flex-col items-center gap-5">
           <div className="bg-orange-500 rounded-[28px] p-5 shadow-2xl shadow-orange-200">
-            <_UtensilsCrossed className="size-10 text-white" />
+            <UtensilsCrossed className="size-10 text-white" />
           </div>
           <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Loading menu…</p>
@@ -327,7 +296,13 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
     );
   }
 
-  // ── Mobile layout ─────────────────────────────────────────────────────────
+  const statusColors: Record<string, string> = {
+    ready:     'bg-emerald-100 text-emerald-700',
+    preparing: 'bg-amber-100 text-amber-700',
+    pending:   'bg-gray-100 text-gray-600',
+    served:    'bg-blue-100 text-blue-700',
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] bg-[#EAEEF3] overflow-hidden">
       {/* Header */}
@@ -397,23 +372,27 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
             </div>
           )}
 
-          {/* Products */}
+          {/* Products grid */}
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             {filteredProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <_UtensilsCrossed className="size-10 text-gray-200 mb-3" />
+                <UtensilsCrossed className="size-10 text-gray-200 mb-3" />
                 <p className="text-sm text-gray-400 font-medium">No items found</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {filteredProducts.map(p => {
-                  const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
+                  const isAvailable =
+                    (p.kitchenStatus || 'available') === 'available' &&
+                    (p.availabilityStatus || 'available') === 'available';
                   return (
                     <div
                       key={p.id}
                       onClick={() => isAvailable && addToCart(p)}
                       className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-h-[100px] transition-all ${
-                        isAvailable ? 'bg-white border-transparent cursor-pointer hover:shadow-md' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
+                        isAvailable
+                          ? 'bg-white border-transparent cursor-pointer hover:shadow-md'
+                          : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                       }`}
                     >
                       <div className="p-3 flex flex-col flex-1 justify-between gap-2 relative">
@@ -446,11 +425,9 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
               {existingItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <span className="text-gray-700">{item.quantity}× {item.productName}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    item.status === 'ready' ? 'bg-emerald-100 text-emerald-700' :
-                    item.status === 'preparing' ? 'bg-amber-100 text-amber-700' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>{item.status}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {item.status}
+                  </span>
                 </div>
               ))}
               <div className="border-t pt-2 flex justify-between text-xs font-bold text-gray-500">
@@ -475,12 +452,24 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
                   <p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p>
                 </div>
                 <div className="flex items-center bg-white border-2 border-orange-100 shadow-sm rounded-xl p-1 gap-3">
-                  <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
+                  <button
+                    onClick={() => setCartItems(prev =>
+                      prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i)
+                        .filter(i => i.quantity > 0)
+                    )}
+                    className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"
+                  ><Minus className="size-4" strokeWidth={3} /></button>
                   <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
-                  <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Plus className="size-4" strokeWidth={3} /></button>
+                  <button
+                    onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))}
+                    className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"
+                  ><Plus className="size-4" strokeWidth={3} /></button>
                 </div>
               </div>
-              <button onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)} className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <button
+                onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)}
+                className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest"
+              >
                 <ChevronDown className={`size-3 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} />
                 {item.notes ? 'Edit note' : 'Add note'}
               </button>
@@ -498,8 +487,8 @@ function _SecureOrderingBridge({ tableId }: { tableId: string }) {
         </div>
       )}
 
-      {/* Bottom bar */}
-      {(mobileView === 'cart' && cartItems.length > 0) && (
+      {/* Place order button */}
+      {mobileView === 'cart' && cartItems.length > 0 && (
         <div className="px-4 pb-safe pt-3 bg-white border-t flex-shrink-0">
           {success ? (
             <div className="flex items-center justify-center gap-2 py-4 text-emerald-600 font-black animate-in zoom-in">

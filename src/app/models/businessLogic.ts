@@ -142,7 +142,8 @@ export function calculateSalesAnalytics(
   // Revenue by day
   const revenueByDayMap: Record<string, { revenue: number; orders: number }> = {};
   orders.forEach(order => {
-    const dateKey = order.createdAt.toISOString().split('T')[0];
+    const createdDate = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+    const dateKey = createdDate.toISOString().split('T')[0];
     if (!revenueByDayMap[dateKey]) {
       revenueByDayMap[dateKey] = { revenue: 0, orders: 0 };
     }
@@ -188,6 +189,7 @@ export function calculateSalesAnalytics(
     topProducts,
     revenueByDay,
     revenueByCategory,
+    paymentMethodBreakdown: [],
   };
 }
 

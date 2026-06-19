@@ -35,9 +35,10 @@ export function Layout() {
   };
 
   const allNavItems: NavItem[] = [
+    // Admin gets the full analytics dashboard; ordering roles get the menu/ordering UI
     ...(currentUser.role === 'admin'
       ? [{ path: '/admin-dashboard', label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewReports' as const }]
-      : [{ path: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewReports' as const }]
+      : [{ path: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewOrderingDashboard' as const }]
     ),
     { path: '/tables',             label: 'Tables',         icon: ShoppingCart,  permission: 'canViewTables' as const },
     { path: '/kitchen',            label: 'Kitchen',        icon: ChefHat,       permission: 'canManageInventory' as const },
@@ -51,9 +52,9 @@ export function Layout() {
     { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true },
-    { path: '/quotations', label: 'Quotations', icon: FileText, permission: 'canManageInvoicesQuotations' as const },
-    { path: '/invoices',   label: 'Invoices',   icon: FileText, permission: 'canManageInvoicesQuotations' as const },
-    { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const },
+    { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const },
+    { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const },
+    { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const, adminOnly: true },
   ];
 
   const navItems = allNavItems.filter(item => {

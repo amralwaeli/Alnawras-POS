@@ -81,16 +81,26 @@ function Lazy({ children }: { children: React.ReactNode }) {
 function LandingPage() {
   const { currentUser } = usePOS();
   if (!currentUser) return <Navigate to="/check-in" replace />;
-  if (currentUser.role === 'admin')      return <Navigate to="/admin-dashboard" replace />;
-  if (currentUser.role === 'cashier')    return <Navigate to="/tables" replace />;
-  if (currentUser.role === 'waiter')     return <Navigate to="/dashboard" replace />;
-  if (currentUser.role === 'kitchen')    return <Navigate to="/kitchen" replace />;
-  if (currentUser.role === 'hr')         return <Navigate to="/workforce/employees" replace />;
-  if (currentUser.role === 'manager')    return <Navigate to="/workforce/employees" replace />;
-  if (currentUser.role === 'supervisor') return <Navigate to="/workforce/attendance" replace />;
-  if (currentUser.role === 'staff')      return <Navigate to="/invoices" replace />;
-  if (currentUser.role === 'accounting') return <Navigate to="/accounting" replace />;
-  return <Navigate to="/admin-dashboard" replace />;
+
+  switch (currentUser.role) {
+    // ── POS / Floor roles ──────────────────────────────────────────────────
+    case 'admin':      return <Navigate to="/admin-dashboard" replace />;
+    case 'cashier':    return <Navigate to="/tables" replace />;
+    case 'waiter':     return <Navigate to="/dashboard" replace />;   // ordering menu
+    case 'kitchen':    return <Navigate to="/kitchen" replace />;
+    case 'juice':      return <Navigate to="/kitchen" replace />;
+
+    // ── Management roles ───────────────────────────────────────────────────
+    case 'manager':    return <Navigate to="/admin-dashboard" replace />;
+    case 'supervisor': return <Navigate to="/reports" replace />;
+
+    // ── Back-office roles — NEVER see the ordering menu ───────────────────
+    case 'accounting': return <Navigate to="/accounting" replace />;
+    case 'hr':         return <Navigate to="/workforce/employees" replace />;
+    case 'staff':      return <Navigate to="/invoices" replace />;
+
+    default:           return <Navigate to="/admin-dashboard" replace />;
+  }
 }
 
 export const router = createHashRouter([
@@ -101,7 +111,7 @@ export const router = createHashRouter([
       { index: true, element: <Lazy><LandingPage /></Lazy> },
 
       // ── Dashboard ──
-      { path: 'dashboard',           element: <Lazy><CustomerMenuView /></Lazy> },
+      { path: 'dashboard',           element: <Lazy><ProtectedRoute permission="canViewOrderingDashboard"><CustomerMenuView /></ProtectedRoute></Lazy> },
       { path: 'admin-dashboard',     element: <Lazy><ProtectedRoute permission="canViewReports"><AdminDashboardView /></ProtectedRoute></Lazy> },
 
       // ── Tables ──
@@ -160,7 +170,7 @@ export const router = createHashRouter([
       { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },
 
       // ── QR ──
-      { path: 'table-qr',            element: <Lazy><ProtectedRoute permission="canViewReports"><TableQRView /></ProtectedRoute></Lazy> },
+      { path: 'table-qr',            element: <Lazy><ProtectedRoute adminOnly><TableQRView /></ProtectedRoute></Lazy> },
     ],
   },
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },

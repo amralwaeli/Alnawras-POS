@@ -1,0 +1,1 @@
+const c="RM";function i(t){const n=Number((t==null?void 0:t.total)??0);return n>0?n:((t==null?void 0:t.items)??[]).reduce((a,u)=>a+Number(u.price??0)*Number(u.quantity??1),0)}function s(t){return`RM ${t.toFixed(2)}`}export{c as C,s as f,i as o};

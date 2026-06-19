@@ -5,9 +5,8 @@ const config: CapacitorConfig = {
   appName: 'AlnawrasPOS',
   webDir: 'docs',
   server: {
-    // Point this to your hosted web URL (GitHub Pages)
-    // This allows the app to load the latest code every time it starts
-    url: 'https://alnawras-rest.github.io/Alnawras-POS/',
+    // Correct GitHub Pages URL — matches the repo owner: amralwaeli
+    url: 'https://amralwaeli.github.io/Alnawras-POS/',
     cleartext: true
   },
   android: {

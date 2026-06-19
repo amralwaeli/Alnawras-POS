@@ -37,8 +37,9 @@ export function CustomerMonitorView() {
     );
   }
 
-  const subtotal = (order.items || []).reduce((s: number, i: any) => s + (i.price * i.quantity), 0);
-  const total = subtotal - (order.discount || 0);
+  const subtotal = (order.items || []).reduce((s: number, i: any) => s + (Number(i.price) * Number(i.quantity)), 0);
+  const tax = Number(order.tax || 0);
+  const total = Math.max(0, subtotal + tax - (Number(order.discount) || 0));
 
   return (
     <div className="h-screen bg-white flex overflow-hidden">
@@ -102,6 +103,12 @@ export function CustomerMonitorView() {
             <div className="flex justify-between text-xl text-emerald-600 font-bold">
               <span>Discount</span>
               <span>-{fmt(order.discount)}</span>
+            </div>
+          )}
+          {tax > 0 && (
+            <div className="flex justify-between text-xl text-gray-500 font-medium">
+              <span>Tax</span>
+              <span>{fmt(tax)}</span>
             </div>
           )}
           <div className="flex justify-between text-5xl font-black text-gray-900 pt-4">

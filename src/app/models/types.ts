@@ -186,6 +186,11 @@ export interface SalesAnalytics {
     revenue: number;
     orders: number;
   }[];
+  revenueByCategory: {
+    category: string;
+    revenue: number;
+    percentage: number;
+  }[];
   paymentMethodBreakdown: {
     method: string;
     count: number;

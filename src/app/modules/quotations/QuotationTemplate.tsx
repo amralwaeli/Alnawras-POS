@@ -32,6 +32,7 @@ const LOGO_URL = `${typeof window !== 'undefined' ? window.location.origin : ''}
 export const QuotationTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => (
   <div
     ref={ref}
+    className="alnawras-pdf-doc"
     style={{
       fontFamily: 'Arial, Helvetica, sans-serif',
       fontSize: '12px',
@@ -46,6 +47,9 @@ export const QuotationTemplate = forwardRef<HTMLDivElement, Props>(({ data }, re
     }}
   >
     <style>{`
+      /* Keep table cell text vertically centred (and nudged down slightly) so
+         mixed Latin/Arabic rows line up cleanly. Scoped to this document. */
+      .alnawras-pdf-doc td { vertical-align: middle !important; padding-top: 2px !important; }
       @media print {
         @page { size: A4 portrait; margin: 0; }
         html, body {

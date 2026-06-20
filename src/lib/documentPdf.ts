@@ -64,28 +64,53 @@ export function preferGeneratedPdf(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const s = typeof reader.result === 'string' ? reader.result : '';
+      resolve(s.includes(',') ? s.split(',')[1] : s);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function deliverPdf(doc: jsPDF, filename: string) {
   const blob = doc.output('blob');
-  const nav = navigator as any;
+  const cap: any = (window as any).Capacitor;
+  const isNative = !!cap && (typeof cap.isNativePlatform === 'function' ? cap.isNativePlatform() : true);
 
-  // 1) Native share sheet — works in the Android WebView and mobile browsers,
-  //    and lets the user Save to Files / Drive / print. This is the only
-  //    reliable way to get a file out of a WebView (silent downloads are blocked).
+  // ── Native app (APK): write the PDF to disk and open the system share/save
+  //    sheet. This is the reliable way to export a file from a WebView —
+  //    browser download/share APIs are unreliable inside Android WebViews. ──
+  if (isNative) {
+    const base64 = await blobToBase64(blob);
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+    const written = await Filesystem.writeFile({
+      path: filename,
+      data: base64,
+      directory: Directory.Cache,
+    });
+    // A real write failure above will surface as an error; a dismissed share
+    // sheet should not, so swallow only the Share step.
+    try { await Share.share({ title: filename, url: written.uri }); } catch { /* dismissed */ }
+    return;
+  }
+
+  // ── Web/mobile-browser fallbacks: file share if available, else download ──
   try {
     const file = new File([blob], filename, { type: 'application/pdf' });
+    const nav = navigator as any;
     if (nav.canShare && nav.canShare({ files: [file] })) {
       await nav.share({ files: [file], title: filename });
       return;
     }
   } catch (e: any) {
     if (e && e.name === 'AbortError') return; // user closed the share sheet
-    // otherwise fall through to the download fallbacks
   }
-
-  // 2) Desktop browsers: a normal file download.
   try { doc.save(filename); return; } catch { /* ignore */ }
-
-  // 3) Last resort: open the PDF in a new tab so the viewer can save it.
   try { window.open(doc.output('bloburl') as unknown as string, '_blank'); } catch { /* ignore */ }
 }
 

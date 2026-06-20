@@ -4,7 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { OrderController } from '../../controllers/OrderController';
 import {
   Plus, Minus, ShoppingCart, Layers, X,
-  Search, CheckCircle2, ShoppingBag, Utensils
+  Search, CheckCircle2, ShoppingBag, Utensils, ArrowLeft
 } from 'lucide-react';
 import { Product, ROLE_PERMISSIONS } from '../../models/types';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ interface CartItem {
   status?: string;
 }
 
-export function CustomerMenuView() {
+export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: boolean } = {}) {
   const navigate = useNavigate();
   const {
     products,
@@ -38,7 +38,7 @@ export function CustomerMenuView() {
   const [showTableOverlay, setShowTableOverlay] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>('dine-in');
+  const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>(takeawayOnly ? 'takeaway' : 'dine-in');
   const [isSending, setIsSending] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [mobileView, setMobileView] = useState<'menu' | 'cart'>('menu');
@@ -160,8 +160,11 @@ export function CustomerMenuView() {
         setShowSuccess(false);
         setSelectedTableId(null);
         setCartItems([]);
-        setOrderType('dine-in');
+        setOrderType(takeawayOnly ? 'takeaway' : 'dine-in');
         await refreshData();
+        // In the cashier's takeaway-only flow, return to Tables so the new
+        // takeaway appears under "Takeaway Orders" ready for payment.
+        if (takeawayOnly) navigate('/tables');
       }, 2000);
     } finally {
       setIsSending(false);
@@ -194,11 +197,17 @@ export function CustomerMenuView() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
             <input type="text" placeholder="Search menu..." className="w-full pl-9 pr-3 py-2.5 bg-gray-100 rounded-xl text-sm focus:outline-none ring-1 ring-gray-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
-          <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-1.5 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
-            <Layers className="size-3.5 text-orange-500" /> Tables ({activeTables.length})
-          </button>
+          {takeawayOnly ? (
+            <button onClick={() => navigate('/tables')} className="flex items-center gap-1.5 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
+              <ArrowLeft className="size-3.5 text-orange-500" /> Tables
+            </button>
+          ) : (
+            <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-1.5 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
+              <Layers className="size-3.5 text-orange-500" /> Tables ({activeTables.length})
+            </button>
+          )}
           <div className="text-right border-l pl-2.5 border-gray-100 min-w-fit">
-            <p className="text-[9px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-0.5">Waiter</p>
+            <p className="text-[9px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-0.5">{takeawayOnly ? 'Takeaway' : 'Waiter'}</p>
             <p className="text-xs font-black text-gray-900 leading-none">{currentUser.name}</p>
           </div>
         </div>
@@ -266,10 +275,16 @@ export function CustomerMenuView() {
             {selectedTable && <span className="text-white font-black italic text-base uppercase opacity-90">Table {selectedTable.number}</span>}
             {selectedTableId && <button onClick={() => setSelectedTableId(null)} className="bg-white/20 text-white p-2 rounded-xl hover:bg-white/30 transition-all"><X className="size-4" strokeWidth={3} /></button>}
           </div>
-          <div className="flex bg-orange-600/30 p-1.5 rounded-[18px] shadow-inner">
-            <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
-            <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
-          </div>
+          {takeawayOnly ? (
+            <div className="flex items-center justify-center gap-2 bg-white text-orange-600 py-3.5 rounded-[18px] shadow-xl font-black text-[11px] uppercase tracking-widest">
+              <ShoppingBag className="size-4" /> Takeaway Order
+            </div>
+          ) : (
+            <div className="flex bg-orange-600/30 p-1.5 rounded-[18px] shadow-inner">
+              <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
+              <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
+            </div>
+          )}
         </div>
 
         {/* Cart items */}
@@ -330,11 +345,17 @@ export function CustomerMenuView() {
             <input type="text" placeholder="Search menu..." className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-2xl text-sm focus:outline-none ring-1 ring-gray-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
-              <Layers className="size-4 text-orange-500" /> Active Tables ({activeTables.length})
-            </button>
+            {takeawayOnly ? (
+              <button onClick={() => navigate('/tables')} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <ArrowLeft className="size-4 text-orange-500" /> Back to Tables
+              </button>
+            ) : (
+              <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <Layers className="size-4 text-orange-500" /> Active Tables ({activeTables.length})
+              </button>
+            )}
             <div className="text-right ml-4 border-l pl-4 border-gray-100">
-              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-1">Waiter</p>
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-1">{takeawayOnly ? 'Takeaway' : 'Waiter'}</p>
               <p className="text-sm font-black text-gray-900 leading-none">{currentUser.name}</p>
             </div>
           </div>
@@ -380,13 +401,19 @@ export function CustomerMenuView() {
       {/* ── DESKTOP: RIGHT SIDEBAR ── */}
       <aside className="hidden lg:flex w-[380px] xl:w-[400px] bg-white border-l flex-col shadow-2xl z-10">
         <div className="p-5 bg-orange-500 relative">
-          <div className="flex bg-orange-600/30 p-1.5 rounded-[22px] relative shadow-inner">
-            <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
-            <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
-            {selectedTableId && (
-              <button onClick={() => setSelectedTableId(null)} className="absolute -right-2 -top-2 bg-white text-orange-600 p-2 rounded-full shadow-2xl border-2 border-orange-100 hover:scale-110 transition-all"><X className="size-4" strokeWidth={4} /></button>
-            )}
-          </div>
+          {takeawayOnly ? (
+            <div className="flex items-center justify-center gap-2 bg-white text-orange-600 py-4 rounded-[22px] shadow-xl font-black text-xs uppercase tracking-widest">
+              <ShoppingBag className="size-4" /> Takeaway Order
+            </div>
+          ) : (
+            <div className="flex bg-orange-600/30 p-1.5 rounded-[22px] relative shadow-inner">
+              <button onClick={() => { setOrderType('dine-in'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'dine-in' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><Utensils className="size-4" /> Dine-In</button>
+              <button onClick={() => { setOrderType('takeaway'); setSelectedTableId(null); }} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${orderType === 'takeaway' ? 'bg-white text-orange-600 shadow-xl' : 'text-white/70'}`}><ShoppingBag className="size-4" /> Take-Away</button>
+              {selectedTableId && (
+                <button onClick={() => setSelectedTableId(null)} className="absolute -right-2 -top-2 bg-white text-orange-600 p-2 rounded-full shadow-2xl border-2 border-orange-100 hover:scale-110 transition-all"><X className="size-4" strokeWidth={4} /></button>
+              )}
+            </div>
+          )}
           {selectedTable && (
             <div className="mt-4 text-center"><span className="text-white font-black italic tracking-tighter text-2xl uppercase opacity-90">Table {selectedTable.number}</span></div>
           )}
@@ -434,7 +461,7 @@ export function CustomerMenuView() {
       </aside>
 
       {/* ─── MODALS (shared by both layouts) ─── */}
-      {showTableModal && (
+      {!takeawayOnly && showTableModal && (
         <div className="fixed inset-0 z-[101] bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6">
           <div className="bg-white rounded-[40px] sm:rounded-[50px] w-full max-w-2xl p-8 sm:p-12 shadow-2xl">
             <div className="flex justify-between items-center mb-7 sm:mb-10">
@@ -453,7 +480,7 @@ export function CustomerMenuView() {
         </div>
       )}
 
-      {showTableOverlay && (
+      {!takeawayOnly && showTableOverlay && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
           <div className="bg-white rounded-[40px] sm:rounded-[55px] w-full max-w-4xl p-8 sm:p-12 shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center mb-7 sm:mb-10">

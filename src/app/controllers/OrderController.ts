@@ -53,7 +53,9 @@ export class OrderController {
         const { error: orderError } = await supabase.from('orders').insert({
           id: orderId,
           table_id: params.table?.id || null,
-          table_number: params.table?.number || null,
+          // orders.table_number is NOT NULL in the schema, so takeaway orders
+          // (which have no table) must use 0 as a sentinel rather than null.
+          table_number: params.table?.number ?? 0,
           status: 'open',
           order_type: params.orderType,
           branch_id: branchId,

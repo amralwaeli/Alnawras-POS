@@ -118,6 +118,9 @@ export const router = createHashRouter([
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
       { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },
 
+      // ── Takeaway ordering (cashier-accessible, takeaway-only) ──
+      { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canViewTables"><CustomerMenuView takeawayOnly /></ProtectedRoute></Lazy> },
+
       // ── Menu / Products ──
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
       { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },

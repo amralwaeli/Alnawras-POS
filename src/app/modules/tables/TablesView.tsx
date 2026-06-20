@@ -311,7 +311,15 @@ export function TablesView() {
                 : 'Live table status — updates in real time'}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-stretch">
+            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
+              <button
+                onClick={() => navigate('/takeaway')}
+                className="flex items-center gap-2 bg-purple-600 text-white rounded-xl px-5 font-semibold text-sm shadow-sm hover:bg-purple-700 transition-colors"
+              >
+                <ShoppingBag className="size-4" /> New Takeaway
+              </button>
+            )}
             {currentUser.role !== 'cashier' && (
               <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
                 <p className="text-2xl font-bold text-emerald-600">{available}</p>

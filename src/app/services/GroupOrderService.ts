@@ -49,6 +49,7 @@ export interface GuestSession {
   sessionId: string;       // UUIDv7
   sessionToken: string;    // stored client-side to resume on refresh
   groupId: string;
+  orderId: string;         // the ONE shared order for the whole group
   guestLabel: string;
   tableId: string;
   tableNumber: number;
@@ -74,26 +75,7 @@ export async function rotateTableQrToken(tableId: string): Promise<string | null
   return error ? null : token;
 }
 
-// ── Internal: find or create the active group for a table ─────────────────────
-
-async function getOrCreateActiveGroup(tableId: string, branchId: string): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from('order_groups').select('id').eq('table_id', tableId).eq('status', 'active').maybeSingle();
-  if (existing?.id) return existing.id;
-
-  const id = uuidv7();
-  const { error } = await supabase.from('order_groups').insert({
-    id, table_id: tableId, branch_id: branchId, status: 'active',
-  });
-  if (!error) return id;
-
-  // Lost a race against another device — re-read the now-existing active group.
-  const { data: again } = await supabase
-    .from('order_groups').select('id').eq('table_id', tableId).eq('status', 'active').maybeSingle();
-  return again?.id ?? null;
-}
-
-// ── Join the table: resolve QR → active group → new (or resumed) guest session ─
+// ── Join the table: resolve QR → active group + shared order → guest session ──
 
 export async function joinTable(qrToken: string): Promise<GuestSession | null> {
   if (!qrToken) return null;
@@ -111,8 +93,15 @@ export async function joinTable(qrToken: string): Promise<GuestSession | null> {
     localStorage.removeItem(storageKey(qrToken)); // stale / closed — drop it
   }
 
-  const groupId = await getOrCreateActiveGroup(table.id, table.branch_id);
-  if (!groupId) return null;
+  // Atomically get/create the table's single active group + its one shared order.
+  const { data, error } = await supabase.rpc('join_table_group', {
+    p_table_id: table.id, p_branch_id: table.branch_id, p_table_number: table.number,
+  });
+  if (error) { console.error('[GroupOrderService] join_table_group failed', error); return null; }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.group_id || !row?.order_id) return null;
+  const groupId = row.group_id as string;
+  const orderId = row.order_id as string;
 
   // Number this guest within the group.
   const { count } = await supabase
@@ -121,15 +110,15 @@ export async function joinTable(qrToken: string): Promise<GuestSession | null> {
 
   const sessionId = uuidv7();
   const sessionToken = randomToken();
-  const { error } = await supabase.from('guest_sessions').insert({
+  const { error: e2 } = await supabase.from('guest_sessions').insert({
     id: sessionId, group_id: groupId, table_id: table.id, branch_id: table.branch_id,
     token: sessionToken, guest_label: guestLabel, status: 'active',
   });
-  if (error) return null;
+  if (e2) return null;
 
   localStorage.setItem(storageKey(qrToken), sessionToken);
   return {
-    sessionId, sessionToken, groupId, guestLabel,
+    sessionId, sessionToken, groupId, orderId, guestLabel,
     tableId: table.id, tableNumber: table.number, branchId: table.branch_id,
   };
 }
@@ -139,18 +128,19 @@ export async function validateSession(sessionToken: string): Promise<GuestSessio
   if (!sessionToken || sessionToken.length !== 64) return null;
   const { data } = await supabase
     .from('guest_sessions')
-    .select('id, group_id, table_id, branch_id, guest_label, status, order_groups(status), tables(number)')
+    .select('id, group_id, table_id, branch_id, guest_label, status, order_groups(status, order_id), tables(number)')
     .eq('token', sessionToken)
     .maybeSingle();
   if (!data || data.status !== 'active') return null;
-  const groupStatus = (data as any).order_groups?.status;
-  if (groupStatus !== 'active') return null;
+  const grp = (data as any).order_groups;
+  if (grp?.status !== 'active' || !grp?.order_id) return null;
 
   void supabase.from('guest_sessions').update({ last_seen: new Date().toISOString() }).eq('token', sessionToken);
   return {
     sessionId: data.id,
     sessionToken,
     groupId: data.group_id,
+    orderId: grp.order_id,
     guestLabel: data.guest_label ?? 'Guest',
     tableId: data.table_id,
     tableNumber: (data as any).tables?.number ?? 0,

@@ -50,5 +50,5 @@ export function GroupOrderingView() {
     );
   }
 
-  return <SecureOrderingUI tableId={session.tableId} addedBy={session.sessionId} addedByName={session.guestLabel} />;
+  return <SecureOrderingUI tableId={session.tableId} addedBy={session.sessionId} addedByName={session.guestLabel} groupOrderId={session.orderId} />;
 }

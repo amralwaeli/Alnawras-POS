@@ -100,9 +100,10 @@ interface ExistingItem {
   price: number;
   quantity: number;
   status: string;
+  addedByName?: string;
 }
 
-export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Guest' }: { tableId: string; addedBy?: string; addedByName?: string }) {
+export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Guest', groupOrderId }: { tableId: string; addedBy?: string; addedByName?: string; groupOrderId?: string }) {
   const [table, setTable]                 = useState<Table | null>(null);
   const [orderId, setOrderId]             = useState<string | null>(null);
   const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
@@ -162,22 +163,45 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       setCategories(cats);
       if (cats.length) setSelectedCategory(cats[0].id);
 
-      if (tableRow.current_order_id) {
+      // In group mode use the group's single shared order; otherwise the table's.
+      const loadOrderId = groupOrderId || tableRow.current_order_id;
+      if (loadOrderId) {
         const { data: orderData } = await supabase
           .from('orders').select('*, order_items(*)')
-          .eq('id', tableRow.current_order_id).single();
+          .eq('id', loadOrderId).single();
         if (orderData) {
           setOrderId(orderData.id);
           setExistingItems((orderData.order_items ?? []).map((item: any) => ({
             id: item.id, productId: item.product_id, productName: item.product_name,
             price: Number(item.price), quantity: Number(item.quantity), status: item.status,
+            addedByName: item.added_by_name,
           })));
         }
       }
       setLoading(false);
     };
     void load();
-  }, [tableId]);
+  }, [tableId, groupOrderId]);
+
+  // Group mode: keep the SHARED cart live so every guest sees everyone's items.
+  useEffect(() => {
+    if (!groupOrderId) return;
+    const refetch = async () => {
+      const { data } = await supabase.from('orders').select('order_items(*)').eq('id', groupOrderId).single();
+      if (data) {
+        setExistingItems((data.order_items ?? []).map((item: any) => ({
+          id: item.id, productId: item.product_id, productName: item.product_name,
+          price: Number(item.price), quantity: Number(item.quantity), status: item.status,
+          addedByName: item.added_by_name,
+        })));
+      }
+    };
+    const channel = supabase
+      .channel(`group-order-${groupOrderId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${groupOrderId}` }, () => { void refetch(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [groupOrderId]);
 
   // Realtime product availability sync
   useEffect(() => {
@@ -243,7 +267,8 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
         branchId: table.branchId,
         orderType: 'dine-in',
         table: { id: table.id, number: table.number },
-        existingOrderId: orderId ?? table.currentOrderId,
+        // Always target the ONE shared group order so the whole party = one bill.
+        existingOrderId: groupOrderId ?? orderId ?? table.currentOrderId,
         items: cartItems.map(item => ({
           productId: item.productId, productName: item.productName,
           quantity: item.quantity, price: item.price,
@@ -258,6 +283,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       setExistingItems((result.data.items ?? []).map((item: any) => ({
         id: item.id, productId: item.productId, productName: item.productName,
         price: item.price, quantity: item.quantity, status: item.status,
+        addedByName: item.addedByName,
       })));
       setCartItems([]);
       setExpandedNotes(null);
@@ -421,17 +447,20 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
 
           {existingItems.length > 0 && (
             <div className="bg-white rounded-2xl p-4 space-y-2">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Already Ordered</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{groupOrderId ? 'Table Order · everyone' : 'Already Ordered'}</p>
               {existingItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{item.quantity}× {item.productName}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                <div key={item.id} className="flex items-center justify-between text-sm gap-2">
+                  <span className="text-gray-700 flex-1 min-w-0">
+                    {item.quantity}× {item.productName}
+                    {groupOrderId && item.addedByName && <em className="text-gray-400 not-italic"> · {item.addedByName}</em>}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
                     {item.status}
                   </span>
                 </div>
               ))}
               <div className="border-t pt-2 flex justify-between text-xs font-bold text-gray-500">
-                <span>Subtotal</span><span>RM {existingTotal.toFixed(2)}</span>
+                <span>Table Total</span><span>RM {existingTotal.toFixed(2)}</span>
               </div>
             </div>
           )}

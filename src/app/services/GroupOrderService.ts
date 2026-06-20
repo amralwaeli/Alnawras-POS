@@ -77,46 +77,64 @@ export async function rotateTableQrToken(tableId: string): Promise<string | null
 
 interface TableRow { id: string; number: number; branch_id: string }
 
+/** The table's single open order = the shared bill. Oldest one wins (deterministic). */
+async function openOrderForTable(tableId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('orders').select('id').eq('table_id', tableId).eq('status', 'open')
+    .order('created_at', { ascending: true }).limit(1).maybeSingle();
+  return data?.id ?? null;
+}
+
 /**
- * Get (or create, race-safe) the table's single ACTIVE group plus its one shared
- * order. Works entirely client-side via the partial unique index on
- * order_groups(active) — no server function required.
+ * Resolve the table's ONE shared order (creating it on the first scan) and the
+ * active group that tracks the party. Every device on the table ends up on the
+ * SAME order — so the kitchen and cashier see a single bill. Concurrent first-
+ * scanners converge onto the oldest open order.
  */
 async function getOrCreateGroup(table: TableRow): Promise<{ groupId: string; orderId: string } | null> {
-  const { data: existing } = await supabase
-    .from('order_groups').select('id, order_id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
-  if (existing?.id && existing.order_id) return { groupId: existing.id, orderId: existing.order_id };
-
-  // Create the one shared order for this party.
-  const orderId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const { error: oErr } = await supabase.from('orders').insert({
-    id: orderId, table_id: table.id, table_number: table.number, status: 'open',
-    order_type: 'dine-in', branch_id: table.branch_id, waiters: [], subtotal: 0, tax: 0, total: 0,
-  });
-  if (oErr) { console.error('[GroupOrderService] order create failed', oErr); return null; }
-
-  // Existing group missing its order — attach this one.
-  if (existing?.id) {
-    await supabase.from('order_groups').update({ order_id: orderId }).eq('id', existing.id);
-    await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', table.id);
-    return { groupId: existing.id, orderId };
+  // ── 1. Shared order: reuse the table's open order, else create one ──
+  let orderId = await openOrderForTable(table.id);
+  if (!orderId) {
+    const newId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const { error } = await supabase.from('orders').insert({
+      id: newId, table_id: table.id, table_number: table.number, status: 'open',
+      order_type: 'dine-in', branch_id: table.branch_id, waiters: [], subtotal: 0, tax: 0, total: 0,
+    });
+    if (error) {
+      orderId = await openOrderForTable(table.id);
+      if (!orderId) { console.error('[GroupOrderService] order create failed', error); return null; }
+    } else {
+      orderId = newId;
+      // Converge: if another device created one at the same time, keep the oldest
+      // (both orders are empty here, so deleting the newer loses nothing).
+      const oldest = await openOrderForTable(table.id);
+      if (oldest && oldest !== newId) {
+        await supabase.from('orders').delete().eq('id', newId);
+        orderId = oldest;
+      }
+      // NOTE: the table is NOT marked occupied here — it stays available until
+      // someone actually sends an order (OrderController marks it busy then).
+    }
   }
 
-  // Create the group. The unique active-group index serialises concurrent scanners.
-  const groupId = uuidv7();
-  const { error: gErr } = await supabase.from('order_groups').insert({
-    id: groupId, table_id: table.id, branch_id: table.branch_id, order_id: orderId, status: 'active',
-  });
-  if (gErr) {
-    // Lost the race (another device created the active group) — drop our order, use theirs.
-    await supabase.from('orders').delete().eq('id', orderId);
-    const { data: again } = await supabase
-      .from('order_groups').select('id, order_id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
-    if (again?.id && again.order_id) return { groupId: again.id, orderId: again.order_id };
-    console.error('[GroupOrderService] group create failed', gErr);
-    return null;
+  // ── 2. One active group references the shared order (session tracking + closure) ──
+  let groupId: string;
+  const { data: g } = await supabase
+    .from('order_groups').select('id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
+  if (g?.id) {
+    groupId = g.id;
+    await supabase.from('order_groups').update({ order_id: orderId }).eq('id', g.id);
+  } else {
+    groupId = uuidv7();
+    const { error } = await supabase.from('order_groups').insert({
+      id: groupId, table_id: table.id, branch_id: table.branch_id, order_id: orderId, status: 'active',
+    });
+    if (error) {
+      const { data: again } = await supabase
+        .from('order_groups').select('id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
+      if (again?.id) groupId = again.id;
+    }
   }
-  await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', table.id);
   return { groupId, orderId };
 }
 

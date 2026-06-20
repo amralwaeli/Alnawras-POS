@@ -50,6 +50,22 @@ export function TablesView() {
   const navigate = useNavigate();
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [pickupBusy, setPickupBusy] = useState<string | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+
+  // Run a pickup action then optimistically update local state (realtime reconciles).
+  const runPickup = async (
+    id: string,
+    fn: () => Promise<{ success: boolean; error?: string }>,
+    okMsg: string,
+    apply: (orders: any[]) => any[],
+  ) => {
+    setPickupBusy(id);
+    const res = await fn();
+    setPickupBusy(null);
+    if (res.success) { toast.success(okMsg); setOrders(prev => apply(prev)); }
+    else toast.error(res.error || 'Action failed');
+  };
 
   const handlePaid = async (orderId: string, _billNo: string, _summary: string) => {
     // 1. Update local state
@@ -108,9 +124,9 @@ export function TablesView() {
     [orders]
   );
 
-  // Cash pickup orders awaiting collection/payment at the counter.
+  // All active pickup orders (managed inline on this page).
   const pickupOrders = useMemo(() =>
-    orders.filter(o => getOrderType(o) === 'pickup' && o.status === 'open' && (o as any).pickupPayType === 'cash'),
+    orders.filter(o => getOrderType(o) === 'pickup' && o.status === 'open'),
     [orders]
   );
 
@@ -338,14 +354,6 @@ export function TablesView() {
                 <ShoppingBag className="size-4" /> New Takeaway
               </button>
             )}
-            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
-              <button
-                onClick={() => navigate('/pickup-orders')}
-                className="flex items-center gap-2 bg-orange-500 text-white rounded-xl px-5 font-semibold text-sm shadow-sm hover:bg-orange-600 transition-colors"
-              >
-                <Package className="size-4" /> Pickup Orders
-              </button>
-            )}
             {currentUser.role !== 'cashier' && (
               <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
                 <p className="text-2xl font-bold text-emerald-600">{available}</p>
@@ -423,39 +431,77 @@ export function TablesView() {
           </div>
         )}
 
-        {/* Cash Pickup Orders — collect payment at the counter (Cashier) */}
+        {/* Pickup Orders — full inline management for the Cashier */}
         {currentUser.role === 'cashier' && pickupOrders.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Package className="size-5 text-orange-600" />
-              <h2 className="text-xl font-bold text-gray-900">Pickup — Cash</h2>
+              <h2 className="text-xl font-bold text-gray-900">Pickup Orders</h2>
               <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-bold">{pickupOrders.length}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {pickupOrders.map(order => {
+              {pickupOrders.map((order: any) => {
                 const { total } = calcOrderTotals(order);
+                const actor = { id: currentUser?.id, name: currentUser?.name, branchId: currentUser?.branchId };
+                const isOnline = order.pickupPayType === 'online';
+                const pending = isOnline && order.paymentStatus === 'pending_verification';
+                const paid = order.paymentStatus === 'paid';
+                const canAdvance = !isOnline || paid;
+                const busy = pickupBusy === order.id;
+                const methodLabel = order.pickupMethod === 'grab' ? 'Grab Express' : order.pickupMethod === 'lalamove' ? 'Lalamove' : 'Self Pickup';
                 return (
-                  <div key={order.id} className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 shadow-sm">
-                    <div className="flex items-start justify-between mb-3">
+                  <div key={order.id} className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 shadow-sm flex flex-col">
+                    <div className="flex items-start justify-between mb-2">
                       <div className="size-10 bg-orange-200 rounded-xl flex items-center justify-center"><Package className="size-5 text-orange-700" /></div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${order.pickupStatus === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{(order.pickupStatus ?? 'preparing').toUpperCase()}</span>
                     </div>
                     <p className="font-bold text-gray-900 text-base">{order.customerName || 'Customer'}</p>
-                    <p className="text-xs text-gray-400 mb-3 flex items-center gap-1"><Clock className="size-3" /> Pickup #{order.billNumber ?? '—'} · {order.customerPhone}</p>
+                    <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Clock className="size-3" /> #{order.billNumber ?? '—'} · {order.customerPhone}</p>
                     <div className="bg-white/80 rounded-xl p-2.5 space-y-1.5 border border-black/5 mb-2">
                       <div className="flex justify-between text-xs"><span className="text-gray-500">Items</span><span className="font-medium">{order.items?.length ?? 0}</span></div>
                       <div className="flex justify-between text-xs"><span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span><span className="font-bold text-gray-900">{fmt(total)}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-gray-500">Method</span><span className="font-medium">{methodLabel}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-gray-500">Payment</span>
+                        <span className="font-bold">{isOnline ? (order.paymentStatus === 'paid' ? 'Online · Paid' : order.paymentStatus === 'rejected' ? 'Online · Rejected' : 'Online · Verify') : 'Cash'}</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setSelectedOrder({ ...order, tableId: null, tableNumber: 'Pickup' })}
-                      className="w-full py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold hover:bg-orange-700 transition-colors"
-                    >
-                      Collect Cash
-                    </button>
+
+                    {/* Online payment verification */}
+                    {pending && (
+                      <div className="space-y-1.5 mb-2">
+                        {order.paymentReceiptUrl && (
+                          <button onClick={() => setReceiptUrl(order.paymentReceiptUrl)} className="w-full py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold">View Receipt</button>
+                        )}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.approvePayment(order.id, actor), 'Payment approved', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'paid' } : o))} className="py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold disabled:opacity-50">Approve</button>
+                          <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.rejectPayment(order.id, actor), 'Payment rejected', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'rejected' } : o))} className="py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-50">Reject</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status / collection actions */}
+                    <div className="mt-auto space-y-1.5">
+                      {canAdvance && order.pickupStatus !== 'ready' && (
+                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.setPickupStatus(order.id, 'ready', actor), 'Marked Ready', prev => prev.map(o => o.id === order.id ? { ...o, pickupStatus: 'ready' } : o))} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Ready</button>
+                      )}
+                      {canAdvance && order.pickupStatus === 'ready' && !isOnline && (
+                        <button onClick={() => setSelectedOrder({ ...order, tableId: null, tableNumber: 'Pickup' })} className="w-full py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold">Collect Cash</button>
+                      )}
+                      {canAdvance && order.pickupStatus === 'ready' && isOnline && (
+                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.markPicked(order.id, actor), 'Order collected', prev => prev.filter(o => o.id !== order.id))} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Picked</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Pickup receipt viewer */}
+        {receiptUrl && (
+          <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4" onClick={() => setReceiptUrl(null)}>
+            <img src={receiptUrl} alt="Payment receipt" className="max-h-[90vh] max-w-full rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
           </div>
         )}
 

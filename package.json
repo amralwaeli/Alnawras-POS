@@ -15,6 +15,7 @@
     "@capacitor/cli": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/filesystem": "^7.1.8",
+    "@capacitor/local-notifications": "^7.0.6",
     "@capacitor/share": "^7.0.4",
     "@radix-ui/react-alert-dialog": "1.1.6",
     "@radix-ui/react-avatar": "1.1.3",

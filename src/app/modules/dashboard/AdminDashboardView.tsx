@@ -113,6 +113,8 @@ function RevenueChart({ days }: { days: { label: string; value: number }[] }) {
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void }) {
   const isTakeaway = order.order_type === 'takeaway' || order.orderType === 'takeaway';
+  const isPickup = order.order_type === 'pickup' || order.orderType === 'pickup';
+  const offPrem = isTakeaway || isPickup;
   const items: any[] = order.items ?? order.order_items ?? [];
 
   const byWaiter = useMemo(() => {
@@ -140,12 +142,14 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b">
           <div className="flex items-center gap-3">
-            <div className={`size-10 rounded-xl flex items-center justify-center ${isTakeaway ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
-              {isTakeaway ? <ShoppingBag className="size-5" /> : <Utensils className="size-5" />}
+            <div className={`size-10 rounded-xl flex items-center justify-center ${offPrem ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+              {offPrem ? <ShoppingBag className="size-5" /> : <Utensils className="size-5" />}
             </div>
             <div>
               <h2 className="font-bold text-gray-900 text-base">
-                {isTakeaway
+                {isPickup
+                  ? `Pickup${order.billNumber ? ` #${order.billNumber}` : ''}`
+                  : isTakeaway
                   ? `Takeaway${order.billNumber ? ` #${order.billNumber}` : ''}`
                   : `Table ${order.tableNumber}${order.billNumber ? ` · #${order.billNumber}` : ''}`}
               </h2>
@@ -230,6 +234,8 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
 // ─── Order Row (clickable) ────────────────────────────────────────────────────
 function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
   const isTakeaway = order.order_type === 'takeaway' || order.orderType === 'takeaway';
+  const isPickup = order.order_type === 'pickup' || order.orderType === 'pickup';
+  const offPrem = isTakeaway || isPickup;
   const statusStyle: Record<string, string> = {
     completed: 'bg-emerald-50 text-emerald-700',
     open:      'bg-blue-50 text-blue-700',
@@ -243,12 +249,14 @@ function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
   return (
     <button onClick={onClick}
       className="w-full flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0 hover:bg-orange-50/50 -mx-2 px-2 rounded-lg transition-colors group text-left">
-      <div className={`size-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${isTakeaway ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
-        {isTakeaway ? <ShoppingBag className="size-4" /> : <Utensils className="size-4" />}
+      <div className={`size-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${offPrem ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+        {offPrem ? <ShoppingBag className="size-4" /> : <Utensils className="size-4" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800 truncate">
-          {isTakeaway
+          {isPickup
+            ? `Pickup ${order.billNumber ? `#${order.billNumber}` : ''}`
+            : isTakeaway
             ? `Takeaway ${order.billNumber ? `#${order.billNumber}` : ''}`
             : `Table ${order.tableNumber}${order.billNumber ? ` · #${order.billNumber}` : ''}`}
         </p>

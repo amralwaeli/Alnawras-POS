@@ -56,6 +56,8 @@ const ShiftManagementView    = lazy(() => import('./modules/accounting/ShiftMana
 const QuotationsView         = lazy(() => import('./modules/quotations').then(m => ({ default: m.QuotationsView })));
 const InvoicesView           = lazy(() => import('./modules/invoices').then(m => ({ default: m.InvoicesView })));
 
+const PickupOrderingView     = lazy(() => import('./modules/pickup/PickupOrderingView').then(m => ({ default: m.PickupOrderingView })));
+const PickupBoardView         = lazy(() => import('./modules/pickup/PickupBoardView').then(m => ({ default: m.PickupBoardView })));
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
@@ -122,6 +124,9 @@ export const router = createHashRouter([
       // ── Takeaway ordering (cashier-accessible, takeaway-only) ──
       { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canViewTables"><CustomerMenuView takeawayOnly /></ProtectedRoute></Lazy> },
 
+      // ── Pickup orders board (cashier / admin / super-waiter) ──
+      { path: 'pickup-orders',       element: <Lazy><ProtectedRoute permission="canViewTables"><PickupBoardView /></ProtectedRoute></Lazy> },
+
       // ── Menu / Products ──
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
       { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },
@@ -182,6 +187,9 @@ export const router = createHashRouter([
 
   // ── Secure QR ordering (new) — token-based, no table ID in URL ──
   { path: '/order/qr/:token',     element: <Lazy><SecureQROrderingView /></Lazy> },
+
+  // ── Pickup ordering — public, token-gated customer page ──
+  { path: '/pickup/:token',       element: <Lazy><PickupOrderingView /></Lazy> },
 
   // ── Legacy QR routes — kept for backward compatibility ──
   { path: '/table/:tableId',      element: <Lazy><QROrderingView /></Lazy> },

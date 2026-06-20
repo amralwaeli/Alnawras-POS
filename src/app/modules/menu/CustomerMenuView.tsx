@@ -5,8 +5,9 @@ import { OrderController } from '../../controllers/OrderController';
 import {
   Plus, Minus, ShoppingCart, Layers, X,
   Search, CheckCircle2, ShoppingBag, Utensils, ArrowLeft,
-  FileText, Receipt, ChevronDown
+  FileText, Receipt, ChevronDown, Package, Copy, Check
 } from 'lucide-react';
+import { createPickupToken } from '../../services/PickupService';
 import { Product, ROLE_PERMISSIONS } from '../../models/types';
 import { toast } from 'sonner';
 
@@ -23,27 +24,53 @@ interface CartItem {
 
 // ─── Super-Waiter Options menu ──────────────────────────────────────────────
 // Shown only for the 'swaiter' role inside the ordering screen, giving quick
-// access to create an Invoice or a Quotation (which a normal waiter cannot).
-function SwaiterOptions({ compact = false }: { compact?: boolean }) {
+// access to create an Invoice, a Quotation, or a secure customer Pickup link.
+function SwaiterOptions({ compact = false, user }: { compact?: boolean; user?: any }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [pickupLink, setPickupLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const triggerClass = compact
     ? 'flex items-center gap-1.5 bg-orange-500 text-white px-3 py-2.5 rounded-xl text-xs font-black shadow-sm whitespace-nowrap'
     : 'flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-2xl text-sm font-black shadow-sm hover:bg-orange-600 transition-all';
 
+  const handleCreatePickup = async () => {
+    if (!user?.branchId) { toast.error('No branch found for this account'); return; }
+    setOpen(false);
+    setGenerating(true);
+    const res = await createPickupToken(user.branchId, user.id, user.name);
+    setGenerating(false);
+    if ('error' in res) { toast.error('Could not create pickup link'); return; }
+    setPickupLink(res.url);
+    setCopied(false);
+  };
+
+  const copyLink = async () => {
+    if (!pickupLink) return;
+    try { await navigator.clipboard.writeText(pickupLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { toast.error('Copy failed — long-press to copy'); }
+  };
+
   return (
     <div className="relative">
-      <button onClick={() => setOpen(v => !v)} className={triggerClass}>
-        <Plus className={compact ? 'size-3.5' : 'size-4'} /> Options
+      <button onClick={() => setOpen(v => !v)} disabled={generating} className={triggerClass}>
+        <Plus className={compact ? 'size-3.5' : 'size-4'} /> {generating ? 'Creating…' : 'Options'}
         <ChevronDown className={compact ? 'size-3' : 'size-3.5'} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 z-40 overflow-hidden">
+          <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-gray-100 z-40 overflow-hidden">
             <p className="px-4 pt-3 pb-1 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Create New</p>
-            <button onClick={() => { setOpen(false); navigate('/invoices'); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-orange-50 text-left">
+            <button onClick={handleCreatePickup} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-orange-50 text-left">
+              <Package className="size-4 text-orange-500 shrink-0" /> Create Pickup Link
+            </button>
+            <button onClick={() => { setOpen(false); navigate('/pickup-orders'); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-orange-50 border-t border-gray-50 text-left">
+              <Package className="size-4 text-orange-500 shrink-0" /> Pickup Orders Board
+            </button>
+            <button onClick={() => { setOpen(false); navigate('/invoices'); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-orange-50 border-t border-gray-50 text-left">
               <Receipt className="size-4 text-orange-500 shrink-0" /> Invoice
             </button>
             <button onClick={() => { setOpen(false); navigate('/quotations'); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-orange-50 border-t border-gray-50 text-left">
@@ -51,6 +78,29 @@ function SwaiterOptions({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Generated pickup link modal */}
+      {pickupLink && (
+        <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-4" onClick={() => setPickupLink(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2"><Package className="size-5 text-orange-500" /> Pickup Link Ready</h3>
+              <button onClick={() => setPickupLink(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-5 text-gray-400" /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-3">Send this secure link to the customer. It is single-use and expires after the order is collected.</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-700 break-all mb-4">{pickupLink}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={copyLink} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-900 text-white font-bold text-sm">
+                {copied ? <><Check className="size-4" /> Copied</> : <><Copy className="size-4" /> Copy</>}
+              </button>
+              <a href={`https://wa.me/?text=${encodeURIComponent('Order for pickup here: ' + pickupLink)}`} target="_blank" rel="noopener"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm">
+                <ShoppingBag className="size-4" /> WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -233,7 +283,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
             <input type="text" placeholder="Search menu..." className="w-full pl-9 pr-3 py-2.5 bg-gray-100 rounded-xl text-sm focus:outline-none ring-1 ring-gray-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
-          {currentUser.role === 'swaiter' && <SwaiterOptions compact />}
+          {currentUser.role === 'swaiter' && <SwaiterOptions compact user={currentUser} />}
           {takeawayOnly ? (
             <button onClick={() => navigate('/tables')} className="flex items-center gap-1.5 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
               <ArrowLeft className="size-3.5 text-orange-500" /> Tables
@@ -382,7 +432,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
             <input type="text" placeholder="Search menu..." className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-2xl text-sm focus:outline-none ring-1 ring-gray-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           <div className="flex items-center gap-3">
-            {currentUser.role === 'swaiter' && <SwaiterOptions />}
+            {currentUser.role === 'swaiter' && <SwaiterOptions user={currentUser} />}
             {takeawayOnly ? (
               <button onClick={() => navigate('/tables')} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
                 <ArrowLeft className="size-4 text-orange-500" /> Back to Tables

@@ -169,17 +169,19 @@ export function KitchenView() {
                 const age = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 60000);
                 const isUrgent = age >= 15;
                 const isTakeaway = ticket.order_type === 'takeaway';
+                const isPickup = ticket.order_type === 'pickup';
+                const offPrem = isTakeaway || isPickup;
                 return (
                   <div key={ticket.id} className={`flex flex-col rounded-[32px] border-b-8 overflow-hidden shadow-2xl transition-all duration-300 ${
-                    isUrgent ? 'bg-red-950/20 border-red-600' : isTakeaway ? 'bg-[#161B22] border-purple-500' : 'bg-[#161B22] border-orange-500'
+                    isUrgent ? 'bg-red-950/20 border-red-600' : offPrem ? 'bg-[#161B22] border-purple-500' : 'bg-[#161B22] border-orange-500'
                   }`}>
                     <div className="p-5 flex items-center justify-between border-b border-white/5 bg-white/[0.03]">
                       <div className="flex items-center gap-3">
                         <div className={`size-10 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${
-                          isTakeaway ? 'bg-purple-500' : isUrgent ? 'bg-red-600' : 'bg-orange-500'
-                        }`}>{isTakeaway ? '🛍️' : ticket.table_number}</div>
+                          offPrem ? 'bg-purple-500' : isUrgent ? 'bg-red-600' : 'bg-orange-500'
+                        }`}>{isPickup ? '📦' : isTakeaway ? '🛍️' : ticket.table_number}</div>
                         <span className="font-black text-xl tracking-tighter italic uppercase">
-                          {isTakeaway ? 'Takeaway' : `Table ${ticket.table_number}`}
+                          {isPickup ? 'Pickup' : isTakeaway ? 'Takeaway' : `Table ${ticket.table_number}`}
                         </span>
                       </div>
                       <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${

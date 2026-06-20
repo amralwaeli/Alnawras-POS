@@ -26,6 +26,7 @@ const TableManagementView    = lazy(() => import('./modules/tables').then(m => (
 const TableOrderingView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableOrderingView })));
 const QROrderingView         = lazy(() => import('./modules/tables').then(m => ({ default: m.QROrderingView })));
 const SecureQROrderingView   = lazy(() => import('./modules/tables').then(m => ({ default: m.SecureQROrderingView })));
+const GroupOrderingView      = lazy(() => import('./modules/tables/GroupOrderingView').then(m => ({ default: m.GroupOrderingView })));
 const TableQRView            = lazy(() => import('./modules/tables').then(m => ({ default: m.TableQRView })));
 const TableRedirectView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableRedirectView })));
 
@@ -185,8 +186,11 @@ export const router = createHashRouter([
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
 
-  // ── Secure QR ordering (new) — token-based, no table ID in URL ──
+  // ── Secure QR ordering (legacy single-session) — token-based ──
   { path: '/order/qr/:token',     element: <Lazy><SecureQROrderingView /></Lazy> },
+
+  // ── Group ordering — stable table token, multi-device, no table ID in URL ──
+  { path: '/order/t/:qrToken',    element: <Lazy><GroupOrderingView /></Lazy> },
 
   // ── Pickup ordering — public, token-gated customer page ──
   { path: '/pickup/:token',       element: <Lazy><PickupOrderingView /></Lazy> },

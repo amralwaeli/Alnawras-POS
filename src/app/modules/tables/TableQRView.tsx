@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePOS } from '../../context/POSContext';
 import QRCode from 'qrcode';
 import { QrCode, Printer, RefreshCw, ShieldCheck, Clock } from 'lucide-react';
-import { createQrSession, buildQrUrl } from '../../services/QrService';
+import { ensureTableQrToken, rotateTableQrToken, buildGroupOrderUrl } from '../../services/GroupOrderService';
 
 export function TableQRView() {
   const { tables, currentUser } = usePOS();
@@ -36,11 +36,12 @@ export function TableQRView() {
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
           <ShieldCheck className="size-5 text-emerald-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-bold text-emerald-800">Secure QR Codes Active</p>
+            <p className="text-sm font-bold text-emerald-800">Secure Group QR Codes Active</p>
             <p className="text-xs text-emerald-700 mt-0.5">
-              Each QR code contains a unique random token — the real table ID is never exposed.
-              Tokens expire after <strong>12 hours</strong>. Use the <strong>Regenerate</strong> button
-              to instantly invalidate an old code and issue a fresh one.
+              Each QR holds a random token identifying the table only — the real table ID is never exposed.
+              The code is <strong>reusable</strong>: every customer at the table can scan and order together,
+              and it automatically starts a fresh group after the bill is paid. Use <strong>Regenerate</strong>
+              to instantly invalidate a printed code.
             </p>
           </div>
         </div>
@@ -77,24 +78,29 @@ function TableQRCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const generateNewToken = useCallback(async () => {
+  // Load the table's STABLE QR token (reusable across many dining groups).
+  const loadToken = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await createQrSession(tableId, tableNumber, branchId);
-    if ('error' in result) {
-      setError(result.error);
-      setLoading(false);
-      return;
-    }
-    setToken(result.token);
-    setUrl(result.url);
+    const t = await ensureTableQrToken(tableId);
+    if (!t) { setError('Could not load QR token'); setLoading(false); return; }
+    setToken(t);
+    setUrl(buildGroupOrderUrl(t));
     setLoading(false);
-  }, [tableId, tableNumber, branchId]);
+  }, [tableId]);
 
-  // Generate a token on first render
-  useEffect(() => {
-    void generateNewToken();
-  }, [generateNewToken]);
+  // Rotate the token — invalidates the old printed QR.
+  const regenerate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const t = await rotateTableQrToken(tableId);
+    if (!t) { setError('Could not regenerate QR token'); setLoading(false); return; }
+    setToken(t);
+    setUrl(buildGroupOrderUrl(t));
+    setLoading(false);
+  }, [tableId]);
+
+  useEffect(() => { void loadToken(); }, [loadToken]);
 
   // Render QR code whenever the URL changes
   useEffect(() => {
@@ -162,7 +168,7 @@ function TableQRCard({
         <div className="flex items-center justify-center gap-1.5 mb-3">
           <Clock className="size-3 text-gray-400" />
           <p className="text-[10px] text-gray-400 font-mono">
-            Token: {token.slice(0, 16)}… · Valid 12h
+            Token: {token.slice(0, 16)}… · Reusable · Multi-device
           </p>
         </div>
       )}
@@ -177,7 +183,7 @@ function TableQRCard({
           Print
         </button>
         <button
-          onClick={generateNewToken}
+          onClick={regenerate}
           disabled={loading}
           title="Regenerate — this invalidates the old QR code immediately"
           className="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 text-sm font-medium print:hidden disabled:opacity-40"

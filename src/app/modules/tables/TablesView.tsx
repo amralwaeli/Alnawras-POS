@@ -7,6 +7,7 @@ import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package } from 
 import { toast } from 'sonner';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
+import { closeTableGroup } from '../../services/GroupOrderService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -90,15 +91,18 @@ export function TablesView() {
     ));
     setSelectedOrder(null);
 
-    // 2. Harden security: Expire the QR session for this table immediately after payment
+    // 2. Harden security: close the group + all guest sessions and expire the
+    //    legacy QR session for this table immediately after payment. This
+    //    invalidates every customer token and prevents further ordering.
     if (targetTable) {
       try {
+        await closeTableGroup(targetTable.id);
         await supabase
           .from('qr_sessions')
           .update({ active: false, last_activity_at: new Date().toISOString() })
           .eq('table_id', targetTable.id);
       } catch (err) {
-        console.warn('[QR Session] Failed to expire session on payment', err);
+        console.warn('[Table close] Failed to close group/QR session on payment', err);
       }
     }
   };

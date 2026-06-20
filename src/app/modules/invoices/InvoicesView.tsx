@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Printer, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
@@ -17,6 +18,9 @@ export function InvoicesView() {
   ]);
 
   const { currentUser } = usePOS();
+  const navigate = useNavigate();
+  // Roles without a sidebar (e.g. Super Waiter) need an in-page way back.
+  const showBack = currentUser?.role === 'swaiter';
   const [catalogProducts, setCatalogProducts] = useState<{ id: string; name: string; price: number }[]>([]);
   const [activeSuggest, setActiveSuggest] = useState<string | null>(null);
 
@@ -83,12 +87,22 @@ export function InvoicesView() {
       <div className="min-h-full bg-gray-50 flex flex-col no-print">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="size-5 sm:size-6 text-amber-500 shrink-0" />
-            Create Invoice
-          </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">Generate and print professional invoices</p>
+        <div className="flex items-center gap-3">
+          {showBack && (
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium shrink-0"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+          )}
+          <div>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="size-5 sm:size-6 text-amber-500 shrink-0" />
+              Create Invoice
+            </h1>
+            <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">Generate and print professional invoices</p>
+          </div>
         </div>
         <button
           onClick={handlePrint}

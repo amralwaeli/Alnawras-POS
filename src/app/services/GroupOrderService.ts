@@ -75,15 +75,61 @@ export async function rotateTableQrToken(tableId: string): Promise<string | null
   return error ? null : token;
 }
 
+interface TableRow { id: string; number: number; branch_id: string }
+
+/**
+ * Get (or create, race-safe) the table's single ACTIVE group plus its one shared
+ * order. Works entirely client-side via the partial unique index on
+ * order_groups(active) — no server function required.
+ */
+async function getOrCreateGroup(table: TableRow): Promise<{ groupId: string; orderId: string } | null> {
+  const { data: existing } = await supabase
+    .from('order_groups').select('id, order_id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
+  if (existing?.id && existing.order_id) return { groupId: existing.id, orderId: existing.order_id };
+
+  // Create the one shared order for this party.
+  const orderId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const { error: oErr } = await supabase.from('orders').insert({
+    id: orderId, table_id: table.id, table_number: table.number, status: 'open',
+    order_type: 'dine-in', branch_id: table.branch_id, waiters: [], subtotal: 0, tax: 0, total: 0,
+  });
+  if (oErr) { console.error('[GroupOrderService] order create failed', oErr); return null; }
+
+  // Existing group missing its order — attach this one.
+  if (existing?.id) {
+    await supabase.from('order_groups').update({ order_id: orderId }).eq('id', existing.id);
+    await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', table.id);
+    return { groupId: existing.id, orderId };
+  }
+
+  // Create the group. The unique active-group index serialises concurrent scanners.
+  const groupId = uuidv7();
+  const { error: gErr } = await supabase.from('order_groups').insert({
+    id: groupId, table_id: table.id, branch_id: table.branch_id, order_id: orderId, status: 'active',
+  });
+  if (gErr) {
+    // Lost the race (another device created the active group) — drop our order, use theirs.
+    await supabase.from('orders').delete().eq('id', orderId);
+    const { data: again } = await supabase
+      .from('order_groups').select('id, order_id').eq('table_id', table.id).eq('status', 'active').maybeSingle();
+    if (again?.id && again.order_id) return { groupId: again.id, orderId: again.order_id };
+    console.error('[GroupOrderService] group create failed', gErr);
+    return null;
+  }
+  await supabase.from('tables').update({ status: 'occupied', current_order_id: orderId }).eq('id', table.id);
+  return { groupId, orderId };
+}
+
 // ── Join the table: resolve QR → active group + shared order → guest session ──
 
 export async function joinTable(qrToken: string): Promise<GuestSession | null> {
   if (!qrToken) return null;
 
   // Resolve the table from the stable QR token (the UUID never leaves the server).
-  const { data: table } = await supabase
+  const { data: table, error: tErr } = await supabase
     .from('tables').select('id, number, branch_id').eq('qr_token', qrToken).maybeSingle();
-  if (!table) return null;
+  if (tErr) console.error('[GroupOrderService] table lookup failed (migration 0008 applied?)', tErr);
+  if (!table) { console.warn('[GroupOrderService] no table for qr_token'); return null; }
 
   // Resume an existing session for this device if it's still valid.
   const saved = localStorage.getItem(storageKey(qrToken));
@@ -93,15 +139,9 @@ export async function joinTable(qrToken: string): Promise<GuestSession | null> {
     localStorage.removeItem(storageKey(qrToken)); // stale / closed — drop it
   }
 
-  // Atomically get/create the table's single active group + its one shared order.
-  const { data, error } = await supabase.rpc('join_table_group', {
-    p_table_id: table.id, p_branch_id: table.branch_id, p_table_number: table.number,
-  });
-  if (error) { console.error('[GroupOrderService] join_table_group failed', error); return null; }
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.group_id || !row?.order_id) return null;
-  const groupId = row.group_id as string;
-  const orderId = row.order_id as string;
+  const grp = await getOrCreateGroup(table);
+  if (!grp) return null;
+  const { groupId, orderId } = grp;
 
   // Number this guest within the group.
   const { count } = await supabase
@@ -114,7 +154,7 @@ export async function joinTable(qrToken: string): Promise<GuestSession | null> {
     id: sessionId, group_id: groupId, table_id: table.id, branch_id: table.branch_id,
     token: sessionToken, guest_label: guestLabel, status: 'active',
   });
-  if (e2) return null;
+  if (e2) { console.error('[GroupOrderService] guest session insert failed', e2); return null; }
 
   localStorage.setItem(storageKey(qrToken), sessionToken);
   return {

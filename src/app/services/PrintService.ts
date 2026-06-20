@@ -33,11 +33,14 @@ export class PrintService {
       const cashierIp = 'localhost'; // Change this to the Cashier's IP for tablet access
       const relayUrl = `http://${cashierIp}:3001/print`; 
       
-      // Convert content to hex if it's not already
+      // Convert content to a hex string the print proxy can turn back into bytes.
+      // Browsers have no Node `Buffer`, so encode with TextEncoder instead.
+      const bytes = new TextEncoder().encode(job.content);
+      const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
       const payload = {
         ip: job.printerIp,
         port: job.printerPort,
-        data: Buffer.from(job.content).toString('hex')
+        data: hex
       };
 
       const response = await fetch(relayUrl, {

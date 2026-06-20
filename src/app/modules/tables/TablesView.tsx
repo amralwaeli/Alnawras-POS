@@ -205,8 +205,6 @@ export function TablesView() {
       });
 
       setSelectedOrder(normalizedOrder);
-      setPaymentMode(null);
-      setSplits([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]);
     } catch (err: any) {
       console.error('[openOrderModal] Unexpected error:', err);
       toast.error('Unable to open bill. Please try again.');
@@ -496,6 +494,7 @@ export function TablesView() {
       {/* ── Payment Modal (shared, includes loyalty panel) ─────────────────── */}
       {selectedOrder && (
         <PaymentModal
+          isOpen={!!selectedOrder}
           order={selectedOrder}
           currentUser={currentUser}
           onClose={() => setSelectedOrder(null)}

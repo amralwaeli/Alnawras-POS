@@ -71,9 +71,11 @@ export class DeviceService {
    */
   static isAuthorized(action: 'payment' | 'ordering' | 'inventory' | 'hr'): boolean {
     const station = DeviceService.getStationType();
-    
-    // Admin station can do everything
-    if (station === 'admin') return true;
+
+    // Admin station can do everything. An unassigned device is unrestricted
+    // (matches the "This device is currently unrestricted" copy in the binding
+    // UI) so a device keeps working until it is explicitly locked to a station.
+    if (station === 'admin' || station === 'unassigned') return true;
 
     switch (action) {
       case 'payment':

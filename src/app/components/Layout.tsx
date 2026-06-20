@@ -21,7 +21,9 @@ export function Layout() {
 
   if (!currentUser) return <Navigate to="/check-in" replace />;
 
-  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter'].includes(currentUser.role);
+  // Roles that run full-screen with no sidebar. Super Waiter is included: it
+  // reaches Invoices/Quotations through the in-screen "Options" menu instead.
+  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter', 'swaiter'].includes(currentUser.role);
   if (isPOSOnlyRole) {
     return <div className="h-screen w-screen overflow-hidden"><Outlet /></div>;
   }

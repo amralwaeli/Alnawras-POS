@@ -282,12 +282,16 @@ export class WorkforceController {
         .limit(1)
         .maybeSingle();
 
-      // Sync user row if any user-facing fields changed
+      // Sync user row if any user-facing fields changed. The role/PIN live on
+      // the users table (that is what login reads), so this MUST succeed —
+      // surface the error instead of silently letting users + employees diverge.
+      // e.g. updating role to a value the users.role CHECK constraint rejects.
       if (Object.keys(userUpdates).length > 0 && empRow.user_id) {
-        await supabase
+        const { error: userErr } = await supabase
           .from('users')
           .update(userUpdates)
           .eq('id', empRow.user_id);
+        if (userErr) throw userErr;
       }
 
       return { success: true, data: mapEmployee(empRow) };

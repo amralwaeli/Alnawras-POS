@@ -102,7 +102,7 @@ interface ExistingItem {
   status: string;
 }
 
-function SecureOrderingUI({ tableId }: { tableId: string }) {
+export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Guest' }: { tableId: string; addedBy?: string; addedByName?: string }) {
   const [table, setTable]                 = useState<Table | null>(null);
   const [orderId, setOrderId]             = useState<string | null>(null);
   const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
@@ -249,8 +249,8 @@ function SecureOrderingUI({ tableId }: { tableId: string }) {
           quantity: item.quantity, price: item.price,
           notes: item.notes, station: item.station,
         })),
-        addedBy: 'guest',
-        addedByName: 'Guest',
+        addedBy,
+        addedByName,
       });
       if (!result.success) { toast.error(result.error); return; }
       setOrderId(result.data.id);

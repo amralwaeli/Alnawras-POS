@@ -4,6 +4,7 @@ import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
 import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
+import { DeviceService } from '../services/DeviceService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -50,12 +51,35 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return { success: false, error: 'Invalid PIN or inactive account' };
       const user = mapStaff(row);
+      
+      // ── DEVICE ROLE LOCKING ───────────────────────────────────────────────
+      // Secure the tablet and cashier devices: only accept waiter on tablets,
+      // and only cashier/admin on the cashier device.
+      const station = DeviceService.getStationType();
+      if (station === 'waiter' && user.role !== 'waiter') {
+        return { success: false, error: 'This tablet is for Waiters only. Please use the Cashier station.' };
+      }
+      if (station === 'cashier' && !['cashier', 'admin', 'manager', 'accounting'].includes(user.role)) {
+        return { success: false, error: 'This station is for Cashiers only.' };
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       setCurrentUser(user);
       return { success: true, user };
     }
 
     const result = AuthController.authenticate(pin, users);
-    if (result.success) setCurrentUser(result.user!);
+    if (result.success && result.user) {
+      const user = result.user;
+      const station = DeviceService.getStationType();
+      if (station === 'waiter' && user.role !== 'waiter') {
+        return { success: false, error: 'This tablet is for Waiters only.' };
+      }
+      if (station === 'cashier' && !['cashier', 'admin', 'manager', 'accounting'].includes(user.role)) {
+        return { success: false, error: 'This station is for Cashiers only.' };
+      }
+      setCurrentUser(user);
+    }
     return result;
   };
 

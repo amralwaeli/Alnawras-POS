@@ -120,11 +120,14 @@ export async function exportElementAsPdf(el: HTMLElement, filename: string) {
   const img = canvas.toDataURL('image/png');
 
   // Add the image, paginating if the content is taller than one A4 page.
+  // Use a small tolerance (mm) so sub-millimetre rounding from the capture
+  // doesn't spill a near-empty extra page.
+  const PAGE_TOLERANCE = 4;
   let heightLeft = imgH;
   let position = 0;
   doc.addImage(img, 'PNG', 0, position, imgW, imgH);
   heightLeft -= pageH;
-  while (heightLeft > 0) {
+  while (heightLeft > PAGE_TOLERANCE) {
     position -= pageH;
     doc.addPage();
     doc.addImage(img, 'PNG', 0, position, imgW, imgH);

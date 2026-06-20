@@ -49,7 +49,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     <style>{`
       /* Keep table cell text vertically centred (and nudged down slightly) so
          mixed Latin/Arabic rows line up cleanly. Scoped to this document. */
-      .alnawras-pdf-doc td { vertical-align: middle !important; padding-top: 3px !important; }
+      .alnawras-pdf-doc td { vertical-align: middle !important; padding-top: 4px !important; padding-bottom: 4px !important; }
       @media print {
         @page { size: A4 portrait; margin: 0; }
         html, body {

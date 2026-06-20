@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Users, Hash } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Hash, Monitor, Smartphone, ShieldCheck } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { DeviceService, DeviceStation } from '../../services/DeviceService';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -98,9 +99,55 @@ export function TableManagementView() {
   };
 
   const cashiers = users.filter(user => user.role === 'cashier');
+  const currentStation = DeviceService.getStationType();
+
+  const handleStationChange = (val: string) => {
+    DeviceService.setStationType(val as DeviceStation);
+    toast.success(`Device station updated to ${val.toUpperCase()}`);
+    // Force reload to apply new login restrictions
+    setTimeout(() => window.location.reload(), 1000);
+  };
 
   return (
     <div className="p-6">
+      {/* ── Device Station Binding ── */}
+      <div className="mb-8 bg-blue-50 border border-blue-100 rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-blue-600 text-white rounded-xl">
+            <Monitor className="size-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-blue-900">Device Station Binding</h2>
+            <p className="text-sm text-blue-700">Set the role for this specific hardware device.</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-blue-900">Current Station: <span className="uppercase text-blue-600">{currentStation}</span></p>
+            <p className="text-xs text-blue-600/80">
+              {currentStation === 'waiter' ? 'This device only allows Waiter logins.' : 
+               currentStation === 'cashier' ? 'This device only allows Cashier/Admin logins.' : 
+               'This device is currently unrestricted.'}
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            <Select value={currentStation} onValueChange={handleStationChange}>
+              <SelectTrigger className="bg-white border-blue-200">
+                <SelectValue placeholder="Assign station role..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned (Unrestricted)</SelectItem>
+                <SelectItem value="waiter">Waiter Tablet (Dining Area)</SelectItem>
+                <SelectItem value="cashier">Cashier Station (Counter)</SelectItem>
+                <SelectItem value="admin">Admin Terminal (Full Access)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Table Management</h1>

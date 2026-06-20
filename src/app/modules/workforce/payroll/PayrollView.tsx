@@ -19,7 +19,7 @@ export function PayrollView() {
 
   const load = async () => {
     setLoading(true);
-    const r = await HRController.getPayroll(month, year);
+    const r = await HRController.getPayroll(month, year, currentUser?.branchId);
     if (r.success) setPayroll(r.data ?? []);
     else setError(r.error ?? 'Failed to load payroll');
     setLoading(false);

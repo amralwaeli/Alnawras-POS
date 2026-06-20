@@ -5,6 +5,7 @@
  * This ensures that specific hardware (e.g. Waiter Tablet) can only
  * perform authorized actions, regardless of the user's role.
  */
+import { supabase } from '../../lib/supabase';
 
 export type DeviceStation = 'cashier' | 'waiter' | 'kitchen' | 'admin' | 'unassigned';
 

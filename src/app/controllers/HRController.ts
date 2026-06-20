@@ -480,17 +480,27 @@ export class HRController {
         .lte('log_date', end);
 
       const workingDays = endDate.getDate(); // simplified; can skip weekends
+      // OPTION A: Fixed salary. We only deduct for UNAUTHORIZED absences.
+      // An unauthorized absence is a day where no log exists and it was NOT a rest day/authorized leave.
+      // For now, we assume any calendar day without a log is an absence IF it's not a rest day.
+      // Since we don't have a roster table yet, we count present days and any "absence" logs explicitly marked.
       const presentDays = (logs || []).filter(l => l.check_in_time).length;
-      const absentDays = workingDays - presentDays;
+      
+      // In a fixed salary system, absentDays are days explicitly marked as "unauthorized absence".
+      // If no explicit absence logs exist, absentDays = 0 (assuming they were rest days).
+      const absentDays = (logs || []).filter(l => l.status === 'absent' || l.status === 'unauthorized').length;
+      
       const totalLateMinutes = (logs || []).reduce((s, l) => s + (l.late_minutes || 0), 0);
       const totalOvertimeMinutes = (logs || []).reduce((s, l) => s + (l.overtime_minutes || 0), 0);
 
-      // Deduction: 1 minute late = (salary / workingDays / 480) per minute
-      const dailyRate = employee.monthlySalary / workingDays;
-      const minuteRate = dailyRate / 480; // 8-hour workday
+      // 30 days is the standard denominator for daily rate in MY/SG/ME payroll
+      const dailyRate = employee.monthlySalary / 30;
+      const minuteRate = dailyRate / 480; // 8-hour standard workday
+      
       const lateDeduction = Math.round(totalLateMinutes * minuteRate * 100) / 100;
       const overtimeBonus = Math.round(totalOvertimeMinutes * minuteRate * 1.5 * 100) / 100;
-      const absentDeduction = absentDays * dailyRate;
+      const absentDeduction = Math.round(absentDays * dailyRate * 100) / 100;
+      
       const netSalary = Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus);
 
       const id = uid('pay');
@@ -526,15 +536,21 @@ export class HRController {
 
   static async getPayroll(
     month: number,
-    year: number
+    year: number,
+    branchId?: string
   ): Promise<{ success: boolean; data?: PayrollSummary[]; error?: string }> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('payroll_summary')
         .select('*')
         .eq('month', month)
-        .eq('year', year)
-        .order('full_name');
+        .eq('year', year);
+      
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
+      
+      const { data, error } = await query.order('full_name');
       if (error) throw error;
       return { success: true, data: (data || []).map(mapPayroll) };
     } catch (err: any) {

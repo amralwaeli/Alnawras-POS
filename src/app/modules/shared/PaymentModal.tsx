@@ -17,6 +17,7 @@ import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { loadLoyaltySettings } from '../../models/types';
 import type { Customer } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
+import { PrintService } from '../../services/PrintService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -306,6 +307,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
+  const [amountReceived, setAmountReceived] = useState('');
 
   const loyaltySettings = loadLoyaltySettings();
 
@@ -369,6 +371,15 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     if (order.status === 'completed') { toast.error('This bill has already been paid'); return; }
     if (paymentMode === 'mix' && !splitExact) { toast.error(`Split must total exactly ${fmt(totals.total)}`); return; }
 
+    // Validate cash received
+    if (paymentMode === 'cash') {
+      const received = parseFloat(amountReceived);
+      if (isNaN(received) || received < totals.total) {
+        toast.error(`Insufficient amount. Total is ${fmt(totals.total)}`);
+        return;
+      }
+    }
+
     setProcessing(true);
     try {
       const { data: lastBill } = await supabase
@@ -423,6 +434,46 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
           });
           toast.success(`+${pointsEarned} ${loyaltySettings.pointsLabel} earned for ${linkedCustomer.name}`);
         }
+      }
+
+      // ── Dispatch LAN Receipt Printing ──
+      try {
+        const printersRaw = localStorage.getItem('alnawras_printers');
+        if (printersRaw) {
+          const printers = JSON.parse(printersRaw);
+          const cashierPrinters = printers.filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
+          
+          for (const printer of cashierPrinters) {
+            const receiptText = `
+ALNAWRAS RESTAURANT
+--------------------------------
+Bill #: ${billNo}
+Date: ${new Date().toLocaleString()}
+Table: ${order.tableNumber || 'Takeaway'}
+Cashier: ${currentUser?.name || 'N/A'}
+--------------------------------
+${(order.items || []).map((i: any) => `${i.productName.padEnd(20)} x${i.quantity} ${fmt(i.price * i.quantity).padStart(8)}`).join('\n')}
+--------------------------------
+SUBTOTAL: ${fmt(totals.subtotal).padStart(20)}
+TAX:      ${fmt(totals.tax).padStart(20)}
+DISCOUNT: ${fmt(totals.discount).padStart(20)}
+TOTAL:    ${fmt(totals.total).padStart(20)}
+--------------------------------
+PAYMENT: ${summary}
+${paymentMode === 'cash' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(parseFloat(amountReceived) - totals.total).padStart(21)}` : ''}
+--------------------------------
+   THANK YOU FOR YOUR VISIT!
+            `;
+
+            await PrintService.sendToPrinter({
+              printerIp: printer.ipAddress,
+              printerPort: printer.port || 9100,
+              content: receiptText
+            });
+          }
+        }
+      } catch (printErr) {
+        console.warn('[ReceiptPrint] LAN Printing failed', printErr);
       }
 
       setLastBillNo(billNo);

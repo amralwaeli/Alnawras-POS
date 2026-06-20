@@ -48,31 +48,45 @@ async function loadLogoDataUrl(): Promise<string | null> {
   }
 }
 
+/**
+ * True when we should build a PDF and share it instead of using the browser
+ * print dialog: i.e. inside the Capacitor APK, or any Android/iOS browser
+ * (these have no reliable "Save as PDF" print dialog). Desktop returns false
+ * so the admin site keeps its print dialog.
+ */
+export function preferGeneratedPdf(): boolean {
+  const cap: any = (window as any).Capacitor;
+  if (cap) {
+    try { if (typeof cap.isNativePlatform === 'function') return !!cap.isNativePlatform(); } catch { /* ignore */ }
+    // Capacitor global is injected only inside the native app → treat as native.
+    return true;
+  }
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+
 async function deliverPdf(doc: jsPDF, filename: string) {
   const blob = doc.output('blob');
-  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+  const nav = navigator as any;
 
-  // On the device, prefer the native share sheet — it lets the user save the
-  // PDF to Files/Drive or print it. WebViews can't trigger a silent download.
-  if (isNative && typeof navigator !== 'undefined') {
-    try {
-      const file = new File([blob], filename, { type: 'application/pdf' });
-      const nav = navigator as any;
-      if (nav.canShare && nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: filename });
-        return;
-      }
-    } catch {
-      // user dismissed the share sheet, or sharing failed — fall through
+  // 1) Native share sheet — works in the Android WebView and mobile browsers,
+  //    and lets the user Save to Files / Drive / print. This is the only
+  //    reliable way to get a file out of a WebView (silent downloads are blocked).
+  try {
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (nav.canShare && nav.canShare({ files: [file] })) {
+      await nav.share({ files: [file], title: filename });
       return;
     }
-    // No file-share support: open the PDF so the system viewer can handle it.
-    try { window.open(URL.createObjectURL(blob), '_blank'); } catch { /* ignore */ }
-    return;
+  } catch (e: any) {
+    if (e && e.name === 'AbortError') return; // user closed the share sheet
+    // otherwise fall through to the download fallbacks
   }
 
-  // Desktop / web: a normal download.
-  doc.save(filename);
+  // 2) Desktop browsers: a normal file download.
+  try { doc.save(filename); return; } catch { /* ignore */ }
+
+  // 3) Last resort: open the PDF in a new tab so the viewer can save it.
+  try { window.open(doc.output('bloburl') as unknown as string, '_blank'); } catch { /* ignore */ }
 }
 
 export async function generateDocumentPdf(data: PdfDocData, filename: string) {

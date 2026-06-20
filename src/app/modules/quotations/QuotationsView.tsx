@@ -4,7 +4,7 @@ import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import { generateDocumentPdf } from '../../../lib/documentPdf';
+import { generateDocumentPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
 
 export function QuotationsView() {
   const [customerName, setCustomerName] = useState('');
@@ -51,9 +51,8 @@ export function QuotationsView() {
   const handlePrint = async () => {
     if (generating) return;
     // Desktop/web (admin site) keeps the print dialog that already works well.
-    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
-    if (!isNative) { window.print(); return; }
-    // APK: build a real PDF and hand it to the native share sheet.
+    if (!preferGeneratedPdf()) { window.print(); return; }
+    // APK / mobile: build a real PDF and hand it to the native share sheet.
     setGenerating(true);
     try {
       await generateDocumentPdf({
@@ -68,6 +67,9 @@ export function QuotationsView() {
         total,
         notes,
       }, `Quotation-${quotationNo || 'draft'}.pdf`);
+    } catch (err) {
+      console.error('[QuotationPDF]', err);
+      alert('Could not generate the PDF. Please try again.');
     } finally {
       setGenerating(false);
     }

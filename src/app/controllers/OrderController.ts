@@ -13,10 +13,21 @@ export interface SubmitOrderItem {
   station?: 'kitchen' | 'juice' | 'shawarma' | 'none';
 }
 
+export interface PickupDetails {
+  method: 'grab' | 'lalamove' | 'self';
+  payType: 'cash' | 'online';
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  receiptUrl?: string;
+  /** 'unpaid' for cash (pay at pickup), 'pending_verification' for online. */
+  paymentStatus: 'unpaid' | 'pending_verification';
+}
+
 export interface SubmitOrderParams {
   branchId: string;
-  orderType: 'dine-in' | 'takeaway';
-  /** Required for dine-in; null/omitted for takeaway. */
+  orderType: 'dine-in' | 'takeaway' | 'pickup';
+  /** Required for dine-in; null/omitted for takeaway & pickup. */
   table?: { id: string; number: number } | null;
   /** Reuse an already-open order if known. */
   existingOrderId?: string | null;
@@ -25,6 +36,8 @@ export interface SubmitOrderParams {
   addedByName: string;
   /** Staff id recorded in waiters[]; omit for guest/QR orders. */
   waiterId?: string;
+  /** Present only for pickup orders. */
+  pickup?: PickupDetails;
 }
 
 /**
@@ -48,13 +61,16 @@ export class OrderController {
       // ── Create the order if one does not already exist ─────────────────────
       if (!orderId) {
         orderId = `order-${Date.now()}`;
-        const billNum = params.orderType === 'takeaway' ? await this.nextBillNumber(branchId) : null;
-        
-        const { error: orderError } = await supabase.from('orders').insert({
+        // takeaway & pickup get a bill number on creation (no table to key off).
+        const billNum = params.orderType !== 'dine-in'
+          ? await this.nextBillNumber(branchId, params.orderType)
+          : null;
+
+        const orderRow: any = {
           id: orderId,
           table_id: params.table?.id || null,
-          // orders.table_number is NOT NULL in the schema, so takeaway orders
-          // (which have no table) must use 0 as a sentinel rather than null.
+          // orders.table_number is NOT NULL in the schema, so takeaway/pickup
+          // orders (which have no table) must use 0 as a sentinel rather than null.
           table_number: params.table?.number ?? 0,
           status: 'open',
           order_type: params.orderType,
@@ -64,7 +80,21 @@ export class OrderController {
           subtotal: 0,
           tax: 0,
           total: 0,
-        });
+        };
+
+        // Pickup-specific fields (customer info, chosen method, payment state).
+        if (params.pickup) {
+          orderRow.pickup_method   = params.pickup.method;
+          orderRow.pickup_status   = 'preparing';
+          orderRow.pickup_pay_type = params.pickup.payType;
+          orderRow.customer_name   = params.pickup.customerName;
+          orderRow.customer_phone  = params.pickup.customerPhone;
+          orderRow.customer_email  = params.pickup.customerEmail || null;
+          orderRow.payment_status  = params.pickup.paymentStatus;
+          orderRow.payment_receipt_url = params.pickup.receiptUrl || null;
+        }
+
+        const { error: orderError } = await supabase.from('orders').insert(orderRow);
         if (orderError) throw orderError;
 
         // If it's a table order, update the table state
@@ -163,13 +193,13 @@ export class OrderController {
     }
   }
 
-  /** Next zero-padded takeaway bill number for a branch. */
-  private static async nextBillNumber(branchId: string): Promise<string> {
+  /** Next zero-padded bill number for a branch, per order type. */
+  private static async nextBillNumber(branchId: string, orderType: string = 'takeaway'): Promise<string> {
     const { data: lastBill } = await supabase
       .from('orders')
       .select('bill_number')
       .eq('branch_id', branchId)
-      .eq('order_type', 'takeaway')
+      .eq('order_type', orderType)
       .not('bill_number', 'is', null)
       .order('bill_number', { ascending: false })
       .limit(1)

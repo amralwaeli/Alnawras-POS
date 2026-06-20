@@ -90,6 +90,13 @@ export const mapOrder = (row: any): Order => ({
   cashierName: row.cashier_name ?? undefined,
   paymentMethod: row.payment_method ?? undefined,
   billNumber: row.bill_number ?? undefined,
+  pickupMethod: row.pickup_method ?? undefined,
+  pickupStatus: row.pickup_status ?? undefined,
+  pickupPayType: row.pickup_pay_type ?? undefined,
+  customerName: row.customer_name ?? undefined,
+  customerPhone: row.customer_phone ?? undefined,
+  customerEmail: row.customer_email ?? undefined,
+  paymentReceiptUrl: row.payment_receipt_url ?? undefined,
 });
 
 // ── Staff / users ────────────────────────────────────────────────────────────

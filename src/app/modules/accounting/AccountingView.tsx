@@ -106,7 +106,7 @@ export function AccountingView() {
       .forEach(o => rows.push([
         new Date(o.createdAt).toLocaleDateString('en-GB'),
         'Revenue',
-        `Order - ${o.orderType === 'takeaway' ? 'Takeaway' : `Table ${o.tableNumber}`}`,
+        `Order - ${o.orderType === 'takeaway' ? 'Takeaway' : o.orderType === 'pickup' ? 'Pickup' : `Table ${o.tableNumber}`}`,
         'sales',
         orderTotal(o).toFixed(2),
       ]));

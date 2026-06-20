@@ -566,7 +566,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
-                <h2 className="font-bold text-lg">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : `Table ${order.tableNumber}`}</h2>
+                <h2 className="font-bold text-lg">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : getOrderType(order) === 'pickup' ? 'Pickup Order' : `Table ${order.tableNumber}`}</h2>
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <Clock className="size-3" />
                   {order.billNumber ? `Bill #${order.billNumber} • ` : ''}

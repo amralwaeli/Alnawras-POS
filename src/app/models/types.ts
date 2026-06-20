@@ -64,8 +64,8 @@ export interface Order {
   discount: number;
   total: number;
   status: 'open' | 'completed' | 'cancelled';
-  paymentStatus?: 'unpaid' | 'paid';
-  orderType?: 'dine-in' | 'takeaway';
+  paymentStatus?: 'unpaid' | 'paid' | 'pending_verification' | 'rejected';
+  orderType?: 'dine-in' | 'takeaway' | 'pickup';
   createdAt: Date;
   completedAt?: Date;
   waiters: string[];
@@ -73,6 +73,14 @@ export interface Order {
   cashierName?: string;
   paymentMethod?: string;
   billNumber?: string;
+  // ── Pickup-order fields (only set when orderType === 'pickup') ──
+  pickupMethod?: 'grab' | 'lalamove' | 'self';
+  pickupStatus?: 'preparing' | 'ready' | 'picked';
+  pickupPayType?: 'cash' | 'online';
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  paymentReceiptUrl?: string;
 }
 
 // ==================== Products & Inventory ====================

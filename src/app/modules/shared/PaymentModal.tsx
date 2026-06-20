@@ -253,17 +253,18 @@ function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedempti
 }
 
 // ── CashChangeRow ─────────────────────────────────────────────────────────────
-function CashChangeRow({ total }: { total: number }) {
-  const [received, setReceived] = useState('');
-  const change = Math.max(0, (parseFloat(received) || 0) - total);
+// Controlled by the parent so the entered amount drives both validation and the
+// printed receipt (change due). Leaving it blank means "exact cash" (no change).
+function CashChangeRow({ total, value, onChange }: { total: number; value: string; onChange: (v: string) => void }) {
+  const change = Math.max(0, (parseFloat(value) || 0) - total);
   return (
     <div className="flex items-center gap-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
       <div className="flex-1">
         <p className="text-xs text-emerald-700 mb-1 font-medium">Cash received</p>
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">{CURRENCY}</span>
-          <input type="number" min={total} step="0.50" placeholder={total.toFixed(2)} value={received}
-            onChange={e => setReceived(e.target.value)}
+          <input type="number" min={total} step="0.50" placeholder={total.toFixed(2)} value={value}
+            onChange={e => onChange(e.target.value)}
             className="w-full pl-9 pr-2 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:outline-none focus:border-emerald-400" />
         </div>
       </div>
@@ -310,6 +311,19 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [amountReceived, setAmountReceived] = useState('');
 
   const loyaltySettings = loadLoyaltySettings();
+
+  // Reset the modal to a clean state whenever a new order is opened, so values
+  // from a previous bill (cash received, split, loyalty, print prompt) never leak.
+  useEffect(() => {
+    if (!isOpen) return;
+    setPaymentMode('cash');
+    setSplits([{ method: 'cash', amount: '' }]);
+    setAmountReceived('');
+    setShowPrint(false);
+    setLinkedCustomer(null);
+    setLoyaltyDiscount(0);
+    setLoyaltyPointsToRedeem(0);
+  }, [order?.id, isOpen]);
 
   const baseTotals = useMemo(() => calcOrderTotals(order), [order]);
   const totals = useMemo(() => {
@@ -371,8 +385,9 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     if (order.status === 'completed') { toast.error('This bill has already been paid'); return; }
     if (paymentMode === 'mix' && !splitExact) { toast.error(`Split must total exactly ${fmt(totals.total)}`); return; }
 
-    // Validate cash received
-    if (paymentMode === 'cash') {
+    // Validate cash received. A blank field means the customer paid the exact
+    // amount (no change), so only block when a value is entered that is too low.
+    if (paymentMode === 'cash' && amountReceived.trim() !== '') {
       const received = parseFloat(amountReceived);
       if (isNaN(received) || received < totals.total) {
         toast.error(`Insufficient amount. Total is ${fmt(totals.total)}`);
@@ -452,7 +467,12 @@ Date: ${new Date().toLocaleString()}
 Table: ${order.tableNumber || 'Takeaway'}
 Cashier: ${currentUser?.name || 'N/A'}
 --------------------------------
-${(order.items || []).map((i: any) => `${i.productName.padEnd(20)} x${i.quantity} ${fmt(i.price * i.quantity).padStart(8)}`).join('\n')}
+${(order.items || []).map((i: any) => {
+              const name = String(i.productName || i.product_name || 'Item');
+              const qty = Number(i.quantity ?? i.qty ?? 1);
+              const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
+              return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}`;
+            }).join('\n')}
 --------------------------------
 SUBTOTAL: ${fmt(totals.subtotal).padStart(20)}
 TAX:      ${fmt(totals.tax).padStart(20)}
@@ -460,7 +480,7 @@ DISCOUNT: ${fmt(totals.discount).padStart(20)}
 TOTAL:    ${fmt(totals.total).padStart(20)}
 --------------------------------
 PAYMENT: ${summary}
-${paymentMode === 'cash' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(parseFloat(amountReceived) - totals.total).padStart(21)}` : ''}
+${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(Math.max(0, parseFloat(amountReceived) - totals.total)).padStart(21)}` : ''}
 --------------------------------
    THANK YOU FOR YOUR VISIT!
             `;
@@ -599,7 +619,7 @@ ${paymentMode === 'cash' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart
                   <button onClick={() => setPaymentMode('mix')} className={methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')}><SplitSquareHorizontal className="size-4" />Mix</button>
                 </div>
 
-                {paymentMode === 'cash' && <CashChangeRow total={totals.total} />}
+                {paymentMode === 'cash' && <CashChangeRow total={totals.total} value={amountReceived} onChange={setAmountReceived} />}
 
                 {paymentMode === 'qr' && (
                   <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 flex flex-col items-center text-center space-y-3 animate-in fade-in zoom-in duration-300">

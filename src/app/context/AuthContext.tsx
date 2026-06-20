@@ -55,12 +55,16 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       // ── DEVICE ROLE LOCKING ───────────────────────────────────────────────
       // Secure the tablet and cashier devices: only accept waiter on tablets,
       // and only cashier/admin on the cashier device.
+      // Admin always bypasses the lock so the owner can never lock themselves
+      // out of a device (e.g. to re-assign its station binding).
       const station = DeviceService.getStationType();
-      if (station === 'waiter' && user.role !== 'waiter') {
-        return { success: false, error: 'This tablet is for Waiters only. Please use the Cashier station.' };
-      }
-      if (station === 'cashier' && !['cashier', 'admin', 'manager', 'accounting'].includes(user.role)) {
-        return { success: false, error: 'This station is for Cashiers only.' };
+      if (user.role !== 'admin') {
+        if (station === 'waiter' && user.role !== 'waiter') {
+          return { success: false, error: 'This tablet is for Waiters only. Please use the Cashier station.' };
+        }
+        if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) {
+          return { success: false, error: 'This station is for Cashiers only.' };
+        }
       }
       // ─────────────────────────────────────────────────────────────────────
 
@@ -72,11 +76,14 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
     if (result.success && result.user) {
       const user = result.user;
       const station = DeviceService.getStationType();
-      if (station === 'waiter' && user.role !== 'waiter') {
-        return { success: false, error: 'This tablet is for Waiters only.' };
-      }
-      if (station === 'cashier' && !['cashier', 'admin', 'manager', 'accounting'].includes(user.role)) {
-        return { success: false, error: 'This station is for Cashiers only.' };
+      // Admin always bypasses the lock (see note above).
+      if (user.role !== 'admin') {
+        if (station === 'waiter' && user.role !== 'waiter') {
+          return { success: false, error: 'This tablet is for Waiters only.' };
+        }
+        if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) {
+          return { success: false, error: 'This station is for Cashiers only.' };
+        }
       }
       setCurrentUser(user);
     }

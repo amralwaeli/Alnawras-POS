@@ -4,6 +4,7 @@ import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
+import { generateDocumentPdf } from '../../../lib/documentPdf';
 
 export function QuotationsView() {
   const [customerName, setCustomerName] = useState('');
@@ -45,12 +46,31 @@ export function QuotationsView() {
   };
 
   const printRef = useRef<HTMLDivElement>(null);
+  const [generating, setGenerating] = useState(false);
 
-  const handlePrint = () => {
-    const el = printRef.current;
-    if (!el) return;
-
-    window.print();
+  const handlePrint = async () => {
+    if (generating) return;
+    // Desktop/web (admin site) keeps the print dialog that already works well.
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    if (!isNative) { window.print(); return; }
+    // APK: build a real PDF and hand it to the native share sheet.
+    setGenerating(true);
+    try {
+      await generateDocumentPdf({
+        title: 'Quotation',
+        refLabel: 'Quotation No',
+        to: { name: customerName, phone: customerPhone },
+        refNo: quotationNo,
+        date,
+        items: items.filter(i => i.name.trim() !== ''),
+        subTotal,
+        discount,
+        total,
+        notes,
+      }, `Quotation-${quotationNo || 'draft'}.pdf`);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const addItem = () => {
@@ -106,12 +126,12 @@ export function QuotationsView() {
         </div>
         <button
           onClick={handlePrint}
-          disabled={!canPrint}
+          disabled={!canPrint || generating}
           className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
         >
           <Printer className="size-4" />
-          <span className="hidden sm:inline">Download PDF</span>
-          <span className="sm:hidden">PDF</span>
+          <span className="hidden sm:inline">{generating ? 'Generating…' : 'Download PDF'}</span>
+          <span className="sm:hidden">{generating ? '…' : 'PDF'}</span>
         </button>
       </div>
 

@@ -87,6 +87,7 @@ function LandingPage() {
     case 'admin':      return <Navigate to="/admin-dashboard" replace />;
     case 'cashier':    return <Navigate to="/tables" replace />;
     case 'waiter':     return <Navigate to="/dashboard" replace />;   // ordering menu
+    case 'swaiter':    return <Navigate to="/dashboard" replace />;   // super waiter — same landing as waiter
     case 'kitchen':    return <Navigate to="/kitchen" replace />;
     case 'juice':      return <Navigate to="/kitchen" replace />;
 

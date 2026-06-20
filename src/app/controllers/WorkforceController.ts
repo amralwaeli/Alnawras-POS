@@ -13,7 +13,7 @@ const defaultDepartment = (role: string): string => {
   const map: Record<string, string> = {
     kitchen: 'Kitchen', juice: 'Kitchen',
     cashier: 'Cashier',
-    waiter: 'Service',
+    waiter: 'Service', swaiter: 'Service',
     hr: 'HR',
     accounting: 'Finance',
     manager: 'Management', supervisor: 'Management',

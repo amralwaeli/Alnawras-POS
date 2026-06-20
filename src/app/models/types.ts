@@ -5,7 +5,7 @@ export type Result<T> = { success: true; data: T } | { success: false; error: st
 
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'swaiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor';
 
 export interface User {
   id: string;
@@ -275,6 +275,25 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageLeave: false,
     canViewOwnAttendance: true,
   },
+  // Super Waiter — a normal waiter that can ALSO manage invoices & quotations.
+  swaiter: {
+    canViewTables: true,
+    canAddOrders: true,
+    canProcessPayments: false,
+    canManageInventory: false,
+    canViewReports: false,
+    canViewOrderingDashboard: true,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+    canManageInvoicesQuotations: true,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
+  },
   kitchen: {
     canViewTables: false,
     canAddOrders: false,
@@ -402,6 +421,47 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
 };
+
+// ==================== Role Catalog (single source of truth) ====================
+// Every screen (Add Employee form, filters, role badges) MUST read role labels,
+// colours and the assignable list from here so they never drift apart again.
+
+export interface RoleMeta {
+  value: UserRole;
+  label: string;
+  /** Tailwind classes for the role badge pill. */
+  badgeClass: string;
+  /** Whether this role can be assigned to staff via the HR form (admin is not). */
+  assignable: boolean;
+}
+
+// Ordered from most to least privileged for nice dropdowns.
+export const ROLE_META: RoleMeta[] = [
+  { value: 'admin',      label: 'Admin',        badgeClass: 'bg-gray-800 text-white',        assignable: false },
+  { value: 'manager',    label: 'Manager',      badgeClass: 'bg-violet-100 text-violet-700', assignable: true },
+  { value: 'supervisor', label: 'Supervisor',   badgeClass: 'bg-cyan-100 text-cyan-700',     assignable: true },
+  { value: 'cashier',    label: 'Cashier',      badgeClass: 'bg-blue-100 text-blue-700',     assignable: true },
+  { value: 'waiter',     label: 'Waiter',       badgeClass: 'bg-emerald-100 text-emerald-700', assignable: true },
+  { value: 'swaiter',    label: 'Super Waiter', badgeClass: 'bg-emerald-200 text-emerald-900', assignable: true },
+  { value: 'kitchen',    label: 'Kitchen',      badgeClass: 'bg-orange-100 text-orange-700',  assignable: true },
+  { value: 'juice',      label: 'Juice Bar',    badgeClass: 'bg-yellow-100 text-yellow-700',  assignable: true },
+  { value: 'accounting', label: 'Accountant',   badgeClass: 'bg-indigo-100 text-indigo-700',  assignable: true },
+  { value: 'hr',         label: 'HR',           badgeClass: 'bg-pink-100 text-pink-700',      assignable: true },
+  { value: 'staff',      label: 'Staff',        badgeClass: 'bg-teal-100 text-teal-700',      assignable: true },
+];
+
+/** Roles that can be picked when creating/editing an employee (everything but admin). */
+export const ASSIGNABLE_ROLES = ROLE_META.filter(r => r.assignable);
+
+export const ROLE_LABELS: Record<string, string> =
+  Object.fromEntries(ROLE_META.map(r => [r.value, r.label]));
+
+export const ROLE_BADGE_CLASSES: Record<string, string> =
+  Object.fromEntries(ROLE_META.map(r => [r.value, r.badgeClass]));
+
+export function roleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role;
+}
 
 // ==================== HR & Fingerprint Attendance ====================
 

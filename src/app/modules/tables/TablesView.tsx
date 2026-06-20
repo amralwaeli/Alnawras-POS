@@ -454,7 +454,7 @@ export function TablesView() {
                         {hasOrderWithItems ? 'Process Payment' : 'Open Bill'}
                       </button>
                     )}
-                    {currentUser.role === 'waiter' && (
+                    {(currentUser.role === 'waiter' || currentUser.role === 'swaiter') && (
                       <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
                         Add Items
                       </button>
@@ -475,7 +475,7 @@ export function TablesView() {
                         Open Bill
                       </button>
                     )}
-                    {(currentUser.role === 'waiter' || currentUser.role === 'admin') && (
+                    {(currentUser.role === 'waiter' || currentUser.role === 'swaiter' || currentUser.role === 'admin') && (
                       <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
                         Start Order
                       </button>

@@ -59,7 +59,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       // out of a device (e.g. to re-assign its station binding).
       const station = DeviceService.getStationType();
       if (user.role !== 'admin') {
-        if (station === 'waiter' && user.role !== 'waiter') {
+        if (station === 'waiter' && !['waiter', 'swaiter'].includes(user.role)) {
           return { success: false, error: 'This tablet is for Waiters only. Please use the Cashier station.' };
         }
         if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) {
@@ -78,7 +78,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       const station = DeviceService.getStationType();
       // Admin always bypasses the lock (see note above).
       if (user.role !== 'admin') {
-        if (station === 'waiter' && user.role !== 'waiter') {
+        if (station === 'waiter' && !['waiter', 'swaiter'].includes(user.role)) {
           return { success: false, error: 'This tablet is for Waiters only.' };
         }
         if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) {

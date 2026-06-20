@@ -14,6 +14,8 @@ production and have been removed.
 | `0002_workforce_reconcile.sql` | DDL — adds the 7 missing `employees` columns, creates `leave_requests`, extends the `users` role CHECK | **Yes — required.** Until applied, employee-create and leave features are broken in prod |
 | `0003_backfill_employees_from_users.sql` | DATA — seeds `employees` from existing `users` | Optional. Writes rows; review first |
 | `0004_pin_auth.sql` | DDL — hashes PINs + adds `verify_staff_pin`/`set_staff_pin` RPCs | **Recommended.** Safe (no RLS, keeps `pin`); see `SECURITY.md` |
+| `0005_secure_qr_tokens.sql` | DDL — token-based secure QR ordering | Required for secure QR ordering |
+| `0006_add_swaiter_role.sql` | DDL — adds the `swaiter` (Super Waiter) role to the `users.role` CHECK | **Yes — required** before creating a Super Waiter |
 
 ## How to apply
 

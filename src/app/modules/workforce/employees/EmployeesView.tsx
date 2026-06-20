@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
-import { EmployeeWithUser, EmployeeFilters } from '../../../models/types';
+import { EmployeeWithUser, EmployeeFilters, ROLE_LABELS, ROLE_BADGE_CLASSES } from '../../../models/types';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import {
   AlertDialog,
@@ -19,23 +19,9 @@ import {
 } from '../../../components/ui/alert-dialog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const ROLE_LABELS: Record<string, string> = {
-  cashier: 'Cashier', waiter: 'Waiter', kitchen: 'Kitchen', juice: 'Juice Bar',
-  hr: 'HR', accounting: 'Accountant', manager: 'Manager',
-  supervisor: 'Supervisor', staff: 'Staff',
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  cashier:    'bg-blue-100 text-blue-700',
-  waiter:     'bg-emerald-100 text-emerald-700',
-  kitchen:    'bg-orange-100 text-orange-700',
-  juice:      'bg-yellow-100 text-yellow-700',
-  hr:         'bg-pink-100 text-pink-700',
-  accounting: 'bg-indigo-100 text-indigo-700',
-  manager:    'bg-violet-100 text-violet-700',
-  supervisor: 'bg-cyan-100 text-cyan-700',
-  staff:      'bg-teal-100 text-teal-700',
-};
+// Role labels & badge colours come from the central ROLE_META registry in
+// models/types so every screen stays in sync. ROLE_COLORS aliases the shared map.
+const ROLE_COLORS = ROLE_BADGE_CLASSES;
 
 const AVATAR_COLORS = [
   'from-blue-500 to-cyan-600',

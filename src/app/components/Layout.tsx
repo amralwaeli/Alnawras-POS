@@ -78,6 +78,7 @@ export function Layout() {
     admin:      'from-violet-500 to-purple-600',
     cashier:    'from-blue-500 to-cyan-600',
     waiter:     'from-emerald-500 to-green-600',
+    swaiter:    'from-emerald-600 to-teal-600',
     kitchen:    'from-orange-500 to-amber-600',
     hr:         'from-pink-500 to-rose-600',
     juice:      'from-yellow-500 to-amber-500',

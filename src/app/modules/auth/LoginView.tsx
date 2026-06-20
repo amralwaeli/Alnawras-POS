@@ -51,7 +51,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
           window.location.hash = '#/admin-dashboard';
         } else if (result.user?.role === 'cashier') {
           window.location.hash = '#/tables';
-        } else if (result.user?.role === 'waiter') {
+        } else if (result.user?.role === 'waiter' || result.user?.role === 'swaiter') {
           window.location.hash = '#/';
         }
         // App.tsx detects the user change and shows the Router (Dashboard)

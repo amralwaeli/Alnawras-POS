@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 import { WorkforceController } from '../../../controllers/WorkforceController';
-import { Employee, CreateEmployeeInput, UserRole } from '../../../models/types';
-
-const ROLES: { value: Exclude<UserRole, 'admin'>; label: string }[] = [
-  { value: 'cashier', label: 'Cashier' },
-  { value: 'waiter',  label: 'Waiter' },
-  { value: 'kitchen', label: 'Kitchen Staff' },
-  { value: 'hr',      label: 'HR' },
-];
+import { Employee, CreateEmployeeInput, UserRole, ASSIGNABLE_ROLES } from '../../../models/types';
 
 interface Props {
   initial?: Employee;
@@ -140,7 +133,7 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
                 onChange={e => set('role', e.target.value as Exclude<UserRole, 'admin'>)}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
-                {ROLES.map(r => (
+                {ASSIGNABLE_ROLES.map(r => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>

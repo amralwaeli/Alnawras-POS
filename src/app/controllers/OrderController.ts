@@ -96,14 +96,8 @@ export class OrderController {
 
         const { error: orderError } = await supabase.from('orders').insert(orderRow);
         if (orderError) throw orderError;
-
-        // If it's a table order, update the table state
-        if (params.table?.id) {
-          await supabase.from('tables').update({ 
-            status: 'occupied', 
-            current_order_id: orderId 
-          }).eq('id', params.table.id);
-        }
+        // The table is marked occupied AFTER items are inserted (below), so a
+        // table never shows busy until an order is actually sent.
       }
 
       // ── Insert the new order items ──────────────────────────────────────────
@@ -134,6 +128,14 @@ export class OrderController {
         const subtotal = (allItems || []).reduce((s, r: any) => s + Number(r.subtotal), 0);
         const tax = 0;
         await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
+
+        // A dine-in table only becomes "occupied" once real items are sent — this
+        // covers group orders, whose shared order is created empty on scan.
+        if (params.table?.id) {
+          await supabase.from('tables')
+            .update({ status: 'occupied', current_order_id: orderId })
+            .eq('id', params.table.id);
+        }
 
         const { data: saved } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
         if (saved) finalOrder = mapOrder(saved);

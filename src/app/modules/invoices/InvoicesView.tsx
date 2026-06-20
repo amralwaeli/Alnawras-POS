@@ -5,6 +5,7 @@ import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
 import { generateDocumentPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
+import { toast } from 'sonner';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -70,7 +71,7 @@ export function InvoicesView() {
       }, `Invoice-${invoiceNo || 'draft'}.pdf`);
     } catch (err) {
       console.error('[InvoicePDF]', err);
-      alert('Could not generate the PDF. Please try again.');
+      toast.error('Could not generate the PDF. Please try again.');
     } finally {
       setGenerating(false);
     }

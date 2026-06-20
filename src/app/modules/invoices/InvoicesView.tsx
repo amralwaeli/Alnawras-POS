@@ -4,7 +4,7 @@ import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import { generateDocumentPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
+import { exportElementAsPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
 import { toast } from 'sonner';
 
 export function InvoicesView() {
@@ -53,22 +53,12 @@ export function InvoicesView() {
     if (generating) return;
     // Desktop/web (admin site) keeps the print dialog that already works well.
     if (!preferGeneratedPdf()) { window.print(); return; }
-    // APK / mobile: the print dialog isn't available, so build a real PDF and
-    // hand it to the native share sheet (Save to Files / Drive / print).
+    // APK / mobile: the print dialog isn't available, so rasterise the template
+    // (renders Arabic correctly) and hand the PDF to the native share sheet.
+    if (!printRef.current) { window.print(); return; }
     setGenerating(true);
     try {
-      await generateDocumentPdf({
-        title: 'Invoice',
-        refLabel: 'Invoice No',
-        to: { name: customerName, phone: customerPhone },
-        refNo: invoiceNo,
-        date,
-        items: items.filter(i => i.name.trim() !== ''),
-        subTotal,
-        discount,
-        total,
-        notes,
-      }, `Invoice-${invoiceNo || 'draft'}.pdf`);
+      await exportElementAsPdf(printRef.current, `Invoice-${invoiceNo || 'draft'}.pdf`);
     } catch (err) {
       console.error('[InvoicePDF]', err);
       toast.error('Could not generate the PDF. Please try again.');
@@ -337,7 +327,14 @@ export function InvoicesView() {
       </div>
     </div>
 
+    {/* Admin print target (hidden on screen, shown by @media print). */}
     <div className="print-only hidden">
+      <InvoiceTemplate data={invoiceData} />
+    </div>
+    {/* Off-screen but rendered copy that html2canvas rasterises for the APK PDF.
+        It is off-screen on screen, and hidden from the admin print by the
+        body{visibility:hidden} rule, so it never affects either path. */}
+    <div aria-hidden style={{ position: 'fixed', left: '-10000px', top: 0, width: '210mm', background: '#fff' }}>
       <InvoiceTemplate ref={printRef} data={invoiceData} />
     </div>
     </>

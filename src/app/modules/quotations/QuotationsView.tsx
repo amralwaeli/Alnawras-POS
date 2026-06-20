@@ -4,7 +4,7 @@ import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import { generateDocumentPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
+import { exportElementAsPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
 import { toast } from 'sonner';
 
 export function QuotationsView() {
@@ -53,21 +53,12 @@ export function QuotationsView() {
     if (generating) return;
     // Desktop/web (admin site) keeps the print dialog that already works well.
     if (!preferGeneratedPdf()) { window.print(); return; }
-    // APK / mobile: build a real PDF and hand it to the native share sheet.
+    // APK / mobile: rasterise the template (renders Arabic correctly) and hand
+    // the PDF to the native share sheet.
+    if (!printRef.current) { window.print(); return; }
     setGenerating(true);
     try {
-      await generateDocumentPdf({
-        title: 'Quotation',
-        refLabel: 'Quotation No',
-        to: { name: customerName, phone: customerPhone },
-        refNo: quotationNo,
-        date,
-        items: items.filter(i => i.name.trim() !== ''),
-        subTotal,
-        discount,
-        total,
-        notes,
-      }, `Quotation-${quotationNo || 'draft'}.pdf`);
+      await exportElementAsPdf(printRef.current, `Quotation-${quotationNo || 'draft'}.pdf`);
     } catch (err) {
       console.error('[QuotationPDF]', err);
       toast.error('Could not generate the PDF. Please try again.');
@@ -336,7 +327,12 @@ export function QuotationsView() {
       </div>
     </div>
 
+    {/* Admin print target (hidden on screen, shown by @media print). */}
     <div className="print-only hidden">
+      <QuotationTemplate data={quotationData} />
+    </div>
+    {/* Off-screen but rendered copy that html2canvas rasterises for the APK PDF. */}
+    <div aria-hidden style={{ position: 'fixed', left: '-10000px', top: 0, width: '210mm', background: '#fff' }}>
       <QuotationTemplate ref={printRef} data={quotationData} />
     </div>
     </>

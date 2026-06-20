@@ -20,6 +20,12 @@ importers:
       '@capacitor/core':
         specifier: ^7.0.0
         version: 7.6.6
+      '@capacitor/filesystem':
+        specifier: ^7.1.8
+        version: 7.1.8(@capacitor/core@7.6.6)
+      '@capacitor/share':
+        specifier: ^7.0.4
+        version: 7.0.4(@capacitor/core@7.6.6)
       '@radix-ui/react-alert-dialog':
         specifier: 1.1.6
         version: 1.1.6(@types/react@19.2.14)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -237,6 +243,19 @@ packages:
 
   '@capacitor/core@7.6.6':
     resolution: {integrity: sha512-TCxNTpi9bWlM31n8hkLKGrugDGcgJpSqafpDoEEn/Hj6KWxjxes7m0ASfrZ2pOmsqMNGjE6bYGZr905CueVAIw==}
+
+  '@capacitor/filesystem@7.1.8':
+    resolution: {integrity: sha512-Qpw/2SE4/CzqAUvGgSM9hw/uXQ5qoOaF4wxbToXwpAaKPS+tzletS1h5ti3jjLmGcqizTs2sEXMtcsARW/Ceew==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/share@7.0.4':
+    resolution: {integrity: sha512-wNXxmXUcChrtbZ5jQv8scFIbIGKo3rk6B7qpWySxfUhYJP5NANgAqQ9Z69m0k/zYsucdh66SBU7XW1ykd9aUug==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/synapse@1.0.4':
+    resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -2376,6 +2395,17 @@ snapshots:
   '@capacitor/core@7.6.6':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/filesystem@7.1.8(@capacitor/core@7.6.6)':
+    dependencies:
+      '@capacitor/core': 7.6.6
+      '@capacitor/synapse': 1.0.4
+
+  '@capacitor/share@7.0.4(@capacitor/core@7.6.6)':
+    dependencies:
+      '@capacitor/core': 7.6.6
+
+  '@capacitor/synapse@1.0.4': {}
 
   '@esbuild/aix-ppc64@0.25.12':
     optional: true

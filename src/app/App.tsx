@@ -5,8 +5,8 @@ import { router } from './routes';
 import { LoginView } from './modules/auth';
 import { checkSupabaseConnection } from '../lib/supabase';
 
-// Routes that customers reach via QR code scan — no staff login required.
-const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/'];
+// Routes that customers reach via QR code scan or a pickup link — no staff login required.
+const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/'];
 
 function isPublicRoute(): boolean {
   return PUBLIC_HASH_PREFIXES.some(prefix => window.location.hash.startsWith(prefix));

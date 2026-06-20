@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router';
 import { POSProvider, usePOS } from './context/POSContext';
 import { router } from './routes';
 import { LoginView } from './modules/auth';
+import { AlertOverlay } from './components/AlertOverlay';
 import { checkSupabaseConnection } from '../lib/supabase';
 
 // Routes that customers reach via QR code scan or a pickup link — no staff login required.
@@ -63,6 +64,7 @@ export default function App() {
         </div>
       )}
       <AppContent />
+      <AlertOverlay />
     </POSProvider>
   );
 }

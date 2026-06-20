@@ -5,12 +5,12 @@
  * Writes to Orders, Tables, and Catalog state via context setters.
  * No feature module should import this directly — it runs as a root wrapper.
  */
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
 import { mapOrder, mapOrderItem, mapProduct, mapTable } from '../models/mappers';
-import { NotificationService } from '../services/NotificationService';
+import { AlertService } from '../services/AlertService';
 import { useAuth } from './AuthContext';
 import { useOrders } from './OrdersContext';
 import { useTables } from './TablesContext';
@@ -21,14 +21,6 @@ export function RealtimeSyncEngine() {
   const { setOrders } = useOrders();
   const { setTables } = useTables();
   const { setProducts, setCategories } = useCatalog();
-
-  // Tables we've already notified are "calling", to avoid repeat notifications.
-  const calledTables = useRef<Set<string>>(new Set());
-
-  // Ask for notification permission once a staff member is logged in (APK only).
-  useEffect(() => {
-    if (currentUser) void NotificationService.init();
-  }, [currentUser]);
 
   const syncAll = useCallback(async () => {
     if (!currentUser) return;
@@ -68,16 +60,13 @@ export function RealtimeSyncEngine() {
             : [...prev, mapped]
         );
 
-        // Notify floor staff when a table calls for a waiter (once per call).
+        // In-app beeping alert for floor staff when a table calls for a waiter.
         const floorStaff = ['waiter', 'swaiter', 'admin'].includes(currentUser.role);
         if (row?.id && floorStaff) {
           if (row.needs_waiter === true) {
-            if (!calledTables.current.has(row.id)) {
-              calledTables.current.add(row.id);
-              void NotificationService.notify('🔔 Table Calling', `Table ${mapped.number} needs a waiter`);
-            }
+            AlertService.push({ id: `table-${row.id}`, kind: 'table', title: 'Table Calling', body: `Table ${mapped.number} needs a waiter`, tableId: row.id });
           } else {
-            calledTables.current.delete(row.id);
+            AlertService.dismiss(`table-${row.id}`);
           }
         }
       })
@@ -91,10 +80,10 @@ export function RealtimeSyncEngine() {
         const orderRow = (payload.new || payload.old) as any;
         if (!orderRow?.id) return;
 
-        // Notify cashier/admin staff when a new pickup order comes in.
+        // In-app beeping alert for cashier/admin when a new pickup order comes in.
         if (payload.eventType === 'INSERT' && orderRow.order_type === 'pickup'
             && ['cashier', 'swaiter', 'admin'].includes(currentUser.role)) {
-          void NotificationService.notify('📦 New Pickup Order', `${orderRow.customer_name || 'A customer'} placed a pickup order`);
+          AlertService.push({ id: `pickup-${orderRow.id}`, kind: 'pickup', title: 'New Pickup Order', body: `${orderRow.customer_name || 'A customer'} placed a pickup order` });
         }
 
         if (payload.eventType === 'DELETE') {

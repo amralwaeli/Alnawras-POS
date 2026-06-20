@@ -4,7 +4,7 @@ import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { InvoiceTemplate, InvoiceData, InvoiceItem } from './InvoiceTemplate';
 import { usePOS } from '../../context/POSContext';
 import { supabase } from '../../../lib/supabase';
-import { generateDocumentPdf } from '../../../lib/documentPdf';
+import { generateDocumentPdf, preferGeneratedPdf } from '../../../lib/documentPdf';
 
 export function InvoicesView() {
   const [customerName, setCustomerName] = useState('');
@@ -51,10 +51,9 @@ export function InvoicesView() {
   const handlePrint = async () => {
     if (generating) return;
     // Desktop/web (admin site) keeps the print dialog that already works well.
-    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
-    if (!isNative) { window.print(); return; }
-    // APK: browsers/WebViews here can't use the print dialog, so build a real
-    // PDF and hand it to the native share sheet (Save to Files / Drive / print).
+    if (!preferGeneratedPdf()) { window.print(); return; }
+    // APK / mobile: the print dialog isn't available, so build a real PDF and
+    // hand it to the native share sheet (Save to Files / Drive / print).
     setGenerating(true);
     try {
       await generateDocumentPdf({
@@ -69,6 +68,9 @@ export function InvoicesView() {
         total,
         notes,
       }, `Invoice-${invoiceNo || 'draft'}.pdf`);
+    } catch (err) {
+      console.error('[InvoicePDF]', err);
+      alert('Could not generate the PDF. Please try again.');
     } finally {
       setGenerating(false);
     }

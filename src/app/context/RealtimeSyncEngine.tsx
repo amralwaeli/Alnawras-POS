@@ -5,7 +5,7 @@
  * Writes to Orders, Tables, and Catalog state via context setters.
  * No feature module should import this directly — it runs as a root wrapper.
  */
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
@@ -21,6 +21,10 @@ export function RealtimeSyncEngine() {
   const { setOrders } = useOrders();
   const { setTables } = useTables();
   const { setProducts, setCategories } = useCatalog();
+
+  // Tables already flagged "needs waiter" (seeded from load) so we only alert on
+  // a genuine NEW call (false → true), never on pre-existing/stale flags.
+  const knownCalling = useRef<Set<string>>(new Set());
 
   const syncAll = useCallback(async () => {
     if (!currentUser) return;
@@ -39,7 +43,11 @@ export function RealtimeSyncEngine() {
 
     if (prodRes.success)   setProducts(prodRes.data);
     if (catRes.success)    setCategories(catRes.data);
-    if (tableRes.success)  setTables(tableRes.data);
+    if (tableRes.success) {
+      setTables(tableRes.data);
+      // Seed the "already calling" set so existing flags don't trigger alerts.
+      knownCalling.current = new Set(tableRes.data.filter((t: any) => t.needsWaiter).map((t: any) => t.id));
+    }
     if (ordersRes.data)    setOrders(ordersRes.data.map(mapOrder));
   }, [currentUser, setProducts, setCategories, setTables, setOrders]);
 
@@ -60,12 +68,17 @@ export function RealtimeSyncEngine() {
             : [...prev, mapped]
         );
 
-        // In-app beeping alert for floor staff when a table calls for a waiter.
+        // In-app beeping alert for floor staff — only on a NEW call (false→true),
+        // never for tables that were already flagged when the app loaded.
         const floorStaff = ['waiter', 'swaiter', 'admin'].includes(currentUser.role);
         if (row?.id && floorStaff) {
           if (row.needs_waiter === true) {
-            AlertService.push({ id: `table-${row.id}`, kind: 'table', title: 'Table Calling', body: `Table ${mapped.number} needs a waiter`, tableId: row.id });
+            if (!knownCalling.current.has(row.id)) {
+              knownCalling.current.add(row.id);
+              AlertService.push({ id: `table-${row.id}`, kind: 'table', title: 'Table Calling', body: `Table ${mapped.number} needs a waiter`, tableId: row.id });
+            }
           } else {
+            knownCalling.current.delete(row.id);
             AlertService.dismiss(`table-${row.id}`);
           }
         }

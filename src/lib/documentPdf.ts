@@ -76,27 +76,47 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+/** No-reinstall fallback: hand the PDF to the system browser as a data URL,
+ *  where it can be viewed, saved, or shared. Opened via a target=_blank anchor
+ *  so Capacitor routes it to the external browser. */
+function openInSystemBrowser(doc: jsPDF) {
+  const dataUri = doc.output('datauristring');
+  try {
+    const a = document.createElement('a');
+    a.href = dataUri;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {
+    try { window.open(dataUri, '_blank'); } catch { /* ignore */ }
+  }
+}
+
 async function deliverPdf(doc: jsPDF, filename: string) {
   const blob = doc.output('blob');
   const cap: any = (window as any).Capacitor;
   const isNative = !!cap && (typeof cap.isNativePlatform === 'function' ? cap.isNativePlatform() : true);
 
-  // ── Native app (APK): write the PDF to disk and open the system share/save
-  //    sheet. This is the reliable way to export a file from a WebView —
-  //    browser download/share APIs are unreliable inside Android WebViews. ──
+  // ── Native app (APK) ──
   if (isNative) {
-    const base64 = await blobToBase64(blob);
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { Share } = await import('@capacitor/share');
-    const written = await Filesystem.writeFile({
-      path: filename,
-      data: base64,
-      directory: Directory.Cache,
-    });
-    // A real write failure above will surface as an error; a dismissed share
-    // sheet should not, so swallow only the Share step.
-    try { await Share.share({ title: filename, url: written.uri }); } catch { /* dismissed */ }
-    return;
+    // Best path: native Filesystem + Share plugins (only present if the APK was
+    // rebuilt with them). Reliable "Save to Files / Drive / print".
+    try {
+      const base64 = await blobToBase64(blob);
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+      const written = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+      try { await Share.share({ title: filename, url: written.uri }); } catch { /* dismissed */ }
+      return;
+    } catch (pluginErr) {
+      // Plugin not in the installed APK (no reinstall yet) → no-reinstall path:
+      // open the PDF in the system browser instead.
+      console.warn('[documentPdf] native plugin unavailable, opening in browser', pluginErr);
+      openInSystemBrowser(doc);
+      return;
+    }
   }
 
   // ── Web/mobile-browser fallbacks: file share if available, else download ──
@@ -111,7 +131,7 @@ async function deliverPdf(doc: jsPDF, filename: string) {
     if (e && e.name === 'AbortError') return; // user closed the share sheet
   }
   try { doc.save(filename); return; } catch { /* ignore */ }
-  try { window.open(doc.output('bloburl') as unknown as string, '_blank'); } catch { /* ignore */ }
+  openInSystemBrowser(doc);
 }
 
 export async function generateDocumentPdf(data: PdfDocData, filename: string) {

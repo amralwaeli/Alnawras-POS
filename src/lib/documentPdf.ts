@@ -105,7 +105,7 @@ async function deliverPdf(doc: jsPDF, filename: string) {
 export async function exportElementAsPdf(el: HTMLElement, filename: string) {
   const html2canvas = (await import('html2canvas')).default;
   const canvas = await html2canvas(el, {
-    scale: 2,                 // sharper text
+    scale: 2,                 // crisp text
     backgroundColor: '#ffffff',
     useCORS: true,            // allow the logo image
     logging: false,
@@ -116,17 +116,18 @@ export async function exportElementAsPdf(el: HTMLElement, filename: string) {
   const pageH = doc.internal.pageSize.getHeight();
   const imgW = pageW;
   const imgH = (canvas.height * imgW) / canvas.width;
-  const img = canvas.toDataURL('image/jpeg', 0.95);
+  // PNG (lossless) so the text stays sharp — matches the admin print closely.
+  const img = canvas.toDataURL('image/png');
 
   // Add the image, paginating if the content is taller than one A4 page.
   let heightLeft = imgH;
   let position = 0;
-  doc.addImage(img, 'JPEG', 0, position, imgW, imgH);
+  doc.addImage(img, 'PNG', 0, position, imgW, imgH);
   heightLeft -= pageH;
   while (heightLeft > 0) {
     position -= pageH;
     doc.addPage();
-    doc.addImage(img, 'JPEG', 0, position, imgW, imgH);
+    doc.addImage(img, 'PNG', 0, position, imgW, imgH);
     heightLeft -= pageH;
   }
 

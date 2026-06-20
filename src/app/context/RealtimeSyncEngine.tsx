@@ -5,11 +5,12 @@
  * Writes to Orders, Tables, and Catalog state via context setters.
  * No feature module should import this directly — it runs as a root wrapper.
  */
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ProductController, CategoryController } from '../controllers/ProductController';
 import { TableController } from '../controllers/TableController';
 import { mapOrder, mapOrderItem, mapProduct, mapTable } from '../models/mappers';
+import { NotificationService } from '../services/NotificationService';
 import { useAuth } from './AuthContext';
 import { useOrders } from './OrdersContext';
 import { useTables } from './TablesContext';
@@ -20,6 +21,14 @@ export function RealtimeSyncEngine() {
   const { setOrders } = useOrders();
   const { setTables } = useTables();
   const { setProducts, setCategories } = useCatalog();
+
+  // Tables we've already notified are "calling", to avoid repeat notifications.
+  const calledTables = useRef<Set<string>>(new Set());
+
+  // Ask for notification permission once a staff member is logged in (APK only).
+  useEffect(() => {
+    if (currentUser) void NotificationService.init();
+  }, [currentUser]);
 
   const syncAll = useCallback(async () => {
     if (!currentUser) return;
@@ -51,12 +60,26 @@ export function RealtimeSyncEngine() {
       .channel('pos-ultra-sync')
       // Tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branchId}` }, (p) => {
-        const mapped = mapTable((p.new || p.old) as any);
+        const row = (p.new || p.old) as any;
+        const mapped = mapTable(row);
         setTables(prev =>
           prev.some(t => t.id === mapped.id)
             ? prev.map(t => t.id === mapped.id ? mapped : t)
             : [...prev, mapped]
         );
+
+        // Notify floor staff when a table calls for a waiter (once per call).
+        const floorStaff = ['waiter', 'swaiter', 'admin'].includes(currentUser.role);
+        if (row?.id && floorStaff) {
+          if (row.needs_waiter === true) {
+            if (!calledTables.current.has(row.id)) {
+              calledTables.current.add(row.id);
+              void NotificationService.notify('🔔 Table Calling', `Table ${mapped.number} needs a waiter`);
+            }
+          } else {
+            calledTables.current.delete(row.id);
+          }
+        }
       })
       // Product updates
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
@@ -67,6 +90,12 @@ export function RealtimeSyncEngine() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, async (payload) => {
         const orderRow = (payload.new || payload.old) as any;
         if (!orderRow?.id) return;
+
+        // Notify cashier/admin staff when a new pickup order comes in.
+        if (payload.eventType === 'INSERT' && orderRow.order_type === 'pickup'
+            && ['cashier', 'swaiter', 'admin'].includes(currentUser.role)) {
+          void NotificationService.notify('📦 New Pickup Order', `${orderRow.customer_name || 'A customer'} placed a pickup order`);
+        }
 
         if (payload.eventType === 'DELETE') {
           setOrders(prev => prev.filter(o => o.id !== orderRow.id));

@@ -196,6 +196,15 @@ export function KitchenView() {
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <p className="text-base font-bold leading-tight">{item.product_name}</p>
+                                {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {item.modifiers.map((m: any, idx: number) => (
+                                      <span key={idx} className="text-[10px] font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-900/40 rounded-md px-1.5 py-0.5">
+                                        {m.optionName || m.option_name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 <span className={`inline-block mt-2 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${style.badge}`}>{item.status}</span>
                               </div>
                               <span className="text-2xl font-black text-orange-500 ml-2 leading-none">×{item.quantity}</span>

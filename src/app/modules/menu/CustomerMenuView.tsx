@@ -22,6 +22,7 @@ interface CartItem {
   station: 'kitchen' | 'juice' | 'none';
   source: 'existing' | 'new';
   status?: string;
+  notes?: string;
   modifiers?: SelectedModifier[];
 }
 
@@ -122,6 +123,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
   // ─── DASHBOARD STATE ────────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
   const [picking, setPicking] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -418,13 +420,21 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
             {newItemsOnly.length === 0
               ? <div className="h-44 border-4 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center justify-center text-gray-300"><ShoppingCart className="size-10 mb-2 opacity-10" /><span className="text-xs font-bold opacity-30 uppercase tracking-widest">Cart Empty</span></div>
               : newItemsOnly.map(item => (
-                  <div key={item.id} className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100 flex items-center gap-3 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p></div>
-                    <div className="flex items-center bg-white rounded-xl border-2 border-orange-100 p-1 gap-3 shadow-sm">
-                      <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
-                      <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
-                      <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: i.quantity + 1} : i))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Plus className="size-4" strokeWidth={3} /></button>
+                  <div key={item.id} className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100 shadow-sm space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p></div>
+                      <div className="flex items-center bg-white rounded-xl border-2 border-orange-100 p-1 gap-3 shadow-sm">
+                        <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
+                        <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
+                        <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: i.quantity + 1} : i))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Plus className="size-4" strokeWidth={3} /></button>
+                      </div>
                     </div>
+                    <button onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)} className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      <ChevronDown className={`size-3 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} /> {item.notes ? 'Edit note' : 'Add note'}
+                    </button>
+                    {expandedNotes === item.id && (
+                      <textarea value={item.notes ?? ''} onChange={e => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, notes: e.target.value } : i))} placeholder="e.g. No onions, extra spicy…" rows={2} className="w-full text-xs bg-white border border-orange-200 rounded-xl p-2.5 resize-none outline-none focus:ring-2 focus:ring-orange-300" />
+                    )}
                   </div>
                 ))
             }
@@ -550,13 +560,21 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
             {newItemsOnly.length === 0
               ? <div className="h-48 border-4 border-dashed border-gray-50 rounded-[40px] flex flex-col items-center justify-center text-gray-300 italic"><ShoppingCart className="size-12 mb-3 opacity-10" /><span className="text-sm font-bold opacity-30 uppercase tracking-widest tracking-tighter">Cart Empty</span></div>
               : newItemsOnly.map(item => (
-                  <div key={item.id} className="bg-orange-50/50 rounded-3xl p-5 border border-orange-100 flex items-center gap-4 animate-in slide-in-from-right-4 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-1">RM {item.price.toFixed(2)}</p></div>
-                    <div className="flex items-center bg-white rounded-2xl border-2 border-orange-100 p-1.5 gap-4 shadow-sm">
-                      <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
-                      <span className="font-black text-gray-900 w-4 text-center text-sm">{item.quantity}</span>
-                      <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: i.quantity + 1} : i))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Plus className="size-4" strokeWidth={3} /></button>
+                  <div key={item.id} className="bg-orange-50/50 rounded-3xl p-5 border border-orange-100 animate-in slide-in-from-right-4 shadow-sm space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-1">RM {item.price.toFixed(2)}</p></div>
+                      <div className="flex items-center bg-white rounded-2xl border-2 border-orange-100 p-1.5 gap-4 shadow-sm">
+                        <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
+                        <span className="font-black text-gray-900 w-4 text-center text-sm">{item.quantity}</span>
+                        <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: i.quantity + 1} : i))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Plus className="size-4" strokeWidth={3} /></button>
+                      </div>
                     </div>
+                    <button onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)} className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      <ChevronDown className={`size-3 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} /> {item.notes ? 'Edit note' : 'Add note'}
+                    </button>
+                    {expandedNotes === item.id && (
+                      <textarea value={item.notes ?? ''} onChange={e => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, notes: e.target.value } : i))} placeholder="e.g. No onions, extra spicy…" rows={2} className="w-full text-xs bg-white border border-orange-200 rounded-xl p-2.5 resize-none outline-none focus:ring-2 focus:ring-orange-300" />
+                    )}
                   </div>
                 ))
             }

@@ -52,6 +52,7 @@ export interface OrderItem {
   status: 'pending' | 'preparing' | 'ready' | 'served';
   notes?: string;
   sentToKitchen?: boolean;
+  modifiers?: SelectedModifier[];
 }
 
 export interface Order {
@@ -114,6 +115,41 @@ export interface Product {
   availabilityStatus: 'available' | 'out-of-stock' | 'finished';
   isActive: boolean;
   createdAt: Date;
+}
+
+// ── Modifiers ──────────────────────────────────────────────────────────────
+export interface ModifierOption {
+  id: string;
+  groupId: string;
+  name: string;
+  addOnPrice: number;
+  isDefault: boolean;
+  displayOrder: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  /** 'single' → pick exactly one (radio); 'multiple' → pick many (checkbox). */
+  type: 'single' | 'multiple';
+  branchId: string;
+  isActive: boolean;
+  options: ModifierOption[];
+  /** Ids of products this group is linked to (loaded on demand). */
+  productIds?: string[];
+  /** Convenience count for list views. */
+  linkedProductCount?: number;
+  createdAt: Date;
+}
+
+/** A modifier option chosen on a specific order line (snapshot). */
+export interface SelectedModifier {
+  groupId: string;
+  groupName: string;
+  optionId: string;
+  optionName: string;
+  /** Add-on price at the time of ordering. */
+  price: number;
 }
 
 export interface ProductImportData {

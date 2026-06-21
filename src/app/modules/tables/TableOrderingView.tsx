@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { Product, Category, Table, Order, OrderItem } from '../../models/types';
+import { Product, Category, Table, Order, OrderItem, ModifierGroup, SelectedModifier } from '../../models/types';
 import { mapOrder } from '../../models/mappers';
 import { OrderController } from '../../controllers/OrderController';
+import { ModifierController } from '../../controllers/ModifierController';
+import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -24,6 +26,7 @@ interface CartItem {
   price: number;
   quantity: number;
   notes: string;
+  modifiers?: SelectedModifier[];
 }
 
 function formatCurrency(value: number) {
@@ -41,6 +44,8 @@ export function TableOrderingView() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
+  const [picking, setPicking] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -96,6 +101,8 @@ export function TableOrderingView() {
           taxRate: Number(product.tax_rate ?? 0),
           categoryId: product.category_id,
         })));
+        const productIds = productsRes.data.map((product: any) => product.id);
+        setModifierMap(await ModifierController.getGroupsForProducts(productIds));
       }
 
       if (categoriesRes.error || !categoriesRes.data) {
@@ -185,13 +192,23 @@ export function TableOrderingView() {
   const billTotal = billSubtotal + billTax;
 
   const addToCart = (product: Product) => {
+    if (modifierMap[product.id]?.length) { setPicking(product); return; }
     setCartItems(prev => {
-      const existing = prev.find(item => item.productId === product.id);
+      const existing = prev.find(item => item.productId === product.id && !item.modifiers?.length);
       if (existing) {
         return prev.map(item => item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, { id: `cart-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, notes: '' }];
     });
+  };
+
+  const addWithModifiers = (product: Product, selected: SelectedModifier[], extra: number) => {
+    setCartItems(prev => [...prev, {
+      id: `cart-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      productId: product.id, productName: product.name, price: product.price + extra,
+      quantity: 1, notes: '', modifiers: selected,
+    }]);
+    setPicking(null);
   };
 
   const updateCartItem = (itemId: string, quantity: number) => {
@@ -242,6 +259,7 @@ export function TableOrderingView() {
           quantity: item.quantity,
           price: item.price,
           notes: item.notes,
+          modifiers: item.modifiers,
         })),
         addedBy: currentUser?.id ?? 'guest',
         addedByName: currentUser?.name ?? 'Guest',
@@ -417,6 +435,9 @@ export function TableOrderingView() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-bold text-slate-900">{item.productName}</p>
+                        {!!item.modifiers?.length && (
+                          <p className="text-[11px] text-slate-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>
+                        )}
                         <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mt-1">New item</p>
                       </div>
                       <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.price * item.quantity)}</span>
@@ -474,6 +495,15 @@ export function TableOrderingView() {
             <button onClick={() => setSuccess(false)} className="rounded-full bg-orange-500 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-orange-600 transition">Add more items</button>
           </div>
         </div>
+      )}
+
+      {picking && (
+        <ModifierPickerModal
+          productName={picking.name}
+          groups={modifierMap[picking.id] ?? []}
+          onConfirm={(sel, extra) => addWithModifiers(picking, sel, extra)}
+          onClose={() => setPicking(null)}
+        />
       )}
     </div>
   );

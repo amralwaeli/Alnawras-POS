@@ -8,7 +8,9 @@ import {
   FileText, Receipt, ChevronDown, Package, Copy, Check
 } from 'lucide-react';
 import { createPickupToken } from '../../services/PickupService';
-import { Product, ROLE_PERMISSIONS } from '../../models/types';
+import { Product, ROLE_PERMISSIONS, ModifierGroup, SelectedModifier } from '../../models/types';
+import { ModifierController } from '../../controllers/ModifierController';
+import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -20,6 +22,7 @@ interface CartItem {
   station: 'kitchen' | 'juice' | 'none';
   source: 'existing' | 'new';
   status?: string;
+  modifiers?: SelectedModifier[];
 }
 
 // ─── Super-Waiter Options menu ──────────────────────────────────────────────
@@ -119,6 +122,8 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
   // ─── DASHBOARD STATE ────────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
+  const [picking, setPicking] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTableOverlay, setShowTableOverlay] = useState(false);
@@ -156,6 +161,13 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
     setCartItems(prev => [...existingItems, ...prev.filter(i => i.source === 'new')]);
   }, [selectedTableId, orders, tables]);
+
+  useEffect(() => {
+    if (!products.length) return;
+    (async () => {
+      setModifierMap(await ModifierController.getGroupsForProducts(products.map(p => p.id)));
+    })();
+  }, [products]);
 
   useEffect(() => {
     if (!menuCategories.length) {
@@ -203,11 +215,21 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
   // ─── HANDLERS ───────────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {
+    if (modifierMap[product.id]?.length) { setPicking(product); return; }
     setCartItems(prev => {
-      const existingNew = prev.find(i => i.productId === product.id && i.source === 'new');
+      const existingNew = prev.find(i => i.productId === product.id && i.source === 'new' && !i.modifiers?.length);
       if (existingNew) return prev.map(i => i.id === existingNew.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { id: `new-${Date.now()}`, productId: product.id, productName: product.name, price: product.price, quantity: 1, station: (product.station as any) || 'kitchen', source: 'new' }];
     });
+  };
+
+  const addWithModifiers = (product: Product, selected: SelectedModifier[], extra: number) => {
+    setCartItems(prev => [...prev, {
+      id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      productId: product.id, productName: product.name, price: product.price + extra,
+      quantity: 1, station: (product.station as any) || 'kitchen', source: 'new', modifiers: selected,
+    }]);
+    setPicking(null);
   };
 
   const handleSendToKitchen = async (targetTableId?: string) => {
@@ -230,6 +252,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
           quantity: i.quantity,
           price: i.price,
           notes: i.notes,
+          modifiers: i.modifiers,
         })),
         addedBy: currentUser.id,
         addedByName: currentUser.name,
@@ -396,7 +419,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
               ? <div className="h-44 border-4 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center justify-center text-gray-300"><ShoppingCart className="size-10 mb-2 opacity-10" /><span className="text-xs font-bold opacity-30 uppercase tracking-widest">Cart Empty</span></div>
               : newItemsOnly.map(item => (
                   <div key={item.id} className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100 flex items-center gap-3 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p></div>
+                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p></div>
                     <div className="flex items-center bg-white rounded-xl border-2 border-orange-100 p-1 gap-3 shadow-sm">
                       <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                       <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
@@ -528,7 +551,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
               ? <div className="h-48 border-4 border-dashed border-gray-50 rounded-[40px] flex flex-col items-center justify-center text-gray-300 italic"><ShoppingCart className="size-12 mb-3 opacity-10" /><span className="text-sm font-bold opacity-30 uppercase tracking-widest tracking-tighter">Cart Empty</span></div>
               : newItemsOnly.map(item => (
                   <div key={item.id} className="bg-orange-50/50 rounded-3xl p-5 border border-orange-100 flex items-center gap-4 animate-in slide-in-from-right-4 shadow-sm">
-                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4><p className="text-orange-600 font-black text-xs mt-1">RM {item.price.toFixed(2)}</p></div>
+                    <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm leading-tight">{item.productName}</h4>{!!item.modifiers?.length && <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-1">RM {item.price.toFixed(2)}</p></div>
                     <div className="flex items-center bg-white rounded-2xl border-2 border-orange-100 p-1.5 gap-4 shadow-sm">
                       <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                       <span className="font-black text-gray-900 w-4 text-center text-sm">{item.quantity}</span>
@@ -591,6 +614,15 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
       )}
 
       <style>{`.no-scrollbar::-webkit-scrollbar { display: none; } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #F97316; border-radius: 10px; } .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }`}</style>
+
+      {picking && (
+        <ModifierPickerModal
+          productName={picking.name}
+          groups={modifierMap[picking.id] ?? []}
+          onConfirm={(sel, extra) => addWithModifiers(picking, sel, extra)}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   );
 }

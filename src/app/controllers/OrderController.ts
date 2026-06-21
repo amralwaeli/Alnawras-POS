@@ -1,4 +1,4 @@
-import { Order, Result } from '../models/types';
+import { Order, Result, SelectedModifier } from '../models/types';
 import { mapOrder } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { PrintService } from '../services/PrintService';
@@ -11,6 +11,8 @@ export interface SubmitOrderItem {
   price: number;
   notes?: string;
   station?: 'kitchen' | 'juice' | 'shawarma' | 'none';
+  /** Chosen modifier options for this line; `price` already includes their add-ons. */
+  modifiers?: SelectedModifier[];
 }
 
 export interface PickupDetails {
@@ -110,6 +112,7 @@ export class OrderController {
         price: item.price,
         subtotal: item.price * item.quantity,
         notes: item.notes || null,
+        modifiers: item.modifiers ?? [],
         status: 'pending',
         added_by: params.addedBy,
         added_by_name: params.addedByName,

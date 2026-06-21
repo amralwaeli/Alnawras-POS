@@ -116,7 +116,7 @@ export function PayrollView() {
 
       {/* Summary cards */}
       {payroll.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'Total Base', value: `${cur(totalBase)}`, icon: DollarSign, color: 'bg-blue-50 text-blue-600' },
             { label: 'Total Net Payroll', value: `${cur(totalNet)}`, icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },

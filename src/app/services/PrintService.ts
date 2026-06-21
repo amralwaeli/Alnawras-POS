@@ -82,6 +82,10 @@ export class PrintService {
     newItems.forEach(item => {
       const name = item.productName || item.product_name || 'Item';
       esc += `\x1D\x21\x01${item.quantity}x ${name}\x1D\x21\x00\n`;
+      const mods = item.modifiers || item.modifiers_json || [];
+      if (Array.isArray(mods)) {
+        mods.forEach((m: any) => { esc += `  - ${m.optionName || m.option_name || ''}\n`; });
+      }
       if (item.notes) esc += `  * NOTE: ${item.notes}\n`;
     });
 

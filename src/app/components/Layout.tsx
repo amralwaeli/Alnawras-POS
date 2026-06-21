@@ -5,7 +5,7 @@ import {
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
   Settings, Fingerprint, ReceiptText, FileText, Printer, Star,
   ChevronsLeft, ChevronsRight, Menu, X, Building2, CalendarOff,
-  ChevronDown, ChevronRight as ChevronRightIcon, Package as PackageIcon,
+  ChevronDown, ChevronRight as ChevronRightIcon, Package as PackageIcon, Layers,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ROLE_PERMISSIONS } from '../models/types';
@@ -51,6 +51,7 @@ export function Layout() {
     { path: '/table-management',   label: 'Manage Tables',  icon: Settings,      permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/modifier-groups',    label: 'Modifier Groups', icon: Layers,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
     { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },

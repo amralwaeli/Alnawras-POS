@@ -53,7 +53,10 @@ export function printReceipt(order: any, paymentSummary: string, billNo: string)
     const price  = Number(item.price ?? item.unit_price ?? 0).toFixed(2);
     const qty    = Number(item.quantity ?? item.qty ?? 1);
     const amount = Number(item.subtotal ?? (item.price ?? 0) * qty).toFixed(2);
-    return `<div class="item-block"><div class="item-name">${name}</div><div class="item-row"><span></span><span class="right">${price}</span><span class="right">${qty}</span><span class="right">0.00</span><span class="right">${amount}</span></div></div>`;
+    const mods = Array.isArray(item.modifiers) && item.modifiers.length
+      ? `<div class="item-name" style="font-size:11px;color:#777;">${escapeHtml(item.modifiers.map((m: any) => m.optionName || m.option_name || '').join(', '))}</div>`
+      : '';
+    return `<div class="item-block"><div class="item-name">${name}</div>${mods}<div class="item-row"><span></span><span class="right">${price}</span><span class="right">${qty}</span><span class="right">0.00</span><span class="right">${amount}</span></div></div>`;
   }).join('');
 
   const win = window.open('', '', 'width=420,height=900');
@@ -471,7 +474,10 @@ ${(order.items || []).map((i: any) => {
               const name = String(i.productName || i.product_name || 'Item');
               const qty = Number(i.quantity ?? i.qty ?? 1);
               const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
-              return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}`;
+              const mods = Array.isArray(i.modifiers) && i.modifiers.length
+                ? `\n  ${i.modifiers.map((m: any) => m.optionName || m.option_name || '').join(', ')}`
+                : '';
+              return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}${mods}`;
             }).join('\n')}
 --------------------------------
 SUBTOTAL: ${fmt(totals.subtotal).padStart(20)}
@@ -583,6 +589,9 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                 <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
+                    {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+                      <p className="text-xs text-gray-500 truncate">{item.modifiers.map((m: any) => m.optionName || m.option_name).join(', ')}</p>
+                    )}
                     <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">

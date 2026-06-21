@@ -15,8 +15,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { validateQrToken, QrSession } from '../../services/QrService';
-import { Product, Category, Table } from '../../models/types';
+import { Product, Category, Table, ModifierGroup, SelectedModifier } from '../../models/types';
 import { OrderController } from '../../controllers/OrderController';
+import { ModifierController } from '../../controllers/ModifierController';
+import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
 import {
   Plus, Minus, ShoppingCart, Search, X,
@@ -91,6 +93,7 @@ interface CartItem {
   quantity: number;
   station: string;
   notes: string;
+  modifiers?: SelectedModifier[];
 }
 
 interface ExistingItem {
@@ -112,6 +115,8 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery]     = useState('');
   const [cartItems, setCartItems]         = useState<CartItem[]>([]);
+  const [modifierMap, setModifierMap]     = useState<Record<string, ModifierGroup[]>>({});
+  const [picking, setPicking]             = useState<Product | null>(null);
   const [loading, setLoading]             = useState(true);
   const [submitting, setSubmitting]       = useState(false);
   const [success, setSuccess]             = useState(false);
@@ -151,6 +156,8 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
         isActive: p.is_active ?? true, createdAt: new Date(p.created_at),
       }));
       setProducts(prods);
+      const productIds = prods.map(p => p.id);
+      setModifierMap(await ModifierController.getGroupsForProducts(productIds));
 
       const cats: Category[] = (categoriesRes.data ?? [])
         .map((c: any) => ({
@@ -237,14 +244,24 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
   const existingTotal = existingItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const addToCart = (product: Product) => {
+    if (modifierMap[product.id]?.length) { setPicking(product); return; }
     setCartItems(prev => {
-      const ex = prev.find(i => i.productId === product.id);
+      const ex = prev.find(i => i.productId === product.id && !i.modifiers?.length);
       if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, {
         id: `new-${Date.now()}`, productId: product.id, productName: product.name,
         price: product.price, quantity: 1, station: product.station || 'kitchen', notes: '',
       }];
     });
+  };
+
+  const addWithModifiers = (product: Product, selected: SelectedModifier[], extra: number) => {
+    setCartItems(prev => [...prev, {
+      id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      productId: product.id, productName: product.name, price: product.price + extra,
+      quantity: 1, station: product.station || 'kitchen', notes: '', modifiers: selected,
+    }]);
+    setPicking(null);
   };
 
   const handleCallWaiter = async () => {
@@ -272,7 +289,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
         items: cartItems.map(item => ({
           productId: item.productId, productName: item.productName,
           quantity: item.quantity, price: item.price,
-          notes: item.notes, station: item.station,
+          notes: item.notes, station: item.station, modifiers: item.modifiers,
         })),
         addedBy,
         addedByName,
@@ -478,6 +495,9 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <h4 className="font-bold text-gray-800 text-sm">{item.productName}</h4>
+                  {!!item.modifiers?.length && (
+                    <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>
+                  )}
                   <p className="text-orange-600 font-black text-xs mt-0.5">RM {item.price.toFixed(2)}</p>
                 </div>
                 <div className="flex items-center bg-white border-2 border-orange-100 shadow-sm rounded-xl p-1 gap-3">
@@ -537,6 +557,15 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
             </button>
           )}
         </div>
+      )}
+
+      {picking && (
+        <ModifierPickerModal
+          productName={picking.name}
+          groups={modifierMap[picking.id] ?? []}
+          onConfirm={(sel, extra) => addWithModifiers(picking, sel, extra)}
+          onClose={() => setPicking(null)}
+        />
       )}
     </div>
   );

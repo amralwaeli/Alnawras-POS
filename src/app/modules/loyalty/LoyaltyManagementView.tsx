@@ -375,7 +375,7 @@ export function LoyaltyManagementView() {
 
         <TabsContent value="customers" className="mt-6 space-y-4">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <CardContent className="flex items-center gap-3 py-4">
                 <Users className="size-8 text-blue-500 shrink-0" />

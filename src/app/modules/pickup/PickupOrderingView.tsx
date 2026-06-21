@@ -9,8 +9,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { Product, Category } from '../../models/types';
+import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
 import { PickupController } from '../../controllers/PickupController';
+import { ModifierController } from '../../controllers/ModifierController';
+import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import {
   validatePickupToken, PickupToken, uploadReceipt, merchantQrUrl,
 } from '../../services/PickupService';
@@ -65,7 +67,7 @@ function Splash({ label }: { label: string }) {
   );
 }
 
-interface CartItem { id: string; productId: string; productName: string; price: number; quantity: number; taxRate: number; station: string; notes: string; }
+interface CartItem { id: string; productId: string; productName: string; price: number; quantity: number; taxRate: number; station: string; notes: string; modifiers?: SelectedModifier[]; }
 type Method = 'grab' | 'lalamove' | 'self';
 type PayType = 'cash' | 'online';
 
@@ -80,6 +82,8 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'menu' | 'checkout'>('menu');
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
+  const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
+  const [picking, setPicking] = useState<Product | null>(null);
 
   // checkout fields
   const [name, setName] = useState('');
@@ -115,6 +119,8 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
       }));
       setCategories(cats);
       if (cats.length) setSelectedCategory(cats[0].id);
+      const productIds = (productsRes.data ?? []).map((p: any) => p.id);
+      setModifierMap(await ModifierController.getGroupsForProducts(productIds));
       setLoading(false);
     })();
   }, [branchId]);
@@ -133,21 +139,35 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   const total = subtotal + tax;
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
 
-  const addToCart = (p: Product) => setCart(prev => {
-    const ex = prev.find(i => i.productId === p.id);
-    if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
-    return [...prev, { id: `c-${Date.now()}`, productId: p.id, productName: p.name, price: p.price, quantity: 1, taxRate: p.taxRate || 0, station: p.station || 'kitchen', notes: '' }];
-  });
+  const addToCart = (p: Product) => {
+    if (modifierMap[p.id]?.length) { setPicking(p); return; }
+    setCart(prev => {
+      const ex = prev.find(i => i.productId === p.id && !i.modifiers?.length);
+      if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { id: `c-${Date.now()}`, productId: p.id, productName: p.name, price: p.price, quantity: 1, taxRate: p.taxRate || 0, station: p.station || 'kitchen', notes: '' }];
+    });
+  };
+
+  const addWithModifiers = (p: Product, selected: SelectedModifier[], extra: number) => {
+    setCart(prev => [...prev, {
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      productId: p.id, productName: p.name, price: p.price + extra, quantity: 1,
+      taxRate: p.taxRate || 0, station: p.station || 'kitchen', notes: '', modifiers: selected,
+    }]);
+    setPicking(null);
+  };
   const setQty = (id: string, delta: number) => setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
   const setNotes = (id: string, notes: string) => setCart(prev => prev.map(i => i.id === id ? { ...i, notes } : i));
 
-  const canSubmit = cart.length > 0 && name.trim() && phone.trim() && method && payType
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit = cart.length > 0 && name.trim() && phone.trim() && emailValid && method && payType
     && (payType === 'cash' || receipt) && ack;
 
   const submit = async () => {
     setError('');
     if (cart.length === 0) { setError('Add at least one item.'); return; }
     if (!name.trim() || !phone.trim()) { setError('Please enter your name and phone number.'); return; }
+    if (!emailValid) { setError('Please enter a valid email address for status updates.'); return; }
     if (!method) { setError('Please choose a pickup method.'); return; }
     if (!payType) { setError('Please choose a payment option.'); return; }
     if (payType === 'online' && !receipt) { setError('Please upload your payment receipt.'); return; }
@@ -163,8 +183,8 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
       }
       const res = await PickupController.submitPickupOrder({
         token, branchId,
-        items: cart.map(i => ({ productId: i.productId, productName: i.productName, quantity: i.quantity, price: i.price, notes: i.notes, station: i.station as any })),
-        method: method!, payType: payType!, customerName: name.trim(), customerPhone: phone.trim(), customerEmail: email.trim() || undefined, receiptUrl,
+        items: cart.map(i => ({ productId: i.productId, productName: i.productName, quantity: i.quantity, price: i.price, notes: i.notes, station: i.station as any, modifiers: i.modifiers })),
+        method: method!, payType: payType!, customerName: name.trim(), customerPhone: phone.trim(), customerEmail: email.trim(), receiptUrl,
       });
       if (!res.success) { setError(res.error || 'Could not place order.'); setSubmitting(false); return; }
       setDone(true);
@@ -269,7 +289,13 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
             {cart.length === 0 ? <p className="text-sm text-gray-400">Cart is empty.</p> : cart.map(item => (
               <div key={item.id} className="bg-orange-50/50 rounded-2xl p-3 border border-orange-100 space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="flex-1"><h4 className="font-bold text-gray-800 text-sm">{item.productName}</h4><p className="text-orange-600 font-black text-xs">{RM(item.price)}</p></div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-800 text-sm">{item.productName}</h4>
+                    {!!item.modifiers?.length && (
+                      <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>
+                    )}
+                    <p className="text-orange-600 font-black text-xs">{RM(item.price)}</p>
+                  </div>
                   <div className="flex items-center bg-white border-2 border-orange-100 rounded-xl p-1 gap-3">
                     <button onClick={() => setQty(item.id, -1)} className="p-1.5 text-orange-500"><Minus className="size-4" strokeWidth={3} /></button>
                     <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
@@ -291,7 +317,7 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
           <Section title="Your Details">
             <Field label="Full Name *"><input value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="e.g. Ahmad" /></Field>
             <Field label="Phone Number *"><input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" className={inputCls} placeholder="e.g. 012-3456789" /></Field>
-            <Field label="Email (for status updates)"><input value={email} onChange={e => setEmail(e.target.value)} inputMode="email" className={inputCls} placeholder="you@email.com" /></Field>
+            <Field label="Email (for status updates)" required><input value={email} onChange={e => setEmail(e.target.value)} inputMode="email" type="email" className={inputCls} placeholder="you@email.com" required /></Field>
           </Section>
 
           {/* Pickup method */}
@@ -352,6 +378,15 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
           <div className="h-4" />
         </div>
       )}
+
+      {picking && (
+        <ModifierPickerModal
+          productName={picking.name}
+          groups={modifierMap[picking.id] ?? []}
+          onConfirm={(sel, extra) => addWithModifiers(picking, sel, extra)}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   );
 }
@@ -366,8 +401,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-bold text-gray-500 mb-1">{label}</label>{children}</div>;
+function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+  return <div><label className="block text-xs font-bold text-gray-500 mb-1">{label}{required && <span className="text-red-500"> *</span>}</label>{children}</div>;
 }
 function Row({ k, v }: { k: string; v: string }) {
   return <div className="flex justify-between text-sm text-gray-600"><span>{k}</span><span>{v}</span></div>;

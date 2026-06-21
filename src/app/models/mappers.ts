@@ -9,6 +9,7 @@
 import {
   Staff, Product, Category, Table, Order, OrderItem, Employee, LeaveRequest,
   AttendanceLog, EmployeeFingerprint, PayrollSummary, Customer, LoyaltyTransaction,
+  ModifierGroup, ModifierOption,
 } from './types';
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,41 @@ export const mapOrderItem = (row: any): OrderItem => ({
   status: row.status ?? 'pending',
   notes: row.notes ?? undefined,
   sentToKitchen: row.sent_to_kitchen ?? undefined,
+  modifiers: Array.isArray(row.modifiers)
+    ? row.modifiers.map((m: any) => ({
+        groupId: m.groupId ?? m.group_id ?? '',
+        groupName: m.groupName ?? m.group_name ?? '',
+        optionId: m.optionId ?? m.option_id ?? '',
+        optionName: m.optionName ?? m.option_name ?? '',
+        price: Number(m.price ?? 0),
+      }))
+    : undefined,
+});
+
+// ── Modifiers ────────────────────────────────────────────────────────────────
+export const mapModifierOption = (row: any): ModifierOption => ({
+  id: row.id,
+  groupId: row.group_id,
+  name: row.name,
+  addOnPrice: Number(row.add_on_price ?? 0),
+  isDefault: row.is_default ?? false,
+  displayOrder: row.display_order ?? 0,
+});
+
+export const mapModifierGroup = (row: any): ModifierGroup => ({
+  id: row.id,
+  name: row.name,
+  type: row.type === 'multiple' ? 'multiple' : 'single',
+  branchId: row.branch_id,
+  isActive: row.is_active ?? true,
+  options: (row.modifier_options ?? row.options ?? [])
+    .map(mapModifierOption)
+    .sort((a: ModifierOption, b: ModifierOption) => a.displayOrder - b.displayOrder),
+  productIds: row.product_modifier_groups
+    ? row.product_modifier_groups.map((l: any) => l.product_id)
+    : undefined,
+  linkedProductCount: typeof row.linked_product_count === 'number' ? row.linked_product_count : undefined,
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
 });
 
 export const mapOrder = (row: any): Order => ({

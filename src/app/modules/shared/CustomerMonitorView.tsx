@@ -42,9 +42,9 @@ export function CustomerMonitorView() {
   const total = Math.max(0, subtotal + tax - (Number(order.discount) || 0));
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden">
+    <div className="h-screen bg-white flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
       {/* Left Side: Order Items */}
-      <div className="flex-1 flex flex-col p-12 bg-gray-50">
+      <div className="flex-1 flex flex-col p-6 lg:p-12 bg-gray-50">
         <div className="flex items-center gap-4 mb-12">
           <div className="size-16 bg-orange-500 rounded-2xl flex items-center justify-center text-white text-3xl font-black italic">A</div>
           <div>
@@ -67,7 +67,7 @@ export function CustomerMonitorView() {
       </div>
 
       {/* Right Side: Payment Info */}
-      <div className="w-[450px] bg-white border-l-2 border-gray-100 flex flex-col p-12">
+      <div className="w-full lg:w-[450px] bg-white border-t-2 lg:border-t-0 lg:border-l-2 border-gray-100 flex flex-col p-6 lg:p-12">
         <div className="flex-1 flex flex-col justify-center text-center space-y-8">
           {paymentQR ? (
             <div className="space-y-6 animate-in fade-in zoom-in duration-500">

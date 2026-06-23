@@ -20,6 +20,7 @@ import {
   Plus, Minus, ShoppingCart, Search, X, CheckCircle2, ShoppingBag,
   UtensilsCrossed, ShieldAlert, Bike, Truck, Store, Upload, ChevronDown, ArrowLeft,
 } from 'lucide-react';
+import { ProductImage } from '../../components/ProductImage';
 
 const RM = (n: number) => `RM ${n.toFixed(2)}`;
 
@@ -267,6 +268,7 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
                 return (
                   <div key={p.id} onClick={() => ok && addToCart(p)}
                     className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-h-[100px] transition-all ${ok ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 opacity-60'}`}>
+                    {p.image && <ProductImage src={p.image} name={p.name} className="w-full h-20 rounded-t-[18px]" />}
                     <div className="p-3 flex flex-col flex-1 justify-between gap-2 relative">
                       {!ok && <div className="absolute inset-0 flex items-center justify-center z-10 rounded-[20px] bg-red-50/80"><span className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase">N/A</span></div>}
                       <h3 className={`font-bold leading-snug break-words text-xs ${ok ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>

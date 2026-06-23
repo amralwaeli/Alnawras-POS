@@ -18,6 +18,7 @@ import {
   Bell,
   X,
 } from 'lucide-react';
+import { ProductImage } from '../../components/ProductImage';
 
 interface CartItem {
   id: string;
@@ -390,11 +391,14 @@ export function TableOrderingView() {
                   className="group rounded-[32px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{product.name}</p>
-                      <p className="mt-3 text-sm text-slate-500 line-clamp-2">{product.image ? 'Tap to add' : 'Add to cart'}</p>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <ProductImage src={product.image} name={product.name} className="size-14 rounded-2xl shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{product.name}</p>
+                        <p className="mt-1 text-sm text-slate-500 line-clamp-2">Tap to add</p>
+                      </div>
                     </div>
-                    <span className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{formatCurrency(product.price)}</span>
+                    <span className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 shrink-0">{formatCurrency(product.price)}</span>
                   </div>
                   <div className="mt-5 flex items-center justify-between text-xs text-slate-400">
                     <span>{product.kitchen_status === 'available' ? 'Available' : 'Unavailable'}</span>

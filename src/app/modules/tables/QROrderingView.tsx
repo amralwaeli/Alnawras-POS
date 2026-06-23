@@ -8,6 +8,7 @@ import {
   Plus, Minus, ShoppingCart, X, Search,
   CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed,
 } from 'lucide-react';
+import { ProductImage } from '../../components/ProductImage';
 
 interface CartItem {
   id: string;
@@ -263,6 +264,7 @@ export function QROrderingView() {
           isAvailable ? 'bg-white border-transparent cursor-pointer hover:shadow-md' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
         }`}
       >
+        {p.image && <ProductImage src={p.image} name={p.name} className={`w-full ${compact ? 'h-20' : 'h-28'} rounded-t-[18px]`} />}
         <div className={`${compact ? 'p-3' : 'p-4'} flex flex-col flex-1 justify-between gap-2 relative`}>
           {!isAvailable && (
             <div className="absolute inset-0 flex items-center justify-center z-10 rounded-[20px] bg-red-50/80">

@@ -7,6 +7,7 @@ import {
   Search, CheckCircle2, ShoppingBag, Utensils, ArrowLeft,
   FileText, Receipt, ChevronDown, Package, Copy, Check
 } from 'lucide-react';
+import { ProductImage } from '../../components/ProductImage';
 import { createPickupToken } from '../../services/PickupService';
 import { Product, ROLE_PERMISSIONS, ModifierGroup, SelectedModifier } from '../../models/types';
 import { ModifierController } from '../../controllers/ModifierController';
@@ -337,6 +338,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                     isAvailable ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                   }`}
                 >
+                  {p.image && <ProductImage src={p.image} name={p.name} className="w-full h-20 rounded-t-[18px]" />}
                   <div className="p-3 flex flex-col flex-1 justify-between gap-2 relative">
                     {!isAvailable && (
                       <div className="absolute inset-0 flex items-center justify-center z-10 rounded-[20px] bg-red-50/80">
@@ -494,6 +496,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                     isAvailable ? 'bg-white border-transparent hover:shadow-md cursor-pointer' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
                   }`}
                 >
+                  {p.image && <ProductImage src={p.image} name={p.name} className="w-full h-28 rounded-t-[22px]" />}
                   <div className="p-4 flex flex-col flex-1 justify-between gap-3 relative">
                     {!isAvailable && (
                       <div className="absolute inset-0 flex items-center justify-center z-10">

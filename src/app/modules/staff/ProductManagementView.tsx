@@ -14,6 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { ProductImage } from '../../components/ProductImage';
+import { compressImage, blobToDataUrl } from '../../../lib/image';
+import { uploadProductImage } from '../../services/ProductImageService';
 
 export function ProductManagementView() {
   const { products, categories, currentUser, addProduct, updateProduct, deleteProduct, importProducts, addCategory, updateCategory, deleteCategory } = usePOS();
@@ -38,7 +41,14 @@ export function ProductManagementView() {
     taxRate: '8.25',
     reorderPoint: '',
     station: 'kitchen' as string,
+    image: '',
   });
+
+  // Product image: the picked-and-compressed blob (uploaded on save) + a preview.
+  const [imageBlob, setImageBlob] = useState<Blob | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [categoryFormData, setCategoryFormData] = useState({
     name: '',
@@ -59,8 +69,38 @@ export function ProductManagementView() {
       taxRate: '8.25',
       reorderPoint: '',
       station: 'kitchen',
+      image: '',
     });
+    setImageBlob(null);
+    setImagePreview('');
     setEditingProduct(null);
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image is too large (max 10MB)');
+      return;
+    }
+    try {
+      const blob = await compressImage(file, 800, 0.8);
+      setImageBlob(blob);
+      setImagePreview(await blobToDataUrl(blob));
+    } catch {
+      toast.error('Could not process that image');
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageBlob(null);
+    setImagePreview('');
+    setProductFormData(prev => ({ ...prev, image: '' }));
   };
 
   const resetCategoryForm = () => {
@@ -98,6 +138,21 @@ export function ProductManagementView() {
     }
 
     const selectedCategory = categories.find(c => c.id === productFormData.categoryId);
+    const branchId = currentUser?.branchId || 'branch-1';
+
+    // Upload a newly picked image first; reuse the existing URL otherwise.
+    let imageUrl = productFormData.image || '';
+    if (imageBlob) {
+      setUploadingImage(true);
+      const uploaded = await uploadProductImage(imageBlob, branchId);
+      setUploadingImage(false);
+      if (!uploaded) {
+        toast.error('Image upload failed. Please try again.');
+        return;
+      }
+      imageUrl = uploaded;
+    }
+
     const productData = {
       name: productFormData.name,
       categoryId: productFormData.categoryId,
@@ -107,8 +162,9 @@ export function ProductManagementView() {
       sku: productFormData.sku || undefined,
       taxRate: parseFloat(productFormData.taxRate),
       reorderPoint: parseInt(productFormData.reorderPoint) || 0,
-      branchId: currentUser?.branchId || 'branch-1',
+      branchId,
       station: productFormData.station,
+      image: imageUrl,
       kitchenStatus: 'available' as const,
       isActive: true,
     };
@@ -199,7 +255,10 @@ export function ProductManagementView() {
       taxRate: product.taxRate.toString(),
       reorderPoint: product.reorderPoint.toString(),
       station: product.station || 'kitchen',
+      image: product.image || '',
     });
+    setImageBlob(null);
+    setImagePreview(product.image || '');
     setIsProductDialogOpen(true);
   };
 
@@ -359,7 +418,7 @@ export function ProductManagementView() {
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
-              <Button onClick={() => setIsProductDialogOpen(true)} disabled={!categories.length}>
+              <Button onClick={() => { resetProductForm(); setIsProductDialogOpen(true); }} disabled={!categories.length}>
                 <Plus className="size-4 mr-2" />
                 Add Product
               </Button>
@@ -396,8 +455,17 @@ export function ProductManagementView() {
             {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase())).map(product => (
               <Card key={product.id}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{product.name}</CardTitle>
-                  <Badge variant="secondary">{product.category}</Badge>
+                  <div className="flex items-center gap-3">
+                    <ProductImage
+                      src={product.image}
+                      name={product.name}
+                      className="size-12 rounded-xl shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <CardTitle className="text-lg truncate">{product.name}</CardTitle>
+                      <Badge variant="secondary" className="mt-1">{product.category}</Badge>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -467,7 +535,7 @@ export function ProductManagementView() {
               <Package className="size-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
               <p className="text-gray-600 mb-4">Get started by adding your first product.</p>
-              <Button onClick={() => setIsProductDialogOpen(true)} disabled={!categories.length}>
+              <Button onClick={() => { resetProductForm(); setIsProductDialogOpen(true); }} disabled={!categories.length}>
                 <Plus className="size-4 mr-2" />
                 Add Product
               </Button>
@@ -586,6 +654,41 @@ export function ProductManagementView() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Product Image (Optional)</Label>
+              <div className="mt-1.5 flex items-center gap-4">
+                <ProductImage
+                  src={imagePreview}
+                  name={productFormData.name || '?'}
+                  className="size-20 rounded-xl border shrink-0"
+                />
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => imageInputRef.current?.click()}>
+                    <Upload className="size-4 mr-2" />
+                    {imagePreview ? 'Change Image' : 'Upload Image'}
+                  </Button>
+                  {imagePreview && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="size-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="product-price">Price</Label>
@@ -661,8 +764,8 @@ export function ProductManagementView() {
               <Button type="button" variant="outline" onClick={() => setIsProductDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {editingProduct ? 'Update' : 'Add'} Product
+              <Button type="submit" disabled={uploadingImage}>
+                {uploadingImage ? 'Uploading…' : `${editingProduct ? 'Update' : 'Add'} Product`}
               </Button>
             </div>
           </form>

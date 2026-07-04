@@ -111,32 +111,17 @@ export class LoyaltyController {
     branchId: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error: txErr } = await supabase.from('loyalty_transactions').insert([{
-        customer_id: params.customerId,
-        order_id: params.orderId,
-        type: 'earn',
-        points: params.points,
-        description: `Earned ${params.points} points on order`,
-        branch_id: params.branchId,
-      }]);
-      if (txErr) throw txErr;
-
-      const { error: custErr } = await supabase.rpc('increment_loyalty_points', {
+      // Atomic + idempotent server-side (migration 0013): one call awards points,
+      // accumulates spend/visits, and writes the ledger row in a single
+      // transaction — and never double-awards if the payment is retried.
+      const { error } = await supabase.rpc('earn_loyalty_points', {
         p_customer_id: params.customerId,
+        p_order_id: params.orderId,
         p_points: params.points,
         p_amount: params.amountSpent,
+        p_branch_id: params.branchId,
       });
-      if (custErr) {
-        // Fallback: manual update if RPC not available
-        const { data: current } = await supabase
-          .from('customers').select('points_balance, total_spent, total_visits').eq('id', params.customerId).single();
-        await supabase.from('customers').update({
-          points_balance: (current?.points_balance ?? 0) + params.points,
-          total_spent: (current?.total_spent ?? 0) + params.amountSpent,
-          total_visits: (current?.total_visits ?? 0) + 1,
-        }).eq('id', params.customerId);
-      }
-
+      if (error) throw error;
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -150,27 +135,17 @@ export class LoyaltyController {
     branchId: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data: current } = await supabase
-        .from('customers').select('points_balance').eq('id', params.customerId).single();
-      if (!current || current.points_balance < params.points) {
-        return { success: false, error: 'Insufficient points balance' };
-      }
-
-      const { error: txErr } = await supabase.from('loyalty_transactions').insert([{
-        customer_id: params.customerId,
-        order_id: params.orderId,
-        type: 'redeem',
-        points: -params.points,
-        description: `Redeemed ${params.points} points for discount`,
-        branch_id: params.branchId,
-      }]);
-      if (txErr) throw txErr;
-
-      const { error: custErr } = await supabase.from('customers').update({
-        points_balance: current.points_balance - params.points,
-      }).eq('id', params.customerId);
-      if (custErr) throw custErr;
-
+      // Atomic guarded deduction (migration 0013): returns false if the balance
+      // is insufficient, so concurrent redemptions can't double-spend or drive
+      // the balance negative. Callers must only apply the discount on success.
+      const { data, error } = await supabase.rpc('redeem_loyalty_points', {
+        p_customer_id: params.customerId,
+        p_order_id: params.orderId,
+        p_points: params.points,
+        p_branch_id: params.branchId,
+      });
+      if (error) throw error;
+      if (data === false) return { success: false, error: 'Insufficient points balance' };
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -184,25 +159,15 @@ export class LoyaltyController {
     branchId: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data: current } = await supabase
-        .from('customers').select('points_balance').eq('id', params.customerId).single();
-      const newBalance = Math.max(0, (current?.points_balance ?? 0) + params.points);
-
-      const { error: txErr } = await supabase.from('loyalty_transactions').insert([{
-        customer_id: params.customerId,
-        order_id: null,
-        type: 'adjust',
-        points: params.points,
-        description: params.description,
-        branch_id: params.branchId,
-      }]);
-      if (txErr) throw txErr;
-
-      const { error: custErr } = await supabase.from('customers').update({
-        points_balance: newBalance,
-      }).eq('id', params.customerId);
-      if (custErr) throw custErr;
-
+      // Atomic (migration 0013): clamps at 0 and records the ACTUAL applied delta,
+      // so the transaction ledger always reconciles with the balance.
+      const { error } = await supabase.rpc('adjust_loyalty_points', {
+        p_customer_id: params.customerId,
+        p_points: params.points,
+        p_description: params.description,
+        p_branch_id: params.branchId,
+      });
+      if (error) throw error;
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };

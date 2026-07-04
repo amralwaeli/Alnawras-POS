@@ -25,6 +25,9 @@ export function RealtimeSyncEngine() {
   // Tables already flagged "needs waiter" (seeded from load) so we only alert on
   // a genuine NEW call (false → true), never on pre-existing/stale flags.
   const knownCalling = useRef<Set<string>>(new Set());
+  // False until the channel's first SUBSCRIBED; distinguishes the initial
+  // subscribe (initial load covers it) from a reconnect (which must resync).
+  const subscribedRef = useRef(false);
 
   const syncAll = useCallback(async () => {
     if (!currentUser) return;
@@ -169,7 +172,15 @@ export function RealtimeSyncEngine() {
           });
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        // On every (re)subscribe after the first, reconcile full state: Supabase
+        // does not replay postgres_changes missed while the socket was dropped,
+        // so without this a reconnect leaves the terminal silently out of sync.
+        if (status === 'SUBSCRIBED') {
+          if (subscribedRef.current) void syncAll();
+          subscribedRef.current = true;
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [currentUser, setOrders, setTables, setProducts, setCategories, syncAll]);
@@ -178,6 +189,19 @@ export function RealtimeSyncEngine() {
   useEffect(() => {
     if (!currentUser) return;
     void syncAll();
+  }, [currentUser, syncAll]);
+
+  // Reconcile when the network returns or the tab/tablet wakes — the realtime
+  // socket may have missed changes while offline or backgrounded.
+  useEffect(() => {
+    if (!currentUser) return;
+    const resync = () => { if (document.visibilityState === 'visible') void syncAll(); };
+    window.addEventListener('online', resync);
+    document.addEventListener('visibilitychange', resync);
+    return () => {
+      window.removeEventListener('online', resync);
+      document.removeEventListener('visibilitychange', resync);
+    };
   }, [currentUser, syncAll]);
 
   return null; // pure side-effect component

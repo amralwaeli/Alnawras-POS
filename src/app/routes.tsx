@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createHashRouter, Navigate } from 'react-router';
+import { createHashRouter, Navigate, useRouteError } from 'react-router';
 import { Layout } from './components/Layout';
 import { usePOS } from './context/POSContext';
 import { ROLE_PERMISSIONS } from './models/types';
@@ -108,10 +108,27 @@ function LandingPage() {
   }
 }
 
+// Route-level error boundary: a render crash or a stale lazy-chunk failure
+// (e.g. right after a deploy) shows a recoverable screen instead of a blank app.
+function RouteError() {
+  const err = useRouteError();
+  console.error('[Route error]', err);
+  return (
+    <div className="min-h-screen flex items-center justify-center p-8 text-center bg-gray-50">
+      <div className="max-w-sm">
+        <p className="text-lg font-bold text-gray-900 mb-2">Something went wrong</p>
+        <p className="text-sm text-gray-500 mb-4">This screen failed to load. If the app was just updated, a refresh usually fixes it.</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold">Reload</button>
+      </div>
+    </div>
+  );
+}
+
 export const router = createHashRouter([
   {
     path: '/',
     Component: Layout,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Lazy><LandingPage /></Lazy> },
 

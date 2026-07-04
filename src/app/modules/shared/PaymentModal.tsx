@@ -506,11 +506,14 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
       setLastSummary(summary);
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
       
-      // Notify customer monitor of success
-      const channel = supabase.channel('customer-monitor');
-      channel.subscribe(async (status) => {
+      // Notify customer monitor of success (one-shot). Remove the channel after
+      // sending so a completed payment doesn't leak a realtime subscription every
+      // time — hundreds would otherwise accumulate over a shift.
+      const successCh = supabase.channel('customer-monitor');
+      successCh.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.send({ type: 'broadcast', event: 'payment-success', payload: {} });
+          await successCh.send({ type: 'broadcast', event: 'payment-success', payload: {} });
+          void supabase.removeChannel(successCh);
         }
       });
 

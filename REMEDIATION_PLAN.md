@@ -4,14 +4,27 @@
 > what is DONE, what is IN PROGRESS, and the exact next actions for everything
 > remaining. Severity IDs (CR-#, HI-#, MED-#) refer to the production audit.
 
-_Last updated: 2026-07 (Increment 1A complete; Increment 1B code complete, migration NOT yet applied)._
+_Last updated: 2026-07 — Increments 1A, 1B, 1C + Phase-1-A (loyalty) + a reliability batch are code-complete; most are committed & pushed to `main`._
+
+---
+
+## ⚠️ REMINDER — DO THESE NEXT (in order)
+
+1. **Apply the pending migrations to the PRODUCTION Supabase project** (`uasnihapkcrgibnpqdyi`) in the SQL editor — the client code that needs them is already pushed and deploying:
+   - `supabase/migrations/0012_storage_hardening.sql` — storage buckets.
+   - `supabase/migrations/0013_loyalty_rpcs.sql` — atomic loyalty. **Until applied, earning/redeeming/adjusting points ERRORS on the live site** (`LoyaltyController` now calls these RPCs).
+   Both are additive & safe: no RLS/data changes, cannot break login.
+   Verify after applying: buckets have `file_size_limit`/`allowed_mime_types`; `earn_loyalty_points`/`redeem_loyalty_points`/`adjust_loyalty_points` exist.
+2. **Rotate the demo PINs** `1234` (Admin) / `2345` (Cashier) — they were live login shortcuts tied to real accounts.
+3. **Deploy:** frontend (push → Pages) + `supabase functions deploy send-pickup-ready`; restart `node print-proxy.js` on the cashier device.
+4. **Provide a testable AlnawrasPOS database** BEFORE the auth/RLS work (Phase 1 B–E). Connect prod `uasnihapkcrgibnpqdyi` to the tooling, or create a staging project / Supabase branch with the same schema. This environment is wired to an UNRELATED app, so B–E cannot be built or tested from it.
 
 ---
 
 ## 0. How to resume quickly
 
 - **Build/verify (no side effects):** `npx vite build --outDir .verify_build --emptyOutDir && rm -rf .verify_build` (exit 0 = imports resolve, no syntax errors). Note: there is no typecheck/test in CI yet (see MED "CI").
-- **Nothing is committed yet.** All 1A + 1B changes live in the working tree. Review with `git status --short` and `git diff`.
+- **Most work is committed & pushed to `main`** (1A, 1B, 1C, Phase-1-A loyalty). A small reliability batch may still be uncommitted — check `git status --short`. NOTE: this environment auto-commits/pushes as work lands.
 - **DB migrations are applied MANUALLY** to the production Supabase project via the SQL editor (CI does not run them). See the ⚠️ project blocker below.
 - Reusable utilities already created — **use these, don't re-implement**:
   - `src/lib/csv.ts` — `downloadCsv`, `escapeCsvCell` (CSV + formula-injection safe).
@@ -31,7 +44,7 @@ _Last updated: 2026-07 (Increment 1A complete; Increment 1B code complete, migra
 ## 2. ⚠️ BLOCKER: Supabase project mismatch (resolve before any DB change)
 
 - App config ([.env](.env)) and every migration header target **`uasnihapkcrgibnpqdyi`** (`https://uasnihapkcrgibnpqdyi.supabase.co`).
-- The Supabase MCP tooling in this environment is connected to a **different** project **`eyaacfoiwfkssailoraw`** ("Alsakkaf-dev's Project"), which is a **stale/partial dev DB**: 0 storage buckets, 0 storage policies, only 11 public tables (prod has ~23 through migration 0011). **Do not apply migrations there.**
+- The Supabase tooling in this environment is connected to a **different, UNRELATED application** — project **`eyaacfoiwfkssailoraw`** ("Alsakkaf-dev's Project"), whose tables are `zones`, `addresses`, `menu_items`, `daily_session`, `notifications`, `payments`, `push_subscriptions`, … — NOT the AlnawrasPOS schema. **Never apply AlnawrasPOS migrations there.** There is currently **no accessible AlnawrasPOS database** (prod or staging) from this environment.
 - **ACTION NEEDED FROM USER:** confirm which project is production, and either (a) apply migrations yourself in the SQL editor of the correct project, or (b) connect the MCP/CLI to the correct project so migrations can be applied programmatically. Also confirm which `VITE_SUPABASE_URL` the GitHub Actions deploy secret uses (that is what the live site actually talks to).
 
 ---

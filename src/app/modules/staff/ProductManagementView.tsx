@@ -326,10 +326,15 @@ export function ProductManagementView() {
       // Row 0 = column headers, Row 1 = instruction text, Row 2+ = product data
       const isLightspeedFormat = headers.includes('Product Name') || headers.includes('Tax-Exclusive Price');
 
+      // Reject prototype-polluting header names and build each row on a null
+      // prototype, so a crafted spreadsheet header (__proto__ / constructor /
+      // prototype) can't tamper with Object.prototype.
+      const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
       if (isLightspeedFormat) {
         for (let i = 2; i < allRows.length; i++) {
-          const row: any = {};
-          headers.forEach((h, idx) => { if (h) row[h] = allRows[i][idx]; });
+          const row: any = Object.create(null);
+          headers.forEach((h, idx) => { if (h && !UNSAFE_KEYS.has(h)) row[h] = allRows[i][idx]; });
           jsonData.push(row);
         }
       } else {

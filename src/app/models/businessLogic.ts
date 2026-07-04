@@ -177,7 +177,8 @@ export function calculateSalesAnalytics(
     .map(([category, revenue]) => ({
       category,
       revenue: Math.round(revenue * 100) / 100,
-      percentage: Math.round((revenue / totalRevenue) * 100 * 100) / 100,
+      // Guard divide-by-zero on a day with no revenue (was NaN%).
+      percentage: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100 * 100) / 100 : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue);
 

@@ -332,7 +332,7 @@ function WaiterLeaderboard({ orders, users }: { orders: any[]; users: any[] }) {
 }
 
 export function AdminDashboardView() {
-  const { orders, products, users, supabase } = usePOS();
+  const { orders, products, users, supabase, currentUser } = usePOS();
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -378,12 +378,20 @@ export function AdminDashboardView() {
   const handleBackup = async () => {
     setIsBackingUp(true);
     try {
-      const tables = ['users', 'products', 'orders', 'order_items', 'employees', 'attendance_logs', 'shifts'];
+      // Client-side backup is limited to non-sensitive, branch-scoped business
+      // data. Credential / PII tables (users, employees, attendance, payroll,
+      // fingerprints) are intentionally NOT exported from the browser — a full,
+      // secure backup is a server-side (service-role) job, never a client bulk
+      // read. See REMEDIATION_PLAN.md (Phase 1).
+      const branchId = currentUser?.branchId;
+      const tables = ['categories', 'products', 'orders', 'order_items', 'expenses', 'customers', 'loyalty_transactions'];
       const backupData: any = {};
 
       for (const table of tables) {
-        const { data } = await supabase.from(table).select('*');
-        backupData[table] = data;
+        let query = supabase.from(table).select('*');
+        if (branchId) query = query.eq('branch_id', branchId);
+        const { data } = await query;
+        backupData[table] = data ?? [];
       }
 
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });

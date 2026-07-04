@@ -93,6 +93,10 @@ export class HRController {
     emp: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
+      // Defence in depth: the admin role is never assignable to an employee.
+      if (emp.role === 'admin') {
+        return { success: false, error: 'The admin role cannot be assigned to an employee.' };
+      }
       const id = uid('emp');
       const { data, error } = await supabase
         .from('employees')
@@ -124,6 +128,10 @@ export class HRController {
     updates: Partial<Employee>
   ): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
+      // Defence in depth: never let an employee be escalated to admin.
+      if (updates.role === 'admin') {
+        return { success: false, error: 'The admin role cannot be assigned to an employee.' };
+      }
       const dbUpdates: any = {};
       if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
       if (updates.role !== undefined) dbUpdates.role = updates.role;

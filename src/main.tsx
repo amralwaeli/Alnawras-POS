@@ -4,6 +4,7 @@
   import "./styles/index.css";
   import { OfflineSyncEngine } from './app/services/OfflineSyncEngine';
   import { initSentry, AppErrorBoundary } from './lib/sentry';
+  import { toast } from 'sonner';
 
   // Initialise error tracking before anything renders (no-op without a DSN).
   initSentry();
@@ -31,11 +32,17 @@
         // Check for a newer service worker on every launch so updates roll out
         // without a reinstall.
         reg.update();
-        let refreshing = false;
+        let prompted = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (refreshing || !hadController) return;
-          refreshing = true;
-          window.location.reload();
+          // A new version took over. Do NOT auto-reload — that would wipe an
+          // in-progress order/payment. Prompt the user to refresh when ready.
+          if (prompted || !hadController) return;
+          prompted = true;
+          toast('A new version is available', {
+            description: 'Finish any open order, then refresh to update.',
+            action: { label: 'Refresh now', onClick: () => window.location.reload() },
+            duration: Infinity,
+          });
         });
       }).catch(err => {
         console.error('ServiceWorker registration failed: ', err);

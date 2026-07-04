@@ -61,6 +61,18 @@ export function RealtimeSyncEngine() {
       // Tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `branch_id=eq.${branchId}` }, (p) => {
         const row = (p.new || p.old) as any;
+        if (!row?.id) return;
+
+        // A removed table must be dropped from state (and any pending alert
+        // cleared), not re-inserted from the stale `old` row — that left
+        // deleted tables lingering as "ghost" tables on other terminals.
+        if (p.eventType === 'DELETE') {
+          setTables(prev => prev.filter(t => t.id !== row.id));
+          knownCalling.current.delete(row.id);
+          AlertService.dismiss(`table-${row.id}`);
+          return;
+        }
+
         const mapped = mapTable(row);
         setTables(prev =>
           prev.some(t => t.id === mapped.id)
@@ -83,10 +95,23 @@ export function RealtimeSyncEngine() {
           }
         }
       })
-      // Product updates
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
-        const mapped = mapProduct(p.new as any);
-        setProducts(prev => prev.map(prod => prod.id === mapped.id ? mapped : prod));
+      // Product inserts / updates / (soft-)deletes
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `branch_id=eq.${branchId}` }, (p) => {
+        const row = (p.new || p.old) as any;
+        if (!row?.id) return;
+        // Hard delete, or soft delete (is_active=false), drops it from the active
+        // list; INSERT appends; UPDATE replaces. Previously only UPDATE was
+        // handled, so newly added/removed products never appeared until reload.
+        if (p.eventType === 'DELETE' || row.is_active === false) {
+          setProducts(prev => prev.filter(prod => prod.id !== row.id));
+          return;
+        }
+        const mapped = mapProduct(row);
+        setProducts(prev =>
+          prev.some(prod => prod.id === mapped.id)
+            ? prev.map(prod => prod.id === mapped.id ? mapped : prod)
+            : [...prev, mapped]
+        );
       })
       // Orders
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, async (payload) => {

@@ -99,7 +99,7 @@ function EmployeeFormModal({
                 onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
-                {['admin', 'cashier', 'waiter', 'kitchen', 'hr', 'juice'].map(r => (
+                {['cashier', 'waiter', 'kitchen', 'hr', 'juice'].map(r => (
                   <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
                 ))}
               </select>

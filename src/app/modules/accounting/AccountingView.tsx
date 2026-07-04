@@ -25,8 +25,6 @@ export function AccountingView() {
   const [form, setForm] = useState(defaultForm());
   const [saving, setSaving] = useState(false);
 
-  if (!currentUser) return null;
-
   // ── Load expenses from Supabase on mount ─────────────────────────────────
   useEffect(() => {
     if (!currentUser?.branchId) return;
@@ -50,6 +48,8 @@ export function AccountingView() {
         })));
       });
   }, [currentUser?.branchId]);
+
+  if (!currentUser) return null;
 
   // ── Totals ────────────────────────────────────────────────────────────────
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);

@@ -91,7 +91,6 @@ function BarChart({ data, labels, height = 200 }: { data: number[]; labels: stri
 
 export function DashboardView() {
   const { currentUser, orders, tables, products, users } = usePOS();
-  if (!currentUser) return null;
 
   // Calculate stats
   const openOrders = orders.filter(o => o.status === 'open');
@@ -141,6 +140,8 @@ export function DashboardView() {
   const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 8);
+
+  if (!currentUser) return null;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">

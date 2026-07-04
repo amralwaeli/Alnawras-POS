@@ -4,6 +4,7 @@ import { usePOS } from '../../../context/POSContext';
 import { HRController } from '../../../controllers/HRController';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { PayrollSummary, EmployeeWithUser } from '../../../models/types';
+import { downloadCsv } from '../../../../lib/csv';
 
 const cur = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -53,14 +54,7 @@ export function PayrollView() {
       p.totalLateMinutes, p.totalOvertimeMinutes,
       p.lateDeduction, p.overtimeBonus, p.netSalary, p.status,
     ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `payroll-${year}-${String(month).padStart(2, '0')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`payroll-${year}-${String(month).padStart(2, '0')}.csv`, [headers, ...rows]);
   };
 
   const totalNet   = payroll.reduce((s, p) => s + p.netSalary, 0);

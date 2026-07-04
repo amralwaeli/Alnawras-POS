@@ -3,6 +3,7 @@ import { usePOS } from '../../context/POSContext';
 import { TrendingUp, TrendingDown, DollarSign, Download, Plus, X } from 'lucide-react';
 import { orderTotal, fmt } from '../../../lib/currency';
 import { supabase } from '../../../lib/supabase';
+import { downloadCsv } from '../../../lib/csv';
 import { toast } from 'sonner';
 
 const expenseCategories = ['utilities', 'supplies', 'rent', 'salary', 'maintenance', 'other'];
@@ -122,16 +123,7 @@ export function AccountingView() {
         `-${e.amount.toFixed(2)}`,
       ]));
 
-    const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `alnawras-${period.toLowerCase()}-${now.toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadCsv(`alnawras-${period.toLowerCase()}-${now.toISOString().split('T')[0]}.csv`, rows);
     toast.success(`${period} report downloaded`);
   };
 

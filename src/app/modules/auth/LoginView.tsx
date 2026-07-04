@@ -69,11 +69,6 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
     }
   };
 
-  const demoRoles = [
-    { label: 'Admin', pin: '1234', color: 'bg-violet-100 text-violet-700' },
-    { label: 'Cashier', pin: '2345', color: 'bg-blue-100 text-blue-700' },
-  ];
-
   return (
     <div className="h-screen flex bg-[#0B0E14]">
       {/* Left panel - Branding */}
@@ -166,22 +161,6 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
                 ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
                 : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>}
             </button>
-          </div>
-
-          {/* Quick Demo Access */}
-          <div className="pt-6 border-t border-gray-800/50">
-            <p className="text-[10px] font-bold text-gray-600 text-center mb-4 uppercase tracking-[0.2em]">Quick Access</p>
-            <div className="flex justify-center gap-3">
-              {demoRoles.map(r => (
-                <button
-                  key={r.label}
-                  onClick={() => setPin(r.pin)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.color} transition-all hover:-translate-y-1 shadow-sm`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

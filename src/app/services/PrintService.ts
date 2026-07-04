@@ -79,14 +79,20 @@ export class PrintService {
     esc += `--------------------------------\n`;
     esc += `\x1B\x61\x00`; // Left align
     
+    // Strip ASCII control characters from untrusted values (product names, notes,
+    // modifier labels) so a crafted string cannot inject ESC/POS control sequences
+    // (paper cut, cash-drawer kick, garbled output). The formatter adds its own
+    // control codes above; only interpolated data is sanitised here.
+    const clean = (v: any) => String(v ?? '').replace(/[\x00-\x1F\x7F]/g, ' ').trimEnd();
+
     newItems.forEach(item => {
-      const name = item.productName || item.product_name || 'Item';
-      esc += `\x1D\x21\x01${item.quantity}x ${name}\x1D\x21\x00\n`;
+      const name = clean(item.productName || item.product_name || 'Item');
+      esc += `\x1D\x21\x01${clean(item.quantity)}x ${name}\x1D\x21\x00\n`;
       const mods = item.modifiers || item.modifiers_json || [];
       if (Array.isArray(mods)) {
-        mods.forEach((m: any) => { esc += `  - ${m.optionName || m.option_name || ''}\n`; });
+        mods.forEach((m: any) => { esc += `  - ${clean(m.optionName || m.option_name || '')}\n`; });
       }
-      if (item.notes) esc += `  * NOTE: ${item.notes}\n`;
+      if (item.notes) esc += `  * NOTE: ${clean(item.notes)}\n`;
     });
 
     esc += `\n\n\n\n\x1B\x69`; // Cut paper

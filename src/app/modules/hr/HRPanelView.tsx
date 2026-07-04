@@ -9,6 +9,7 @@ import {
   ChevronRight, ShieldOff, Wifi, Search, Calendar, DollarSign,
   UserCheck, UserX, TrendingUp, Activity
 } from 'lucide-react';
+import { downloadCsv } from '../../../lib/csv';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -540,11 +541,7 @@ function PayrollTab({ currentUserId }: { currentUserId: string }) {
         p.totalLateMinutes, p.totalOvertimeMinutes, p.lateDeduction, p.overtimeBonus, p.netSalary, p.status
       ])
     ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = 'data:text/csv,' + encodeURIComponent(csv);
-    a.download = `payroll-${year}-${String(month).padStart(2, '0')}.csv`;
-    a.click();
+    downloadCsv(`payroll-${year}-${String(month).padStart(2, '0')}.csv`, rows);
   };
 
   const monthName = new Date(year, month - 1).toLocaleString('en-US', { month: 'long' });

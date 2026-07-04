@@ -112,15 +112,12 @@ export class PickupController {
       await audit(`pickup.${status}`, 'order', orderId, actor);
 
       // On READY, email the customer (best-effort — never blocks the status change).
+      // The edge function resolves the recipient from the order itself using the
+      // service role; we pass only the orderId, so the client can never address an
+      // arbitrary recipient (the function is not an open relay).
       if (status === 'ready') {
         try {
-          const { data } = await supabase.from('orders')
-            .select('customer_email, customer_name, bill_number').eq('id', orderId).single();
-          if (data?.customer_email) {
-            await supabase.functions.invoke('send-pickup-ready', {
-              body: { to: data.customer_email, customerName: data.customer_name, billNumber: data.bill_number },
-            });
-          }
+          await supabase.functions.invoke('send-pickup-ready', { body: { orderId } });
         } catch (mailErr) {
           console.warn('[PickupController] ready email failed (non-fatal):', mailErr);
         }

@@ -3,6 +3,7 @@ import { usePOS } from '../../context/POSContext';
 import { HRController } from '../../controllers/HRController';
 import { AttendanceLog, Employee } from '../../models/types';
 import { supabase } from '../../../lib/supabase';
+import { downloadCsv } from '../../../lib/csv';
 import {
   Clock, UserCheck, AlertCircle, ShieldOff, RefreshCw,
   Fingerprint, ExternalLink, UserX, TrendingUp, Users,
@@ -52,11 +53,7 @@ function exportCSV(logs: AttendanceLog[], absentEmps: Employee[], date: string) 
       e.fullName, e.employeeId, date, e.shiftStart, e.shiftEnd, '', '', '', '', 'absent', ''
     ])
   ];
-  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv,' + encodeURIComponent(csv);
-  a.download = `attendance-${date}.csv`;
-  a.click();
+  downloadCsv(`attendance-${date}.csv`, rows);
 }
 
 export function AttendanceView() {

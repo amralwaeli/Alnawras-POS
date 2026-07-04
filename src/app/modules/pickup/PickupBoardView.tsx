@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router';
 import { usePOS } from '../../context/POSContext';
 import { PickupController } from '../../controllers/PickupController';
 import { uploadMerchantQr } from '../../services/PickupService';
+import { validateUpload, IMAGE_TYPES, MB } from '../../../lib/upload';
 import { Order } from '../../models/types';
 import { fmt } from '../../../lib/currency';
 import { toast } from 'sonner';
@@ -67,10 +68,17 @@ export function PickupBoardView() {
   };
 
   const uploadQr = async (file: File) => {
+    const verr = validateUpload(file, IMAGE_TYPES, 5 * MB);
+    if (verr) { toast.error(verr); return; }
     setQrUploading(true);
-    const url = await uploadMerchantQr(branchId, file);
+    const res = await uploadMerchantQr(branchId, file);
     setQrUploading(false);
-    if (url) toast.success('Merchant QR updated'); else toast.error('QR upload failed');
+    if ('url' in res) toast.success('Payment QR set');
+    else if (res.alreadyExists) {
+      toast.error('A payment QR is already set. To replace it, delete the old one in the Supabase Storage dashboard first.');
+    } else {
+      toast.error(res.error || 'QR upload failed');
+    }
   };
 
   const active = orders.filter(o => o.pickupStatus !== 'picked');

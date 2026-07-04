@@ -11,6 +11,7 @@
  * URL shape:  /#/pickup/<token>
  */
 import { supabase } from '../../lib/supabase';
+import { randomHex, extForType } from '../../lib/upload';
 
 /** Pickup links stay valid for 24h (a customer may order over the course of a day). */
 const TOKEN_TTL_HOURS = 24;
@@ -135,13 +136,17 @@ export async function completePickupToken(orderId: string): Promise<void> {
 
 // ─── Storage: receipts & merchant QR ──────────────────────────────────────────
 
-/** Upload a customer's payment receipt image; returns its public URL. */
+/**
+ * Upload a customer's payment receipt image; returns its public URL.
+ * The key is unguessable and create-only; the extension is derived from the MIME
+ * type (never the client filename). The bucket rejects non-image/PDF or oversized
+ * uploads server-side (migration 0012).
+ */
 export async function uploadReceipt(token: string, file: File): Promise<string | null> {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = `${token}-${Date.now()}.${ext}`;
+  const path = `${token.slice(0, 16)}-${randomHex(8)}.${extForType(file.type)}`;
   const { error } = await supabase.storage.from('pickup-receipts').upload(path, file, {
     cacheControl: '3600',
-    upsert: true,
+    upsert: false,
     contentType: file.type || 'image/jpeg',
   });
   if (error) {
@@ -156,16 +161,30 @@ export function merchantQrUrl(branchId: string): string {
   return supabase.storage.from('merchant-qr').getPublicUrl(`${branchId}.png`).data.publicUrl;
 }
 
-/** Admin uploads / replaces the branch's merchant payment QR. */
-export async function uploadMerchantQr(branchId: string, file: File): Promise<string | null> {
+/**
+ * Admin uploads the branch's merchant payment QR (first-time / create-only).
+ *
+ * The bucket no longer allows the anon key to overwrite or delete objects
+ * (migration 0012), which closes the payment-QR spoofing path. As a result an
+ * EXISTING QR cannot be replaced from the app — that is now an authenticated
+ * action via the Supabase Storage dashboard. `alreadyExists` distinguishes that
+ * case so the UI can guide the admin instead of showing a generic error.
+ */
+export async function uploadMerchantQr(
+  branchId: string,
+  file: File,
+): Promise<{ url: string } | { error: string; alreadyExists?: boolean }> {
   const { error } = await supabase.storage.from('merchant-qr').upload(`${branchId}.png`, file, {
     cacheControl: '0',
-    upsert: true,
+    upsert: false,
     contentType: file.type || 'image/png',
   });
   if (error) {
     console.error('[PickupService] uploadMerchantQr failed:', error);
-    return null;
+    // supabase-storage returns 409 "Duplicate"/"resource already exists" when the
+    // object exists and upsert is off.
+    const alreadyExists = /exist|dupli|409/i.test(error.message);
+    return { error: error.message, alreadyExists };
   }
-  return merchantQrUrl(branchId);
+  return { url: merchantQrUrl(branchId) };
 }

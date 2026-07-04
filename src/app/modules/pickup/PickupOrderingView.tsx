@@ -16,6 +16,7 @@ import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import {
   validatePickupToken, PickupToken, uploadReceipt, merchantQrUrl,
 } from '../../services/PickupService';
+import { validateUpload, RECEIPT_TYPES, MB } from '../../../lib/upload';
 import {
   Plus, Minus, ShoppingCart, Search, X, CheckCircle2, ShoppingBag,
   UtensilsCrossed, ShieldAlert, Bike, Truck, Store, Upload, ChevronDown, ArrowLeft,
@@ -172,6 +173,10 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
     if (!method) { setError('Please choose a pickup method.'); return; }
     if (!payType) { setError('Please choose a payment option.'); return; }
     if (payType === 'online' && !receipt) { setError('Please upload your payment receipt.'); return; }
+    if (payType === 'online' && receipt) {
+      const verr = validateUpload(receipt, RECEIPT_TYPES, 15 * MB);
+      if (verr) { setError(verr); return; }
+    }
     if (!ack) { setError('Please acknowledge the pickup notice.'); return; }
 
     setSubmitting(true);

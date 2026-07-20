@@ -222,7 +222,13 @@ export class OrderController {
         return { success: false, error: 'Cannot void an item on a bill that has already been paid' };
       }
 
-      const { error: itemErr } = await supabase
+      // Only void an item that has NOT already been settled by a split payment.
+      // With split-by-item an order stays 'open' while individual items are
+      // paid=true; voiding one of those would leave the guest's payment
+      // unreconciled. The `.eq('paid', false)` guard + row-count check refuses
+      // that case so a paid item must be refunded through a payment flow, not
+      // silently cancelled off the bill.
+      const { data: voided, error: itemErr } = await supabase
         .from('order_items')
         .update({
           status: 'cancelled',
@@ -232,8 +238,13 @@ export class OrderController {
           cancelled_at: new Date().toISOString(),
         })
         .eq('id', itemId)
-        .eq('order_id', orderId);
+        .eq('order_id', orderId)
+        .eq('paid', false)
+        .select('id');
       if (itemErr) throw itemErr;
+      if (!voided || voided.length === 0) {
+        return { success: false, error: 'This item was already paid for and cannot be voided — refund it separately.' };
+      }
 
       const { data: remaining } = await supabase
         .from('order_items')

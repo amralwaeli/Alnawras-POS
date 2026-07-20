@@ -136,50 +136,17 @@ export class TableController {
     }
 
     try {
-      const { data: toTable, error: toErr } = await supabase
-        .from('tables')
-        .select('id, number, status')
-        .eq('id', toTableId)
-        .eq('branch_id', user.branchId)
-        .single();
-      if (toErr || !toTable) return { success: false, error: 'Target table not found' };
-      if (toTable.status !== 'available') return { success: false, error: 'Target table is not available' };
-
-      const { error: orderErr } = await supabase
-        .from('orders')
-        .update({ table_id: toTableId, table_number: toTable.number })
-        .eq('id', orderId)
-        .eq('branch_id', user.branchId);
-      if (orderErr) throw orderErr;
-
-      const { error: newTableErr } = await supabase
-        .from('tables')
-        .update({ status: 'occupied', current_order_id: orderId })
-        .eq('id', toTableId)
-        .eq('branch_id', user.branchId);
-      if (newTableErr) throw newTableErr;
-
-      const { error: oldTableErr } = await supabase
-        .from('tables')
-        .update({ status: 'available', current_order_id: null })
-        .eq('id', fromTableId)
-        .eq('branch_id', user.branchId);
-      if (oldTableErr) throw oldTableErr;
-
-      // Move the active group-ordering session (if any) along with the order —
-      // both the group's table pointer and every guest device's own table_id,
-      // so their already-open ordering page shows the correct table number.
-      const { data: group } = await supabase
-        .from('order_groups')
-        .select('id')
-        .eq('table_id', fromTableId)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (group?.id) {
-        await supabase.from('order_groups').update({ table_id: toTableId }).eq('id', group.id);
-        await supabase.from('guest_sessions').update({ table_id: toTableId }).eq('group_id', group.id).eq('status', 'active');
-      }
-
+      // One atomic, target-locked transaction (migration 0021). The RPC derives
+      // the real source table from the order itself, locks the target so two
+      // concurrent moves can't collide on one table, and moves any active group
+      // session along with the order — replacing the previous four unsequenced
+      // client writes.
+      const { error } = await supabase.rpc('move_order_to_table', {
+        p_order_id: orderId,
+        p_to_table_id: toTableId,
+        p_branch_id: user.branchId,
+      });
+      if (error) throw error;
       return { success: true, data: undefined };
     } catch (error: any) {
       console.error('Error transferring order to new table:', error);

@@ -528,15 +528,20 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
 
     setProcessing(true);
     try {
-      const { data: lastBill } = await supabase
-        .from('orders').select('bill_number')
-        .eq('branch_id', currentUser.branchId)
-        .eq('order_type', getOrderType(order))
-        .not('bill_number', 'is', null)
-        .order('bill_number', { ascending: false })
-        .limit(1).maybeSingle();
-
-      const billNo  = String((lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0) + 1).padStart(4, '0');
+      // Atomic per-(branch, order_type) bill number (migration 0021) — replaces
+      // the old MAX(bill_number)+1 read, which raced two concurrent checkouts
+      // into duplicate numbers. Reuse the order's existing number if it has one.
+      let billNo: string;
+      if (order.billNumber) {
+        billNo = String(order.billNumber);
+      } else {
+        const { data: nextNo, error: billErr } = await supabase.rpc('next_bill_number', {
+          p_branch_id: currentUser.branchId,
+          p_order_type: getOrderType(order),
+        });
+        if (billErr) throw billErr;
+        billNo = String(nextNo);
+      }
       const summary = paymentMode === 'mix'
         ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
         : paymentMode.toUpperCase();

@@ -262,19 +262,15 @@ export class OrderController {
     }
   }
 
-  /** Next zero-padded bill number for a branch, per order type. */
+  /** Next zero-padded bill number for a branch, per order type. Uses the atomic
+   *  server-side counter (migration 0021) so two concurrent orders can never
+   *  receive the same number, instead of the old racy MAX(bill_number)+1. */
   private static async nextBillNumber(branchId: string, orderType: string = 'takeaway'): Promise<string> {
-    const { data: lastBill } = await supabase
-      .from('orders')
-      .select('bill_number')
-      .eq('branch_id', branchId)
-      .eq('order_type', orderType)
-      .not('bill_number', 'is', null)
-      .order('bill_number', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastNum = lastBill?.bill_number ? parseInt(lastBill.bill_number, 10) : 0;
-    return String(lastNum + 1).padStart(4, '0');
+    const { data, error } = await supabase.rpc('next_bill_number', {
+      p_branch_id: branchId,
+      p_order_type: orderType,
+    });
+    if (error) throw error;
+    return String(data);
   }
 }

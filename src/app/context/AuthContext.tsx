@@ -2,9 +2,18 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User } from '../models/types';
 import { AuthController } from '../controllers/AuthController';
 import { StaffController } from '../controllers/StaffController';
+import { BranchController } from '../controllers/BranchController';
 import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { DeviceService } from '../services/DeviceService';
+
+/** Staff-facing message when a branch is locked out (contract lapsed or the
+ *  super-admin suspended it). Kept generic — staff shouldn't see billing detail. */
+function branchBlockedMessage(reason?: 'suspended' | 'expired' | 'not-found'): string {
+  if (reason === 'expired') return 'This branch subscription has ended. Please contact the administrator.';
+  if (reason === 'suspended') return 'This branch is currently suspended. Please contact the administrator.';
+  return 'This branch is not available right now. Please contact the administrator.';
+}
 
 interface AuthContextType {
   currentUser: User | null;
@@ -51,7 +60,16 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return { success: false, error: 'Invalid PIN or inactive account' };
       const user = mapStaff(row);
-      
+
+      // ── BRANCH CONTRACT / SUSPENSION LOCK ─────────────────────────────────
+      // Block login the moment a branch's contract lapses or it's suspended by
+      // the super-admin. Fails open if the branches registry isn't present yet
+      // (single-tenant install pre-0018), so this can't break existing logins.
+      const access = await BranchController.getAccess(user.branchId);
+      if (!access.allowed) {
+        return { success: false, error: branchBlockedMessage(access.reason) };
+      }
+
       // ── DEVICE ROLE LOCKING ───────────────────────────────────────────────
       // Secure the tablet and cashier devices: only accept waiter on tablets,
       // and only cashier/admin on the cashier device.
@@ -75,6 +93,13 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
     const result = AuthController.authenticate(pin, users);
     if (result.success && result.user) {
       const user = result.user;
+
+      // Same branch contract/suspension lock as the primary path above.
+      const access = await BranchController.getAccess(user.branchId);
+      if (!access.allowed) {
+        return { success: false, error: branchBlockedMessage(access.reason) };
+      }
+
       const station = DeviceService.getStationType();
       // Admin always bypasses the lock (see note above).
       if (user.role !== 'admin') {

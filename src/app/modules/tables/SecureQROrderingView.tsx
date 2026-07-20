@@ -18,6 +18,7 @@ import { validateQrToken, QrSession } from '../../services/QrService';
 import { Product, Category, Table, ModifierGroup, SelectedModifier } from '../../models/types';
 import { OrderController } from '../../controllers/OrderController';
 import { ModifierController } from '../../controllers/ModifierController';
+import { BranchController } from '../../controllers/BranchController';
 import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
 import {
@@ -122,6 +123,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
   const [submitting, setSubmitting]       = useState(false);
   const [success, setSuccess]             = useState(false);
   const [invalidTable, setInvalidTable]   = useState(false);
+  const [branchClosed, setBranchClosed]   = useState(false);
   const [callingWaiter, setCallingWaiter] = useState(false);
   const [mobileView, setMobileView]       = useState<'menu' | 'cart'>('menu');
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
@@ -134,12 +136,17 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       if (error || !tableRow) { setInvalidTable(true); setLoading(false); return; }
 
       const branchId = tableRow.branch_id;
+
+      // Contract expired / branch suspended → customers can't order.
+      const access = await BranchController.getAccess(branchId);
+      if (!access.allowed) { setBranchClosed(true); setLoading(false); return; }
       setTable({
         id: tableRow.id, number: tableRow.number, capacity: tableRow.capacity,
         status: tableRow.status, branchId,
         currentOrderId: tableRow.current_order_id,
         assignedCashierId: tableRow.assigned_cashier_id,
         needsWaiter: tableRow.needs_waiter ?? false,
+        orderingEnabled: tableRow.ordering_enabled ?? false,
       });
 
       const [productsRes, categoriesRes] = await Promise.all([
@@ -210,6 +217,20 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [groupOrderId]);
+
+  // Realtime: react live if a waiter turns this table's QR ordering on/off
+  // while the customer already has the page open.
+  useEffect(() => {
+    if (!tableId) return;
+    const channel = supabase
+      .channel(`secure-qr-table-${tableId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, (payload) => {
+        const up = payload.new as any;
+        setTable(prev => prev ? { ...prev, orderingEnabled: up.ordering_enabled ?? false } : prev);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [tableId]);
 
   // Realtime product availability sync
   useEffect(() => {
@@ -335,6 +356,34 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
           </div>
           <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Invalid QR Code</h2>
           <p className="text-sm text-gray-400">Please ask a team member for a valid QR code or scan the correct table.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (branchClosed) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="bg-gray-100 rounded-full p-4 w-fit mx-auto mb-5">
+            <UtensilsCrossed className="size-10 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Temporarily Unavailable</h2>
+          <p className="text-sm text-gray-400">Online ordering is currently unavailable for this restaurant. Please ask a team member for assistance.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!table?.orderingEnabled) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="bg-amber-100 rounded-full p-4 w-fit mx-auto mb-5">
+            <Bell className="size-10 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Ask Your Waiter</h2>
+          <p className="text-sm text-gray-400">Ordering isn't open for this table yet — a team member needs to enable it first. This page will unlock automatically once they do.</p>
         </div>
       </div>
     );

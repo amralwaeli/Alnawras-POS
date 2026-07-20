@@ -9,8 +9,52 @@
 import {
   Staff, Product, Category, Table, Order, OrderItem, Employee, LeaveRequest,
   AttendanceLog, EmployeeFingerprint, PayrollSummary, Customer, LoyaltyTransaction,
-  ModifierGroup, ModifierOption,
+  ModifierGroup, ModifierOption, Organization, Branch, BranchFeatures, ALL_FEATURES_ON,
+  BranchSettings, DiscountPreset, DEFAULT_BRANCH_SETTINGS,
 } from './types';
+
+// ── Multi-tenant: organizations & branches ───────────────────────────────────
+export const mapOrganization = (row: any): Organization => ({
+  id: row.id,
+  name: row.name,
+  ownerName: row.owner_name ?? undefined,
+  ownerEmail: row.owner_email ?? undefined,
+  ownerPhone: row.owner_phone ?? undefined,
+  status: row.status ?? 'active',
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+});
+
+export const mapBranchSettings = (row: any): BranchSettings => {
+  if (!row) return { ...DEFAULT_BRANCH_SETTINGS };
+  const presets: DiscountPreset[] = Array.isArray(row.discount_presets)
+    ? row.discount_presets.map((p: any) => ({
+        id: p.id ?? `d-${Math.random().toString(36).slice(2, 7)}`,
+        label: String(p.label ?? 'Discount'),
+        type: p.type === 'fixed' ? 'fixed' : 'percentage',
+        value: Number(p.value ?? 0),
+      }))
+    : [];
+  return {
+    taxEnabled: row.tax_enabled ?? false,
+    taxRate: Number(row.tax_rate ?? 0),
+    taxLabel: row.tax_label ?? 'Tax',
+    taxInclusive: row.tax_inclusive ?? false,
+    discountPresets: presets,
+  };
+};
+
+export const mapBranch = (row: any): Branch => ({
+  id: row.id,
+  orgId: row.org_id,
+  name: row.name,
+  contractStart: row.contract_start ?? undefined,
+  contractEnd: row.contract_end ?? undefined,
+  status: row.status ?? 'active',
+  // Merge over the all-on default so a row missing a newer key fails open
+  // (feature visible) rather than crashing on an undefined toggle.
+  features: { ...ALL_FEATURES_ON, ...(row.enabled_features ?? {}) } as BranchFeatures,
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+});
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 export const mapProduct = (row: any): Product => ({
@@ -54,6 +98,7 @@ export const mapTable = (row: any): Table => ({
   currentOrderId: row.current_order_id ?? undefined,
   assignedCashierId: row.assigned_cashier_id ?? undefined,
   needsWaiter: row.needs_waiter ?? false,
+  orderingEnabled: row.ordering_enabled ?? false,
 });
 
 export const mapOrderItem = (row: any): OrderItem => ({
@@ -70,6 +115,9 @@ export const mapOrderItem = (row: any): OrderItem => ({
   status: row.status ?? 'pending',
   notes: row.notes ?? undefined,
   sentToKitchen: row.sent_to_kitchen ?? undefined,
+  cancelledByName: row.cancelled_by_name ?? undefined,
+  cancelReason: row.cancel_reason ?? undefined,
+  paid: row.paid ?? false,
   modifiers: Array.isArray(row.modifiers)
     ? row.modifiers.map((m: any) => ({
         groupId: m.groupId ?? m.group_id ?? '',

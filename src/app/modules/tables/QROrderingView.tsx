@@ -3,10 +3,13 @@ import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { Product, Category, Table } from '../../models/types';
 import { OrderController } from '../../controllers/OrderController';
+import { AuthController } from '../../controllers/AuthController';
+import { BranchController } from '../../controllers/BranchController';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import {
   Plus, Minus, ShoppingCart, X, Search,
-  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed,
+  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, Ban,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 
@@ -31,6 +34,13 @@ interface ExistingItem {
 
 export function QROrderingView() {
   const { tableId } = useParams();
+  // This legacy route is reached two ways: a customer scanning the printed QR
+  // (no session) and a staff member navigating here from TablesView's "Add
+  // Items"/"View Menu" buttons while already logged in. The ordering-enabled
+  // gate below is about blocking self-service customers, not staff already
+  // standing at the table on the restaurant's own device — so it only applies
+  // when there's no active staff session in this browser tab.
+  const { currentUser } = useAuth();
 
   const [table, setTable]               = useState<Table | null>(null);
   const [orderId, setOrderId]           = useState<string | null>(null);
@@ -44,9 +54,35 @@ export function QROrderingView() {
   const [submitting, setSubmitting]     = useState(false);
   const [success, setSuccess]           = useState(false);
   const [invalidTable, setInvalidTable] = useState(false);
+  const [branchClosed, setBranchClosed] = useState(false);
   const [callingWaiter, setCallingWaiter] = useState(false);
   const [mobileView, setMobileView]     = useState<'menu' | 'cart'>('menu');
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
+  const [voidTarget, setVoidTarget]     = useState<ExistingItem | null>(null);
+  const [voidReason, setVoidReason]     = useState('');
+  const [voiding, setVoiding]           = useState(false);
+
+  // Voiding an already-sent item is restricted to staff with the elevated
+  // permission (e.g. Super Waiter/manager/admin) — never shown to a customer.
+  const canVoid = !!currentUser && AuthController.hasPermission(currentUser, 'canVoidSentItems');
+
+  const handleVoidConfirm = async () => {
+    if (!voidTarget || !currentUser || !orderId) return;
+    setVoiding(true);
+    const res = await OrderController.voidItem(
+      voidTarget.id, orderId, voidReason.trim() || undefined,
+      { id: currentUser.id, name: currentUser.name }
+    );
+    setVoiding(false);
+    if (res.success) {
+      setExistingItems(prev => prev.filter(i => i.id !== voidTarget.id));
+      toast.success('Item voided — the kitchen has been notified');
+      setVoidTarget(null);
+      setVoidReason('');
+    } else {
+      toast.error(res.error || 'Failed to void item');
+    }
+  };
 
   // ── Load table, products, categories, open order ──────────────────────────
   useEffect(() => {
@@ -59,11 +95,21 @@ export function QROrderingView() {
       if (error || !tableRow) { setInvalidTable(true); setLoading(false); return; }
 
       const branchId = tableRow.branch_id;
+
+      // Contract expired / branch suspended → customers can't order. Staff
+      // reaching this route while logged in means the branch is open, so only
+      // gate the customer (no session) case.
+      if (!currentUser) {
+        const access = await BranchController.getAccess(branchId);
+        if (!access.allowed) { setBranchClosed(true); setLoading(false); return; }
+      }
+
       setTable({
         id: tableRow.id, number: tableRow.number, capacity: tableRow.capacity,
         status: tableRow.status, branchId, currentOrderId: tableRow.current_order_id,
         assignedCashierId: tableRow.assigned_cashier_id,
         needsWaiter: tableRow.needs_waiter ?? false,
+        orderingEnabled: tableRow.ordering_enabled ?? false,
       });
 
       const [productsRes, categoriesRes] = await Promise.all([
@@ -123,6 +169,19 @@ export function QROrderingView() {
       setLoading(false);
     };
     void load();
+  }, [tableId]);
+
+  // ── Realtime: react live if a waiter turns ordering on/off for this table ──
+  useEffect(() => {
+    if (!tableId) return;
+    const channel = supabase
+      .channel(`qr-table-${tableId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, (payload) => {
+        const up = payload.new as any;
+        setTable(prev => prev ? { ...prev, orderingEnabled: up.ordering_enabled ?? false } : prev);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [tableId]);
 
   // ── Realtime: keep product availability in sync ──────────────────────────
@@ -254,6 +313,37 @@ export function QROrderingView() {
     );
   }
 
+  // ── Branch closed (contract expired / suspended) ──────────────────────────
+  if (branchClosed) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="bg-gray-100 rounded-full p-4 w-fit mx-auto mb-5">
+            <UtensilsCrossed className="size-10 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Temporarily Unavailable</h2>
+          <p className="text-sm text-gray-400">Online ordering is currently unavailable for this restaurant. Please ask a team member for assistance.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Ordering not yet enabled for this table (customers only — staff using
+  //    this route from inside the app while logged in are never blocked) ──
+  if (!currentUser && !table?.orderingEnabled) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="bg-amber-100 rounded-full p-4 w-fit mx-auto mb-5">
+            <Bell className="size-10 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Ask Your Waiter</h2>
+          <p className="text-sm text-gray-400">Ordering isn't open for this table yet — a team member needs to enable it first. This page will unlock automatically once they do.</p>
+        </div>
+      </div>
+    );
+  }
+
   // ── Product card (shared by mobile + desktop) ────────────────────────────
   const ProductCard = ({ p, compact = false }: { p: Product; compact?: boolean }) => {
     const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
@@ -323,6 +413,32 @@ export function QROrderingView() {
 
   return (
     <div className="flex h-[100dvh] w-full bg-[#EAEEF3] overflow-hidden relative">
+
+      {/* ── VOID ITEM CONFIRM (staff only) ── */}
+      {voidTarget && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 p-4" onClick={() => !voiding && setVoidTarget(null)}>
+          <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="bg-red-100 rounded-full p-3 w-fit mx-auto mb-4">
+              <Ban className="size-7 text-red-500" />
+            </div>
+            <h2 className="text-lg font-black text-gray-900 text-center mb-1">Void this item?</h2>
+            <p className="text-sm text-gray-500 text-center mb-4">
+              "{voidTarget.productName}" will be removed from the bill and the kitchen will be notified it was cancelled.
+            </p>
+            <input
+              type="text" value={voidReason} onChange={e => setVoidReason(e.target.value)}
+              placeholder="Reason (optional)"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm mb-4 focus:outline-none focus:border-red-300"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setVoidTarget(null)} disabled={voiding} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm">Cancel</button>
+              <button onClick={handleVoidConfirm} disabled={voiding} className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-bold text-sm disabled:opacity-60">
+                {voiding ? 'Voiding…' : 'Void Item'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── SUCCESS OVERLAY ── */}
       {success && (
@@ -437,6 +553,11 @@ export function QROrderingView() {
                   </div>
                   <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
                   <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                  {canVoid && (
+                    <button onClick={() => setVoidTarget(item)} className="p-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title="Void item">
+                      <Ban className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -565,6 +686,11 @@ export function QROrderingView() {
                   </div>
                   <div className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black">×{item.quantity}</div>
                   <div className="text-sm font-bold text-gray-500">RM {(item.price * item.quantity).toFixed(2)}</div>
+                  {canVoid && (
+                    <button onClick={() => setVoidTarget(item)} className="p-2.5 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title="Void item">
+                      <Ban className="size-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

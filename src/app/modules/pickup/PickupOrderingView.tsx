@@ -12,6 +12,7 @@ import { supabase } from '../../../lib/supabase';
 import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
 import { PickupController } from '../../controllers/PickupController';
 import { ModifierController } from '../../controllers/ModifierController';
+import { BranchController } from '../../controllers/BranchController';
 import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import {
   validatePickupToken, PickupToken, uploadReceipt, merchantQrUrl,
@@ -35,6 +36,9 @@ export function PickupOrderingView() {
       if (!token) { setState('invalid'); return; }
       const res = await validatePickupToken(token);
       if (!res) { setState('invalid'); return; }
+      // Contract expired / branch suspended → treat the link as unavailable.
+      const access = await BranchController.getAccess(res.branchId);
+      if (!access.allowed) { setState('invalid'); return; }
       setSession(res);
       setState('valid');
     })();

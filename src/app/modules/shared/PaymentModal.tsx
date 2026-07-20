@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   X, Clock, CheckCircle, CreditCard, Banknote, QrCode,
   SplitSquareHorizontal, Plus, Minus, Search, UserCheck, Star, Gift,
-  ShieldAlert
+  ShieldAlert, Users, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
@@ -15,13 +15,24 @@ import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { loadLoyaltySettings } from '../../models/types';
-import type { Customer } from '../../models/types';
+import type { Customer, DiscountPreset } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService } from '../../services/PrintService';
+import { useBranch } from '../../context/BranchContext';
+
+/** Compute the tax on a post-discount amount for the current branch settings.
+ *  Exclusive tax is added on top; inclusive tax is backed out of the amount. */
+function computeTax(netAmount: number, taxEnabled: boolean, taxRate: number, taxInclusive: boolean) {
+  if (!taxEnabled || taxRate <= 0 || netAmount <= 0) return 0;
+  const raw = taxInclusive
+    ? netAmount - netAmount / (1 + taxRate / 100)
+    : netAmount * (taxRate / 100);
+  return Math.round(raw * 100) / 100;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
-type PaymentMode  = SimpleMethod | 'mix';
+type PaymentMode  = SimpleMethod | 'mix' | 'split-items';
 interface SplitEntry { method: SimpleMethod; amount: string; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -307,11 +318,24 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [showPrint, setShowPrint] = useState(false);
   const [lastBillNo, setLastBillNo] = useState('');
   const [lastSummary, setLastSummary] = useState('');
+  // Final money breakdown snapshot for the receipt (order prop isn't re-fetched).
+  const [lastTotals, setLastTotals] = useState<{ subtotal: number; discount: number; tax: number; total: number } | null>(null);
   
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [amountReceived, setAmountReceived] = useState('');
+  // Tenant-admin-configured tax + quick-discount presets for this branch.
+  const { settings: branchSettings } = useBranch();
+  const [presetDiscount, setPresetDiscount] = useState(0);
+  const [appliedPresetId, setAppliedPresetId] = useState<string | null>(null);
+
+  // ── Split-by-item payment state ("everyone pays for what they ate") ──────
+  const [splitSelected, setSplitSelected] = useState<Set<string>>(new Set());
+  const [splitMethod, setSplitMethod] = useState<SimpleMethod>('cash');
+  const [splitAmountReceived, setSplitAmountReceived] = useState('');
+  const [paidItemIds, setPaidItemIds] = useState<Set<string>>(new Set());
+  const [splitProcessing, setSplitProcessing] = useState(false);
 
   const loyaltySettings = loadLoyaltySettings();
 
@@ -326,15 +350,69 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setLinkedCustomer(null);
     setLoyaltyDiscount(0);
     setLoyaltyPointsToRedeem(0);
+    setSplitSelected(new Set());
+    setSplitMethod('cash');
+    setSplitAmountReceived('');
+    setPaidItemIds(new Set());
+    setPresetDiscount(0);
+    setAppliedPresetId(null);
   }, [order?.id, isOpen]);
+
+  // Items still owed on this bill — already-paid (via a prior split) or
+  // voided items drop out as soon as they're settled.
+  const unpaidItems = useMemo(
+    () => ((order?.items ?? []) as any[]).filter(i => !paidItemIds.has(i.id) && !i.paid && i.status !== 'cancelled'),
+    [order, paidItemIds]
+  );
+  const splitSelectedTotal = useMemo(
+    () => unpaidItems.filter(i => splitSelected.has(i.id)).reduce((s, i) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0),
+    [unpaidItems, splitSelected]
+  );
+  // What the selected guest actually pays — the RPC adds exclusive branch tax
+  // per split, so the button/validation must show the same tax-inclusive figure.
+  const splitSelectedDue = useMemo(() => {
+    const t = computeTax(splitSelectedTotal, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive);
+    return branchSettings.taxInclusive ? splitSelectedTotal : splitSelectedTotal + t;
+  }, [splitSelectedTotal, branchSettings]);
 
   const baseTotals = useMemo(() => calcOrderTotals(order), [order]);
   const totals = useMemo(() => {
-    const discount = baseTotals.discount + loyaltyDiscount;
-    const total    = Math.max(0, baseTotals.subtotal + baseTotals.tax - discount);
-    return { ...baseTotals, discount, total };
-  }, [baseTotals, loyaltyDiscount]);
+    const discount = baseTotals.discount + loyaltyDiscount + presetDiscount;
+    const net = Math.max(0, baseTotals.subtotal - discount);
+    const tax = computeTax(net, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive);
+    // Inclusive tax is already inside the net amount; exclusive tax adds on top.
+    const total = branchSettings.taxInclusive ? net : net + tax;
+    return { subtotal: baseTotals.subtotal, discount, tax, total };
+  }, [baseTotals, loyaltyDiscount, presetDiscount, branchSettings]);
+
+  // Apply / clear a one-tap discount preset (Student 10%, etc.).
+  const applyPreset = (preset: DiscountPreset) => {
+    if (appliedPresetId === preset.id) { setPresetDiscount(0); setAppliedPresetId(null); return; }
+    const amount = preset.type === 'percentage'
+      ? Math.round(baseTotals.subtotal * (preset.value / 100) * 100) / 100
+      : Math.min(preset.value, baseTotals.subtotal);
+    setPresetDiscount(amount);
+    setAppliedPresetId(preset.id);
+  };
   
+  // Once any split-by-item payment has landed on this order, whole-order
+  // payment modes are no longer safe to use — they'd re-charge the full
+  // total, including items already paid for by another guest.
+  const lockedToSplit = paidItemIds.size > 0;
+  useEffect(() => {
+    if (lockedToSplit && paymentMode !== 'split-items') setPaymentMode('split-items');
+  }, [lockedToSplit, paymentMode]);
+
+  // Preset discounts are whole-order only. Clear any applied preset when the
+  // cashier switches to split-by-item so the (ignored-by-the-RPC) discount
+  // can't silently show in the summary while not affecting what guests pay.
+  useEffect(() => {
+    if (paymentMode === 'split-items' && (presetDiscount > 0 || appliedPresetId)) {
+      setPresetDiscount(0);
+      setAppliedPresetId(null);
+    }
+  }, [paymentMode, presetDiscount, appliedPresetId]);
+
   const splitTotal = splits.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   
   const handleRedemptionChange = (discount: number, points: number) => {
@@ -351,15 +429,15 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
         await channel.send({
           type: 'broadcast',
           event: 'update-bill',
-          payload: { 
-            order: { ...order, discount: baseTotals.discount + loyaltyDiscount },
+          payload: {
+            order: { ...order, discount: totals.discount, tax: totals.tax, total: totals.total },
             paymentQR: paymentMode === 'qr' ? `ALNAWRAS-PAY-${order.id}-${totals.total}` : null
           }
         });
       }
     });
     return () => { supabase.removeChannel(channel); };
-  }, [order, isOpen, loyaltyDiscount, paymentMode, totals.total, baseTotals.discount]);
+  }, [order, isOpen, paymentMode, totals.total, totals.tax, totals.discount]);
 
   if (!isOpen) return null;
 
@@ -383,9 +461,59 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     `flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all
     ${paymentMode === mode ? `${active} shadow-sm` : 'border-gray-200 hover:border-gray-300 text-gray-700'}`;
 
+  // Shared tail for any payment path that just completed the WHOLE order:
+  // apply loyalty earn/redeem, notify the customer-facing monitor, hand back
+  // to the parent, and prompt to print. Used by the normal whole-order
+  // payment and by the final split-by-item payment that settles the last
+  // unpaid items on the bill.
+  const finalizeCompletedOrder = async (billNo: string, summary: string) => {
+    if (linkedCustomer && loyaltySettings.enabled) {
+      if (loyaltyPointsToRedeem > 0) {
+        await LoyaltyController.redeemPoints({
+          customerId: linkedCustomer.id,
+          orderId: order.id,
+          points: loyaltyPointsToRedeem,
+          branchId: currentUser.branchId,
+        });
+      }
+      const pointsEarned = Math.floor(totals.total * loyaltySettings.pointsPerDollar);
+      if (pointsEarned > 0) {
+        await LoyaltyController.earnPoints({
+          customerId: linkedCustomer.id,
+          orderId: order.id,
+          points: pointsEarned,
+          amountSpent: totals.total,
+          branchId: currentUser.branchId,
+        });
+        toast.success(`+${pointsEarned} ${loyaltySettings.pointsLabel} earned for ${linkedCustomer.name}`);
+      }
+    }
+
+    setLastBillNo(billNo);
+    setLastSummary(summary);
+    setLastTotals({ subtotal: totals.subtotal, discount: totals.discount, tax: totals.tax, total: totals.total });
+
+    // Notify customer monitor of success (one-shot). Remove the channel after
+    // sending so a completed payment doesn't leak a realtime subscription
+    // every time — hundreds would otherwise accumulate over a shift.
+    const successCh = supabase.channel('customer-monitor');
+    successCh.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await successCh.send({ type: 'broadcast', event: 'payment-success', payload: {} });
+        void supabase.removeChannel(successCh);
+      }
+    });
+
+    onPaid(order.id, billNo, summary);
+    setShowPrint(true);
+  };
+
   const handlePayment = async () => {
     if (!order || !paymentMode) return;
     if (order.status === 'completed') { toast.error('This bill has already been paid'); return; }
+    // Defence-in-depth: once part of the bill is paid by item, the whole-order
+    // path must not run (it would re-charge already-settled items).
+    if (lockedToSplit) { toast.error('This bill is partially paid — continue by item'); return; }
     if (paymentMode === 'mix' && !splitExact) { toast.error(`Split must total exactly ${fmt(totals.total)}`); return; }
 
     // Validate cash received. A blank field means the customer paid the exact
@@ -416,42 +544,23 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
       const orderUpdate: any = {
         status: 'completed', completed_at: new Date().toISOString(),
         payment_method: summary, bill_number: billNo, payment_status: 'paid',
+        // Persist the final money breakdown so reports/receipts reflect the
+        // tax and any discounts actually applied at the till.
+        subtotal: totals.subtotal,
+        tax: totals.tax,
+        discount: totals.discount,
+        total: totals.total,
       };
-      if (loyaltyDiscount > 0) {
-        orderUpdate.discount = baseTotals.discount + loyaltyDiscount;
-        orderUpdate.total = totals.total;
-      }
       const { error: orderErr } = await supabase.from('orders').update(orderUpdate).eq('id', order.id).eq('branch_id', currentUser.branchId);
 
       if (orderErr) throw orderErr;
 
       if (order.tableId) {
+        // Also turn QR self-ordering back off — a waiter must explicitly
+        // re-enable it for the next party seated at this table.
         await supabase.from('tables')
-          .update({ status: 'available', current_order_id: null })
+          .update({ status: 'available', current_order_id: null, ordering_enabled: false })
           .eq('id', order.tableId).eq('branch_id', currentUser.branchId);
-      }
-
-      // ── Loyalty: apply discount & earn/redeem points ──────────────────────
-      if (linkedCustomer && loyaltySettings.enabled) {
-        if (loyaltyPointsToRedeem > 0) {
-          await LoyaltyController.redeemPoints({
-            customerId: linkedCustomer.id,
-            orderId: order.id,
-            points: loyaltyPointsToRedeem,
-            branchId: currentUser.branchId,
-          });
-        }
-        const pointsEarned = Math.floor(totals.total * loyaltySettings.pointsPerDollar);
-        if (pointsEarned > 0) {
-          await LoyaltyController.earnPoints({
-            customerId: linkedCustomer.id,
-            orderId: order.id,
-            points: pointsEarned,
-            amountSpent: totals.total,
-            branchId: currentUser.branchId,
-          });
-          toast.success(`+${pointsEarned} ${loyaltySettings.pointsLabel} earned for ${linkedCustomer.name}`);
-        }
       }
 
       // ── Dispatch LAN Receipt Printing ──
@@ -502,27 +611,52 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
         console.warn('[ReceiptPrint] LAN Printing failed', printErr);
       }
 
-      setLastBillNo(billNo);
-      setLastSummary(summary);
       toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
-      
-      // Notify customer monitor of success (one-shot). Remove the channel after
-      // sending so a completed payment doesn't leak a realtime subscription every
-      // time — hundreds would otherwise accumulate over a shift.
-      const successCh = supabase.channel('customer-monitor');
-      successCh.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await successCh.send({ type: 'broadcast', event: 'payment-success', payload: {} });
-          void supabase.removeChannel(successCh);
-        }
-      });
-
-      onPaid(order.id, billNo, summary);
-      setShowPrint(true);
+      await finalizeCompletedOrder(billNo, summary);
     } catch (err: any) {
       toast.error('Payment failed: ' + (err.message || 'Please try again'));
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // ── Split-by-item payment: settle a subset of the bill's items ───────────
+  const handleSplitPay = async () => {
+    if (splitSelected.size === 0) { toast.error('Select at least one item to pay for'); return; }
+    if (splitMethod === 'cash' && splitAmountReceived.trim() !== '') {
+      const received = parseFloat(splitAmountReceived);
+      if (isNaN(received) || received < splitSelectedDue) {
+        toast.error(`Insufficient amount. Due is ${fmt(splitSelectedDue)}`);
+        return;
+      }
+    }
+
+    setSplitProcessing(true);
+    try {
+      const { data, error } = await supabase.rpc('pay_order_items', {
+        p_order_id: order.id,
+        p_item_ids: Array.from(splitSelected),
+        p_method: splitMethod,
+        p_amount_received: splitMethod === 'cash' && splitAmountReceived.trim() !== '' ? parseFloat(splitAmountReceived) : null,
+        p_cashier_id: currentUser.id,
+        p_cashier_name: currentUser.name,
+        p_branch_id: currentUser.branchId,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+
+      setPaidItemIds(prev => new Set([...prev, ...splitSelected]));
+      toast.success(`Paid ${fmt(Number(row.amount))} via ${splitMethod.toUpperCase()}`);
+      setSplitSelected(new Set());
+      setSplitAmountReceived('');
+
+      if (row.order_completed) {
+        await finalizeCompletedOrder(row.bill_number, 'Split Payment');
+      }
+    } catch (err: any) {
+      toast.error('Payment failed: ' + (err.message || 'Please try again'));
+    } finally {
+      setSplitProcessing(false);
     }
   };
 
@@ -542,7 +676,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
             <div><p className="text-lg font-semibold text-gray-900">Payment Successful!</p><p className="text-sm text-gray-500 mt-1">Would you like to print a receipt?</p></div>
           </div>
           <div className="px-6 py-4 border-t space-y-3">
-            <button onClick={() => { printReceipt({ ...order, billNumber: lastBillNo }, lastSummary, lastBillNo); onClose(); }}
+            <button onClick={() => { printReceipt({ ...order, billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo); onClose(); }}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Print Receipt
@@ -588,8 +722,10 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
               {(order.items ?? []).length === 0 ? (
                 <p className="text-center text-gray-400 py-8">No items in this order</p>
-              ) : (order.items ?? []).map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+              ) : (order.items ?? []).map((item: any) => {
+                const isPaid = item.status !== 'cancelled' && (item.paid || paidItemIds.has(item.id));
+                return (
+                <div key={item.id} className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${isPaid ? 'opacity-50' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
                     {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
@@ -598,19 +734,25 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                     <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
+                    {isPaid ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700">Paid</span>
+                    ) : (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
+                    )}
                     <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
                     <span className="text-sm font-semibold w-24 text-right">{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
               <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
-              {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>Tax</span><span>{fmt(totals.tax)}</span></div>}
               {baseTotals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(baseTotals.discount)}</span></div>}
+              {presetDiscount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>{branchSettings.discountPresets.find(p => p.id === appliedPresetId)?.label ?? 'Discount'}</span><span>−{fmt(presetDiscount)}</span></div>}
               {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
+              {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>{branchSettings.taxLabel}{branchSettings.taxInclusive ? ' (incl.)' : ` (${branchSettings.taxRate}%)`}</span><span>{fmt(totals.tax)}</span></div>}
               <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
             </div>
 
@@ -623,12 +765,42 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                   onCustomerChange={setLinkedCustomer}
                   onRedemptionChange={handleRedemptionChange}
                 />
-                <p className="text-sm font-semibold text-gray-700">Payment Method</p>
-                <div className="grid grid-cols-4 gap-2">
-                  <button onClick={() => setPaymentMode('cash')} className={methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')}><Banknote className="size-4" />Cash</button>
-                  <button onClick={() => setPaymentMode('card')} className={methodBtn('card', 'border-blue-500 bg-blue-50 text-blue-700')}><CreditCard className="size-4" />Card</button>
-                  <button onClick={() => setPaymentMode('qr')} className={methodBtn('qr', 'border-violet-500 bg-violet-50 text-violet-700')}><QrCode className="size-4" />QR</button>
-                  <button onClick={() => setPaymentMode('mix')} className={methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')}><SplitSquareHorizontal className="size-4" />Mix</button>
+
+                {/* Quick discounts — one-tap presets the tenant admin configured
+                    (e.g. Student 10%). Not available on split-by-item (per-guest). */}
+                {branchSettings.discountPresets.length > 0 && paymentMode !== 'split-items' && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-1.5">Quick Discount</p>
+                    <div className="flex flex-wrap gap-2">
+                      {branchSettings.discountPresets.map(preset => {
+                        const active = appliedPresetId === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => applyPreset(preset)}
+                            className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+                              active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            }`}
+                          >
+                            {preset.label} · {preset.type === 'percentage' ? `${preset.value}%` : fmt(preset.value)}
+                            {active && ' ✓'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-700">Payment Method</p>
+                  {lockedToSplit && <p className="text-[11px] font-semibold text-pink-600">Partially paid — continue by item</p>}
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  <button onClick={() => setPaymentMode('cash')} disabled={lockedToSplit} className={`${methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><Banknote className="size-4" />Cash</button>
+                  <button onClick={() => setPaymentMode('card')} disabled={lockedToSplit} className={`${methodBtn('card', 'border-blue-500 bg-blue-50 text-blue-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><CreditCard className="size-4" />Card</button>
+                  <button onClick={() => setPaymentMode('qr')} disabled={lockedToSplit} className={`${methodBtn('qr', 'border-violet-500 bg-violet-50 text-violet-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><QrCode className="size-4" />QR</button>
+                  <button onClick={() => setPaymentMode('mix')} disabled={lockedToSplit} className={`${methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><SplitSquareHorizontal className="size-4" />Mix</button>
+                  <button onClick={() => setPaymentMode('split-items')} className={methodBtn('split-items', 'border-pink-500 bg-pink-50 text-pink-700')}><Users className="size-4" />Split</button>
                 </div>
 
                 {paymentMode === 'cash' && <CashChangeRow total={totals.total} value={amountReceived} onChange={setAmountReceived} />}
@@ -688,12 +860,94 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                   </div>
                 )}
 
+                {paymentMode === 'split-items' && (
+                  <div className="space-y-2 bg-pink-50 rounded-xl p-3 border border-pink-100">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-medium text-pink-800">Select what this guest is paying for</span>
+                      <span className="font-semibold text-pink-600">{unpaidItems.length} item{unpaidItems.length !== 1 ? 's' : ''} left</span>
+                    </div>
+
+                    {unpaidItems.length === 0 ? (
+                      <p className="text-xs text-pink-600 py-3 text-center">Everything on this bill has been paid.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {unpaidItems.map(item => {
+                          const checked = splitSelected.has(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => setSplitSelected(prev => {
+                                const next = new Set(prev);
+                                next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                                return next;
+                              })}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-colors ${
+                                checked ? 'bg-pink-100 border-pink-300' : 'bg-white border-pink-100 hover:border-pink-200'
+                              }`}
+                            >
+                              <span className={`size-4 rounded flex items-center justify-center border-2 flex-shrink-0 ${checked ? 'bg-pink-600 border-pink-600' : 'border-gray-300'}`}>
+                                {checked && <Check className="size-3 text-white" strokeWidth={3} />}
+                              </span>
+                              <span className="flex-1 text-xs font-medium text-gray-800 truncate">{item.productName || item.product_name} ×{item.quantity}</span>
+                              <span className="text-xs font-bold text-gray-900">{fmt(Number(item.price ?? 0) * Number(item.quantity ?? 1))}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {splitSelected.size > 0 && (
+                      <>
+                        <div className="grid grid-cols-3 gap-1.5 pt-1">
+                          {(['cash', 'card', 'qr'] as SimpleMethod[]).map(m => (
+                            <button key={m} onClick={() => setSplitMethod(m)}
+                              className={`py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                                splitMethod === m ? 'bg-pink-600 border-pink-600 text-white' : 'bg-white border-pink-200 text-pink-700'
+                              }`}>
+                              {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'QR'}
+                            </button>
+                          ))}
+                        </div>
+                        {splitMethod === 'cash' && (
+                          <CashChangeRow total={splitSelectedDue} value={splitAmountReceived} onChange={setSplitAmountReceived} />
+                        )}
+                        <div className="pt-1 text-sm space-y-0.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-pink-700 font-medium">Selected items</span>
+                            <span className="text-gray-600">{fmt(splitSelectedTotal)}</span>
+                          </div>
+                          {splitSelectedDue > splitSelectedTotal && (
+                            <div className="flex justify-between items-center text-xs text-gray-500">
+                              <span>{branchSettings.taxLabel} ({branchSettings.taxRate}%)</span>
+                              <span>{fmt(splitSelectedDue - splitSelectedTotal)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center font-bold text-gray-900">
+                            <span>Due now</span>
+                            <span>{fmt(splitSelectedDue)}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <button
-                  onClick={handlePayment}
-                  disabled={processing || (paymentMode === 'mix' && !splitExact)}
+                  onClick={paymentMode === 'split-items' ? handleSplitPay : handlePayment}
+                  disabled={
+                    paymentMode === 'split-items'
+                      ? (splitProcessing || splitSelected.size === 0)
+                      : (processing || (paymentMode === 'mix' && !splitExact))
+                  }
                   className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {processing ? (
+                  {paymentMode === 'split-items' ? (
+                    splitProcessing ? (
+                      <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>Pay Selected • {fmt(splitSelectedDue)}</>
+                    )
+                  ) : processing ? (
                     <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>Complete Payment • {fmt(totals.total)}</>

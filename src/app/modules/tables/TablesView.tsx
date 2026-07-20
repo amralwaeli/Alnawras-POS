@@ -3,11 +3,44 @@ import { usePOS } from '../../context/POSContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
-import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package } from 'lucide-react';
+import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package, ArrowLeftRight, X, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
+import { TableController } from '../../controllers/TableController';
 import { closeTableGroup } from '../../services/GroupOrderService';
+
+// ─── Move Table modal ───────────────────────────────────────────────────────
+function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (toTableId: string) => void; onClose: () => void }) {
+  const available = tables.filter(t => t.status === 'available');
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <h3 className="font-bold text-gray-900">Move to Table</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>
+        </div>
+        <div className="p-4 max-h-[60vh] overflow-y-auto">
+          {available.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No available tables to move to.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              {available.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => onMove(t.id)}
+                  className="py-3 rounded-xl border-2 border-gray-100 hover:border-emerald-400 hover:bg-emerald-50 font-bold text-gray-700 text-sm transition-colors"
+                >
+                  {t.number}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,6 +86,38 @@ export function TablesView() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [pickupBusy, setPickupBusy] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [movingTable, setMovingTable] = useState<{ orderId: string; fromTableId: string; fromNumber: number } | null>(null);
+
+  const handleMoveTable = async (toTableId: string) => {
+    if (!movingTable) return;
+    const res = await TableController.transferOrder(movingTable.orderId, movingTable.fromTableId, toTableId, currentUser!);
+    if (res.success) {
+      const toTable = tables.find(t => t.id === toTableId);
+      toast.success(`Moved from Table ${movingTable.fromNumber} to Table ${toTable?.number ?? '?'}`);
+      setTables(prev => prev.map(t => {
+        if (t.id === toTableId) return { ...t, status: 'occupied', currentOrderId: movingTable.orderId };
+        if (t.id === movingTable.fromTableId) return { ...t, status: 'available', currentOrderId: undefined };
+        return t;
+      }));
+      setOrders(prev => prev.map(o =>
+        o.id === movingTable.orderId ? { ...o, tableId: toTableId, tableNumber: toTable?.number ?? o.tableNumber } : o
+      ));
+      setMovingTable(null);
+    } else {
+      toast.error(res.error || 'Failed to move table');
+    }
+  };
+
+  const handleToggleOrdering = async (table: any) => {
+    const next = !table.orderingEnabled;
+    const res = await TableController.setOrderingEnabled(table.id, next, currentUser!);
+    if (res.success) {
+      setTables(prev => prev.map(t => t.id === table.id ? { ...t, orderingEnabled: next } : t));
+      toast.success(next ? `QR ordering enabled for Table ${table.number}` : `QR ordering disabled for Table ${table.number}`);
+    } else {
+      toast.error(res.error || 'Failed to update ordering status');
+    }
+  };
 
   // Run a pickup action then optimistically update local state (realtime reconciles).
   const runPickup = async (
@@ -543,9 +608,22 @@ export function TablesView() {
                   </div>
                 </div>
                 <p className="font-bold text-gray-900 text-lg">Table {table.number}</p>
-                <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                   <Users className="size-3" /> {table.capacity} seats
                 </p>
+                {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && (
+                  <button
+                    onClick={() => void handleToggleOrdering(table)}
+                    className={`w-full mb-3 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                      table.orderingEnabled
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    <QrCode className="size-3" />
+                    QR Ordering: {table.orderingEnabled ? 'On' : 'Off'}
+                  </button>
+                )}
                 {order ? (
                   <div className="space-y-2">
                     <div className="bg-white/80 rounded-xl p-2.5 space-y-1.5 border border-black/5">
@@ -574,6 +652,14 @@ export function TablesView() {
                     {currentUser.role === 'admin' && (
                       <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-700 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors">
                         View Menu
+                      </button>
+                    )}
+                    {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && table.currentOrderId && (
+                      <button
+                        onClick={() => setMovingTable({ orderId: table.currentOrderId!, fromTableId: table.id, fromNumber: table.number })}
+                        className="w-full py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <ArrowLeftRight className="size-3.5" /> Move Table
                       </button>
                     )}
                   </div>
@@ -610,6 +696,15 @@ export function TablesView() {
           </div>
         )}
       </div>
+
+      {/* ── Move Table modal ────────────────────────────────────────────────── */}
+      {movingTable && (
+        <MoveTableModal
+          tables={tables}
+          onMove={handleMoveTable}
+          onClose={() => setMovingTable(null)}
+        />
+      )}
 
       {/* ── Payment Modal (shared, includes loyalty panel) ─────────────────── */}
       {selectedOrder && (

@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { CatalogProvider, useCatalog } from './CatalogContext';
 import { TablesProvider, useTables } from './TablesContext';
 import { OrdersProvider, useOrders } from './OrdersContext';
+import { BranchProvider } from './BranchContext';
 import { RealtimeSyncEngine } from './RealtimeSyncEngine';
 import { supabase } from '../../lib/supabase';
 
@@ -40,16 +41,18 @@ function MiscProvider({ children }: { children: ReactNode }) {
 function InnerProviders({ children }: { children: ReactNode }) {
   const { currentUser, setOrders: _setOrders } = useAuth() as any;
   return (
-    <CatalogProvider currentUser={currentUser}>
-      <TablesProvider currentUser={currentUser}>
-        <OrdersProvider>
-          <MiscProvider>
-            <RealtimeSyncEngine />
-            {children}
-          </MiscProvider>
-        </OrdersProvider>
-      </TablesProvider>
-    </CatalogProvider>
+    <BranchProvider currentUser={currentUser}>
+      <CatalogProvider currentUser={currentUser}>
+        <TablesProvider currentUser={currentUser}>
+          <OrdersProvider>
+            <MiscProvider>
+              <RealtimeSyncEngine />
+              {children}
+            </MiscProvider>
+          </OrdersProvider>
+        </TablesProvider>
+      </CatalogProvider>
+    </BranchProvider>
   );
 }
 

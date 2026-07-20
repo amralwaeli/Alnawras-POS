@@ -1,0 +1,2 @@
+const r=/^[=+\-@\t\r]/,s=/^[+-]?\d+(\.\d+)?$/;function d(e){let t=e==null?"":String(e);return r.test(t)&&!s.test(t)&&(t=`'${t}`),`"${t.replace(/"/g,'""')}"`}function l(e){return e.map(t=>t.map(d).join(",")).join(`\r
+`)}function a(e,t){const c=new Blob(["\uFEFF"+l(t)],{type:"text/csv;charset=utf-8;"}),o=URL.createObjectURL(c),n=document.createElement("a");n.href=o,n.download=e,document.body.appendChild(n),n.click(),n.remove(),URL.revokeObjectURL(o)}export{a as d};

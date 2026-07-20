@@ -3,15 +3,17 @@ import { useState } from 'react';
 import {
   ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
-  Settings, Fingerprint, ReceiptText, FileText, Printer, Star,
+  Settings, Fingerprint, ReceiptText, FileText, Printer, Star, Percent,
   ChevronsLeft, ChevronsRight, Menu, X, Building2, CalendarOff,
   ChevronDown, ChevronRight as ChevronRightIcon, Package as PackageIcon, Layers,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
-import { ROLE_PERMISSIONS } from '../models/types';
+import { useBranch } from '../context/BranchContext';
+import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
+  const { hasFeature } = useBranch();
   const location = useLocation();
   const [collapsed, setCollapsed]     = useState(() => window.innerWidth < 1024);
   const [mobileOpen, setMobileOpen]   = useState(false);
@@ -34,6 +36,8 @@ export function Layout() {
     path: string; label: string; icon: any;
     permission: keyof typeof ROLE_PERMISSIONS['admin'];
     adminOnly?: boolean;
+    /** Hidden when the branch's super-admin has this feature module disabled. */
+    feature?: BranchFeatureKey;
   };
 
   const allNavItems: NavItem[] = [
@@ -43,39 +47,43 @@ export function Layout() {
       : [{ path: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewOrderingDashboard' as const }]
     ),
     { path: '/tables',             label: 'Tables',         icon: ShoppingCart,  permission: 'canViewTables' as const },
-    { path: '/pickup-orders',      label: 'Pickup',         icon: PackageIcon,   permission: 'canViewTables' as const },
+    { path: '/pickup-orders',      label: 'Pickup',         icon: PackageIcon,   permission: 'canViewTables' as const, feature: 'pickup' },
     { path: '/kitchen',            label: 'Kitchen',        icon: ChefHat,       permission: 'canManageInventory' as const },
     { path: '/inventory',          label: 'Inventory',      icon: Package,       permission: 'canManageInventory' as const },
-    { path: '/reports',            label: 'Reports',        icon: BarChart3,     permission: 'canViewReports' as const },
-    { path: '/accounting',         label: 'Accounting',     icon: DollarSign,    permission: 'canManageAccounting' as const },
+    { path: '/reports',            label: 'Reports',        icon: BarChart3,     permission: 'canViewReports' as const, feature: 'reports' },
+    { path: '/accounting',         label: 'Accounting',     icon: DollarSign,    permission: 'canManageAccounting' as const, feature: 'accounting' },
     { path: '/table-management',   label: 'Manage Tables',  icon: Settings,      permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/modifier-groups',    label: 'Modifier Groups', icon: Layers,       permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true },
-    { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const },
+    { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true, feature: 'accounting' },
+    { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const, feature: 'accounting' },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true },
-    { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const },
-    { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const },
-    { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const, adminOnly: true },
+    { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true, feature: 'loyalty' },
+    { path: '/business-settings',  label: 'Tax & Discounts', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
+    { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
+    { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const, adminOnly: true, feature: 'groupOrdering' },
   ];
 
   const navItems = allNavItems.filter(item => {
     if (item.adminOnly && currentUser.role !== 'admin') return false;
+    if (item.feature && !hasFeature(item.feature)) return false;
     return !!permissions[item.permission];
   });
 
-  // Workforce sub-nav items
+  // Workforce sub-nav items. The whole group hides when the branch's
+  // 'workforce' module is off; Biometrics additionally hides when the
+  // 'biometrics' module is off.
   const workforceSubItems = [
-    { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const },
-    { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const },
-    { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const },
-    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const },
-    { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const },
-  ].filter(item => !!permissions[item.permission]);
+    { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const, feature: undefined as BranchFeatureKey | undefined },
+    { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const, feature: undefined },
+    { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const, feature: undefined },
+    { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const, feature: undefined },
+    { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const, feature: 'biometrics' as BranchFeatureKey },
+  ].filter(item => !!permissions[item.permission] && (!item.feature || hasFeature(item.feature)));
 
-  const showWorkforce = workforceSubItems.length > 0;
+  const showWorkforce = hasFeature('workforce') && workforceSubItems.length > 0;
 
   const initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
   const roleColors: Record<string, string> = {

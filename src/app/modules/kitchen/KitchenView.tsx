@@ -37,7 +37,7 @@ export function KitchenView() {
     if (error) return;
     if (orders) {
       const active = orders
-        .map(o => ({ ...o, items: (o.order_items || []).filter((i: any) => i.status !== 'served') }))
+        .map(o => ({ ...o, items: (o.order_items || []).filter((i: any) => i.status !== 'served' && i.status !== 'cancelled') }))
         .filter(o => o.items.length > 0);
       setTickets(active);
     }
@@ -49,7 +49,28 @@ export function KitchenView() {
 
     const channel = supabase
       .channel('kitchen-tickets')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, async (payload) => {
+        // A cancellation is an UPDATE transitioning INTO 'cancelled' — flag it
+        // distinctly (red, sticky) instead of the generic new-item alert, so
+        // the kitchen notices an already-fired item was pulled.
+        const isCancellation = payload.eventType === 'UPDATE'
+          && (payload.new as any)?.status === 'cancelled'
+          && (payload.old as any)?.status !== 'cancelled';
+
+        if (isCancellation) {
+          const cancelledItem = payload.new as any;
+          const { data: orderRow } = await supabase
+            .from('orders').select('table_number, order_type').eq('id', cancelledItem.order_id).maybeSingle();
+          const label = orderRow?.order_type === 'pickup' ? 'Pickup'
+            : orderRow?.order_type === 'takeaway' ? 'Takeaway'
+            : `Table ${orderRow?.table_number ?? '?'}`;
+          toast.error(`Item cancelled — ${cancelledItem.product_name} (${label})`, {
+            duration: 6000, style: { background: '#dc2626', color: '#fff', fontWeight: 700 },
+          });
+          void loadTickets();
+          return;
+        }
+
         void loadTickets();
         if (payload.eventType === 'INSERT') {
           setNewAlert(true);

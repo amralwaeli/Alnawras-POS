@@ -6,8 +6,9 @@ import { LoginView } from './modules/auth';
 import { AlertOverlay } from './components/AlertOverlay';
 import { checkSupabaseConnection } from '../lib/supabase';
 
-// Routes that customers reach via QR code scan or a pickup link — no staff login required.
-const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/'];
+// Routes that bypass the staff PIN login: customer QR/pickup pages, and the
+// super-admin panel (which uses its own separate Supabase Auth login).
+const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/', '#/superadmin'];
 
 function isPublicRoute(): boolean {
   return PUBLIC_HASH_PREFIXES.some(prefix => window.location.hash.startsWith(prefix));

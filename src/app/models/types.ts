@@ -36,6 +36,10 @@ export interface Table {
   currentOrderId?: string;
   assignedCashierId?: string;
   needsWaiter?: boolean;
+  /** Whether customers may currently order from this table's QR code. A waiter
+   *  turns this on after seating a party; it's automatically turned back off
+   *  once the table's bill is paid. */
+  orderingEnabled?: boolean;
 }
 
 export interface OrderItem {
@@ -49,10 +53,14 @@ export interface OrderItem {
   addedByName: string;
   addedAt: Date;
   station: 'kitchen' | 'juice' | 'shawarma' | 'none';
-  status: 'pending' | 'preparing' | 'ready' | 'served';
+  status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
   notes?: string;
   sentToKitchen?: boolean;
   modifiers?: SelectedModifier[];
+  cancelledByName?: string;
+  cancelReason?: string;
+  /** Set once this specific item has been settled via a split payment. */
+  paid?: boolean;
 }
 
 export interface Order {
@@ -201,15 +209,90 @@ export interface Expense {
   status: 'pending' | 'approved' | 'rejected';
 }
 
-// ==================== Branch ====================
+// ==================== Multi-tenant: Organizations & Branches ====================
 
-export interface Branch {
+/** The set of feature modules that can be toggled on/off per branch by the
+ *  super-admin. Absent key = enabled (fail-open for older rows). */
+export interface BranchFeatures {
+  loyalty: boolean;
+  workforce: boolean;
+  biometrics: boolean;
+  invoices: boolean;
+  pickup: boolean;
+  groupOrdering: boolean;
+  reports: boolean;
+  accounting: boolean;
+}
+
+export type BranchFeatureKey = keyof BranchFeatures;
+
+export const ALL_FEATURES_ON: BranchFeatures = {
+  loyalty: true, workforce: true, biometrics: true, invoices: true,
+  pickup: true, groupOrdering: true, reports: true, accounting: true,
+};
+
+/** Human labels for the super-admin feature toggles. */
+export const FEATURE_LABELS: Record<BranchFeatureKey, string> = {
+  loyalty: 'Loyalty Program',
+  workforce: 'Workforce / HR',
+  biometrics: 'Biometric Attendance',
+  invoices: 'Invoices & Quotations',
+  pickup: 'Pickup Ordering',
+  groupOrdering: 'Group QR Ordering',
+  reports: 'Reports',
+  accounting: 'Accounting',
+};
+
+export interface Organization {
   id: string;
   name: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  isActive: boolean;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  status: 'active' | 'suspended';
+  createdAt: Date;
+}
+
+/** A one-tap discount the cashier can apply at payment, e.g. "Student" 10%.
+ *  Configured per-branch by the tenant's own admin. */
+export interface DiscountPreset {
+  id: string;
+  label: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+}
+
+/** Per-branch business settings the tenant admin controls (tax + quick
+ *  discounts). Stored in the DB per branch (migration 0020) so every device at
+ *  the branch agrees. */
+export interface BranchSettings {
+  taxEnabled: boolean;
+  /** Percentage, e.g. 6 = 6%. */
+  taxRate: number;
+  taxLabel: string;
+  /** true = menu prices already include tax; false = tax added on top. */
+  taxInclusive: boolean;
+  discountPresets: DiscountPreset[];
+}
+
+export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
+  taxEnabled: false,
+  taxRate: 0,
+  taxLabel: 'Tax',
+  taxInclusive: false,
+  discountPresets: [],
+};
+
+/** A billable restaurant location. `id` is the value used as `branch_id`
+ *  across every other table. */
+export interface Branch {
+  id: string;
+  orgId: string;
+  name: string;
+  contractStart?: string;
+  contractEnd?: string;
+  status: 'active' | 'suspended' | 'expired';
+  features: BranchFeatures;
   createdAt: Date;
 }
 
@@ -262,10 +345,13 @@ export interface RolePermissions {
   canManagePayroll: boolean;
   canManageLeave: boolean;
   canViewOwnAttendance: boolean;
+  /** Void/cancel an order item that's already been sent to the kitchen. */
+  canVoidSentItems: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
+    canVoidSentItems: true,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: true,
@@ -284,6 +370,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   cashier: {
+    canVoidSentItems: false,
     canViewTables: true,
     canAddOrders: false,
     canProcessPayments: true,
@@ -302,6 +389,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   waiter: {
+    canVoidSentItems: false,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: false,
@@ -321,6 +409,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   // Super Waiter — a normal waiter that can ALSO manage invoices & quotations.
   swaiter: {
+    // The "special waiter account" the void-item feature is gated on.
+    canVoidSentItems: true,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: false,
@@ -339,6 +429,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   kitchen: {
+    canVoidSentItems: false,
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
@@ -357,6 +448,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   juice: {
+    canVoidSentItems: false,
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
@@ -375,6 +467,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   hr: {
+    canVoidSentItems: false,
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
@@ -393,6 +486,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   manager: {
+    canVoidSentItems: true,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: true,
@@ -411,6 +505,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   supervisor: {
+    canVoidSentItems: false,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: false,
@@ -429,6 +524,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   staff: {
+    canVoidSentItems: false,
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,
@@ -447,6 +543,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   accounting: {
+    canVoidSentItems: false,
     canViewTables: false,
     canAddOrders: false,
     canProcessPayments: false,

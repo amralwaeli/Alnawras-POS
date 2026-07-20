@@ -198,6 +198,59 @@ export class OrderController {
     }
   }
 
+  /**
+   * Void a single item that's already been sent to the kitchen (e.g. a
+   * mis-order or a guest changed their mind). Only allowed while the parent
+   * order is still open — an item on an already-paid bill can't be voided
+   * here. Recomputes the order's subtotal/total excluding cancelled items,
+   * the same way submitOrder does when items are added.
+   */
+  static async voidItem(
+    itemId: string,
+    orderId: string,
+    reason: string | undefined,
+    actor: { id: string; name: string }
+  ): Promise<Result<void>> {
+    try {
+      const { data: orderRow, error: orderFetchErr } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+      if (orderFetchErr || !orderRow) return { success: false, error: 'Order not found' };
+      if (orderRow.status !== 'open') {
+        return { success: false, error: 'Cannot void an item on a bill that has already been paid' };
+      }
+
+      const { error: itemErr } = await supabase
+        .from('order_items')
+        .update({
+          status: 'cancelled',
+          cancelled_by: actor.id,
+          cancelled_by_name: actor.name,
+          cancel_reason: reason || null,
+          cancelled_at: new Date().toISOString(),
+        })
+        .eq('id', itemId)
+        .eq('order_id', orderId);
+      if (itemErr) throw itemErr;
+
+      const { data: remaining } = await supabase
+        .from('order_items')
+        .select('subtotal')
+        .eq('order_id', orderId)
+        .neq('status', 'cancelled');
+      const subtotal = (remaining ?? []).reduce((s, r: any) => s + Number(r.subtotal), 0);
+      const tax = 0;
+      await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
+
+      return { success: true, data: undefined };
+    } catch (err: any) {
+      console.error('[OrderController.voidItem]', err);
+      return { success: false, error: err?.message || 'Failed to void item.' };
+    }
+  }
+
   /** Next zero-padded bill number for a branch, per order type. */
   private static async nextBillNumber(branchId: string, orderType: string = 'takeaway'): Promise<string> {
     const { data: lastBill } = await supabase

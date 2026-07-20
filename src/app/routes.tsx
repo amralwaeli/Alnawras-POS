@@ -2,18 +2,24 @@ import { lazy, Suspense } from 'react';
 import { createHashRouter, Navigate, useRouteError } from 'react-router';
 import { Layout } from './components/Layout';
 import { usePOS } from './context/POSContext';
-import { ROLE_PERMISSIONS } from './models/types';
+import { useBranch } from './context/BranchContext';
+import { ROLE_PERMISSIONS, BranchFeatureKey } from './models/types';
 import { ProductManagementView } from './modules/staff';
 
-function ProtectedRoute({ children, permission, adminOnly }: {
+function ProtectedRoute({ children, permission, adminOnly, feature }: {
   children: React.ReactNode;
   permission?: keyof typeof ROLE_PERMISSIONS['admin'];
   adminOnly?: boolean;
+  /** Redirect home if the branch's super-admin has this module disabled —
+   *  blocks direct-URL access to a hidden feature, not just the nav link. */
+  feature?: BranchFeatureKey;
 }) {
   const { currentUser } = usePOS();
+  const { hasFeature } = useBranch();
   if (!currentUser) return <Navigate to="/check-in" replace />;
   if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
   if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/" replace />;
+  if (feature && !hasFeature(feature)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -63,7 +69,12 @@ const PickupBoardView         = lazy(() => import('./modules/pickup/PickupBoardV
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
+const BusinessSettingsView   = lazy(() => import('./modules/settings').then(m => ({ default: m.BusinessSettingsView })));
 const CustomerMonitorView    = lazy(() => import('./modules/shared/CustomerMonitorView').then(m => ({ default: m.CustomerMonitorView })));
+
+// ── Super-admin (separate Supabase Auth login, own route tree) ────────────────
+const SuperAdminLoginView    = lazy(() => import('./modules/superadmin').then(m => ({ default: m.SuperAdminLoginView })));
+const SuperAdminPanelView    = lazy(() => import('./modules/superadmin').then(m => ({ default: m.SuperAdminPanelView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 function PageLoader() {
@@ -144,7 +155,7 @@ export const router = createHashRouter([
       { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canViewTables"><CustomerMenuView takeawayOnly /></ProtectedRoute></Lazy> },
 
       // ── Pickup orders board (cashier / admin / super-waiter) ──
-      { path: 'pickup-orders',       element: <Lazy><ProtectedRoute permission="canViewTables"><PickupBoardView /></ProtectedRoute></Lazy> },
+      { path: 'pickup-orders',       element: <Lazy><ProtectedRoute permission="canViewTables" feature="pickup"><PickupBoardView /></ProtectedRoute></Lazy> },
 
       // ── Menu / Products ──
       { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
@@ -160,21 +171,21 @@ export const router = createHashRouter([
       { path: 'inventory',           element: <Lazy><ProtectedRoute permission="canManageInventory"><InventoryView /></ProtectedRoute></Lazy> },
 
       // ── Reports ──
-      { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports"><ReportsView /></ProtectedRoute></Lazy> },
+      { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports" feature="reports"><ReportsView /></ProtectedRoute></Lazy> },
 
       // ── Accounting ──
-      { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting"><AccountingView /></ProtectedRoute></Lazy> },
-      { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting"><BillFormatView /></ProtectedRoute></Lazy> },
-      { path: 'shifts',              element: <Lazy><ProtectedRoute permission="canManageAccounting"><ShiftManagementView /></ProtectedRoute></Lazy> },
-      { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><QuotationsView /></ProtectedRoute></Lazy> },
-      { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations"><InvoicesView /></ProtectedRoute></Lazy> },
+      { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><AccountingView /></ProtectedRoute></Lazy> },
+      { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><BillFormatView /></ProtectedRoute></Lazy> },
+      { path: 'shifts',              element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><ShiftManagementView /></ProtectedRoute></Lazy> },
+      { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" feature="invoices"><QuotationsView /></ProtectedRoute></Lazy> },
+      { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" feature="invoices"><InvoicesView /></ProtectedRoute></Lazy> },
 
       // ── Workforce (unified module) ──
       {
         path: 'workforce',
         element: (
           <Lazy>
-            <ProtectedRoute permission="canManageStaff">
+            <ProtectedRoute permission="canManageStaff" feature="workforce">
               <WorkforceLayout />
             </ProtectedRoute>
           </Lazy>
@@ -186,7 +197,7 @@ export const router = createHashRouter([
           { path: 'attendance', element: <Lazy><WorkforceAttendanceView /></Lazy> },
           { path: 'payroll',    element: <Lazy><ProtectedRoute permission="canManagePayroll"><PayrollView /></ProtectedRoute></Lazy> },
           { path: 'leave',      element: <Lazy><ProtectedRoute permission="canManageLeave"><LeaveManagementView /></ProtectedRoute></Lazy> },
-          { path: 'biometrics', element: <Lazy><BiometricsView /></Lazy> },
+          { path: 'biometrics', element: <Lazy><ProtectedRoute feature="biometrics"><BiometricsView /></ProtectedRoute></Lazy> },
         ],
       },
 
@@ -196,10 +207,13 @@ export const router = createHashRouter([
       { path: 'attendance', element: <Navigate to="/workforce/attendance" replace /> },
 
       // ── Loyalty ──
-      { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly><LoyaltyManagementView /></ProtectedRoute></Lazy> },
+      { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly feature="loyalty"><LoyaltyManagementView /></ProtectedRoute></Lazy> },
+
+      // ── Tax & Discounts (tenant admin) ──
+      { path: 'business-settings',   element: <Lazy><ProtectedRoute adminOnly><BusinessSettingsView /></ProtectedRoute></Lazy> },
 
       // ── QR ──
-      { path: 'table-qr',            element: <Lazy><ProtectedRoute adminOnly><TableQRView /></ProtectedRoute></Lazy> },
+      { path: 'table-qr',            element: <Lazy><ProtectedRoute adminOnly feature="groupOrdering"><TableQRView /></ProtectedRoute></Lazy> },
     ],
   },
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
@@ -220,4 +234,8 @@ export const router = createHashRouter([
   { path: '/order/:tableSlug',    element: <Lazy><TableRedirectView /></Lazy> },
 
   { path: '/customer-monitor',    element: <Lazy><CustomerMonitorView /></Lazy> },
+
+  // ── Super-admin panel (gated on its own Supabase Auth session, not staff PIN) ──
+  { path: '/superadmin/login',    element: <Lazy><SuperAdminLoginView /></Lazy> },
+  { path: '/superadmin',          element: <Lazy><SuperAdminPanelView /></Lazy> },
 ]);

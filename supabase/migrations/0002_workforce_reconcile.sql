@@ -44,10 +44,12 @@ ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_no_admin;
 ALTER TABLE employees ADD  CONSTRAINT employees_no_admin CHECK (role <> 'admin');
 
 -- ─── 3. users: extend the role CHECK to the full role set ────
--- UserRole in types.ts defines 10 roles; prod allowed only 8.
+-- UserRole in types.ts defines 11 roles. Includes 'swaiter' (Super Waiter) so
+-- this constraint does not reject an existing swaiter row when re-applied to a
+-- database that already carries app data (0006 also adds swaiter — same set).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD  CONSTRAINT users_role_check CHECK (role IN
-  ('admin','cashier','waiter','kitchen','hr','juice','staff','accounting','manager','supervisor'));
+  ('admin','cashier','waiter','swaiter','kitchen','hr','juice','staff','accounting','manager','supervisor'));
 
 -- ─── 4. leave_requests: create the missing table ─────────────
 CREATE TABLE IF NOT EXISTS leave_requests (

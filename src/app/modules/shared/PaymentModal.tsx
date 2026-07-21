@@ -14,7 +14,6 @@ import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
-import { loadLoyaltySettings } from '../../models/types';
 import type { Customer, DiscountPreset } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService } from '../../services/PrintService';
@@ -126,7 +125,8 @@ function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedempti
   const [searching, setSearching] = useState(false);
   const [addMode, setAddMode] = useState(false);
   const [newName, setNewName] = useState('');
-  const settings = loadLoyaltySettings();
+  const { settings: branchSettings } = useBranch();
+  const settings = branchSettings.loyalty;
 
   const search = async () => {
     if (!phone.trim()) return;
@@ -328,7 +328,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [paidItemIds, setPaidItemIds] = useState<Set<string>>(new Set());
   const [splitProcessing, setSplitProcessing] = useState(false);
 
-  const loyaltySettings = loadLoyaltySettings();
+  const loyaltySettings = branchSettings.loyalty;
 
   // Reset the modal to a clean state whenever a new order is opened, so values
   // from a previous bill (cash received, split, loyalty, print prompt) never leak.

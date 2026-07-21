@@ -38,6 +38,7 @@ export class SettingsController {
         tax_label: s.taxLabel.trim() || 'Tax',
         tax_inclusive: s.taxInclusive,
         discount_presets: s.discountPresets,
+        loyalty: s.loyalty,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'branch_id' });
       if (error) throw error;

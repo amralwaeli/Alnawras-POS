@@ -11,6 +11,7 @@ import {
   AttendanceLog, EmployeeFingerprint, PayrollSummary, Customer, LoyaltyTransaction,
   ModifierGroup, ModifierOption, Organization, Branch, BranchFeatures, ALL_FEATURES_ON,
   BranchSettings, DiscountPreset, DEFAULT_BRANCH_SETTINGS,
+  DEFAULT_LOYALTY_SETTINGS,
 } from './types';
 
 // ── Multi-tenant: organizations & branches ───────────────────────────────────
@@ -40,6 +41,9 @@ export const mapBranchSettings = (row: any): BranchSettings => {
     taxLabel: row.tax_label ?? 'Tax',
     taxInclusive: row.tax_inclusive ?? false,
     discountPresets: presets,
+    // Merge over defaults so a row missing the loyalty column (pre-0023) or a
+    // newer key still yields a complete settings object.
+    loyalty: { ...DEFAULT_LOYALTY_SETTINGS, ...(row.loyalty ?? {}) },
   };
 };
 

@@ -273,6 +273,8 @@ export interface BranchSettings {
   /** true = menu prices already include tax; false = tax added on top. */
   taxInclusive: boolean;
   discountPresets: DiscountPreset[];
+  /** Loyalty program config (was per-device localStorage; now per branch). */
+  loyalty: LoyaltySettings;
 }
 
 export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
@@ -281,6 +283,15 @@ export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   taxLabel: 'Tax',
   taxInclusive: false,
   discountPresets: [],
+  // Inlined (not the DEFAULT_LOYALTY_SETTINGS const, which is declared later in
+  // this module — referencing it here would hit the temporal dead zone).
+  loyalty: {
+    enabled: true,
+    pointsPerDollar: 1,
+    redemptionRate: 100,
+    minimumRedemption: 100,
+    pointsLabel: 'Points',
+  },
 };
 
 /** A billable restaurant location. `id` is the value used as `branch_id`

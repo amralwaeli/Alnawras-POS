@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { usePOS } from '../../context/POSContext';
+import { useBranch } from '../../context/BranchContext';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
-import { loadLoyaltySettings, saveLoyaltySettings, DEFAULT_LOYALTY_SETTINGS } from '../../models/types';
+import { SettingsController } from '../../controllers/SettingsController';
 import type { Customer, LoyaltyTransaction, LoyaltySettings } from '../../models/types';
 import { fmt } from '../../../lib/currency';
 
@@ -250,11 +251,20 @@ function CustomerDetail({
 
 // ── Settings Panel ────────────────────────────────────────────────────────────
 function SettingsPanel() {
-  const [settings, setSettings] = useState<LoyaltySettings>(loadLoyaltySettings);
+  const { currentUser } = usePOS();
+  const branchId = currentUser?.branchId ?? 'branch-1';
+  const { settings: branchSettings, reloadSettings } = useBranch();
+  const [settings, setSettings] = useState<LoyaltySettings>(branchSettings.loyalty);
   const [saved, setSaved] = useState(false);
 
-  const save = () => {
-    saveLoyaltySettings(settings);
+  // Keep the editor in sync if the branch settings load/refresh after mount.
+  useEffect(() => { setSettings(branchSettings.loyalty); }, [branchSettings.loyalty]);
+
+  const save = async () => {
+    // Persist loyalty within the full branch settings so tax/discounts survive.
+    const res = await SettingsController.saveSettings(branchId, { ...branchSettings, loyalty: settings });
+    if (!res.success) { toast.error(res.error || 'Failed to save loyalty settings'); return; }
+    reloadSettings();
     setSaved(true);
     toast.success('Loyalty settings saved');
     setTimeout(() => setSaved(false), 2000);
@@ -313,8 +323,9 @@ function SettingsPanel() {
 // ── Main View ─────────────────────────────────────────────────────────────────
 export function LoyaltyManagementView() {
   const { currentUser } = usePOS();
+  const { settings: branchSettings } = useBranch();
   const branchId = currentUser?.branchId ?? 'branch-1';
-  const settings = loadLoyaltySettings();
+  const settings = branchSettings.loyalty;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);

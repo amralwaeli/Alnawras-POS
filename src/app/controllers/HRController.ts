@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { Employee, AttendanceLog, PayrollSummary } from '../models/types';
 import { mapEmployee, mapFingerprint, mapAttendanceLog, mapPayroll } from '../models/mappers';
+import { localDateStr, monthDateRange } from '../../lib/date';
 
 // ─────────────────────────────────────────────
 // Utility: generate IDs
@@ -331,8 +332,8 @@ export class HRController {
     error?: string;
   }> {
     try {
-      const today = new Date().toISOString().split('T')[0];
       const now = new Date();
+      const today = localDateStr(now); // local business date, consistent with the clock math below
       const nowMins = now.getHours() * 60 + now.getMinutes();
       const shiftStartMins = timeToMinutes(employee.shiftStart);
       const shiftEndMins = timeToMinutes(employee.shiftEnd);
@@ -441,8 +442,7 @@ export class HRController {
       if (filters.date) {
         query = query.eq('log_date', filters.date);
       } else if (filters.month && filters.year) {
-        const start = `${filters.year}-${String(filters.month).padStart(2, '0')}-01`;
-        const end = new Date(filters.year, filters.month, 0).toISOString().split('T')[0];
+        const { start, end } = monthDateRange(filters.year, filters.month);
         query = query.gte('log_date', start).lte('log_date', end);
       }
       if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
@@ -475,10 +475,9 @@ export class HRController {
       if (!empRow) return { success: false, error: 'Employee not found' };
       const employee = mapEmployee(empRow);
 
-      // Get all attendance logs for the month
-      const start = `${year}-${String(month).padStart(2, '0')}-01`;
+      // Get all attendance logs for the month (local business dates)
+      const { start, end } = monthDateRange(year, month);
       const endDate = new Date(year, month, 0);
-      const end = endDate.toISOString().split('T')[0];
 
       const { data: logs } = await supabase
         .from('attendance_logs')

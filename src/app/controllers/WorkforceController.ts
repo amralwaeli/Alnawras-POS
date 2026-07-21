@@ -4,6 +4,7 @@ import {
   LeaveRequest, LeaveFilters, Result,
 } from '../models/types';
 import { mapEmployee, mapLeaveRequest } from '../models/mappers';
+import { localDateStr } from '../../lib/date';
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -180,7 +181,7 @@ export class WorkforceController {
       const fpSet = new Set((fps ?? []).map((r: any) => r.employee_id));
 
       // Attach today's attendance status
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateStr(); // local business date (not UTC)
       const { data: todayLogs } = await supabase
         .from('attendance_logs')
         .select('employee_id, check_in_time, check_out_time, status')
@@ -224,7 +225,7 @@ export class WorkforceController {
         .eq('is_active', true)
         .maybeSingle();
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateStr(); // local business date (not UTC)
       const { data: todayLog } = await supabase
         .from('attendance_logs')
         .select('check_in_time, check_out_time, status')
@@ -394,7 +395,7 @@ export class WorkforceController {
     late: number; onLeave: number; clockedOut: number;
   }>> {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateStr(); // local business date (not UTC)
 
       const [empResult, logsResult] = await Promise.all([
         supabase.from('employees').select('*', { count: 'exact', head: true })

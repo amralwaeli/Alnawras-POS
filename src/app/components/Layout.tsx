@@ -1,7 +1,7 @@
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router';
 import { useState } from 'react';
 import {
-  ShoppingCart, Package, BarChart3, Users, LogOut, Clock,
+  ShoppingCart, Package, BarChart3, Users, LogOut, MonitorX, Clock,
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
   Settings, Fingerprint, ReceiptText, FileText, Printer, Star, Percent,
   ChevronsLeft, ChevronsRight, Menu, X, Building2, CalendarOff,
@@ -9,11 +9,13 @@ import {
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { useBranch } from '../context/BranchContext';
+import { useDeviceAuth } from '../context/DeviceAuthContext';
 import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
   const { hasFeature } = useBranch();
+  const { deviceGateRequired, signOutDevice } = useDeviceAuth();
   const location = useLocation();
   const [collapsed, setCollapsed]     = useState(() => window.innerWidth < 1024);
   const [mobileOpen, setMobileOpen]   = useState(false);
@@ -100,6 +102,12 @@ export function Layout() {
   const avatarGradient = roleColors[currentUser.role] ?? 'from-gray-500 to-gray-600';
 
   const closeMobile = () => setMobileOpen(false);
+
+  const handleDeviceSignOut = async () => {
+    if (!confirm('Sign this device out of the branch account? Staff will need the branch email and password to use it again.')) return;
+    await signOutDevice();
+    logout();
+  };
 
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
@@ -261,6 +269,19 @@ export function Layout() {
               <LogOut className="size-4" />
             </button>
           </div>
+
+          {/* Admin-only: unbind this device from its branch account. Only shown
+              when the device-login gate is active (a branch account exists). */}
+          {currentUser.role === 'admin' && deviceGateRequired && (
+            <button
+              onClick={handleDeviceSignOut}
+              title="Sign this device out of the branch account"
+              className={`mt-2 w-full flex items-center gap-2 ${collapsed ? 'lg:justify-center lg:px-0' : 'px-2'} py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-colors`}
+            >
+              <MonitorX className="size-4 shrink-0" />
+              <span className={collapsed ? 'lg:hidden' : ''}>Sign out device</span>
+            </button>
+          )}
         </div>
       </aside>
 

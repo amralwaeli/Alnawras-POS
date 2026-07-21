@@ -102,7 +102,20 @@ export class OrderController {
         // table never shows busy until an order is actually sent.
       }
 
-      // ── Insert the new order items ──────────────────────────────────────────
+      // ── Re-price + insert items SERVER-SIDE (migration 0022) ────────────────
+      // The RPC ignores the client's prices entirely: it looks each line up from
+      // `products` and each modifier from `modifier_options`, inserts the items
+      // with those authoritative values, and rewrites the order total. This is
+      // what stops a customer on the public QR/pickup page posting an item at an
+      // arbitrary price. `rows` (client-priced) is kept ONLY as the offline
+      // fallback (own-staff, reconciled on sync) and offline printing source.
+      const rpcItems = params.items.map(item => ({
+        product_id: item.productId,
+        quantity: item.quantity,
+        notes: item.notes || null,
+        option_ids: (item.modifiers ?? []).map(m => m.optionId).filter(Boolean),
+      }));
+
       const rows = params.items.map(item => ({
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         order_id: orderId,
@@ -120,17 +133,21 @@ export class OrderController {
         branch_id: branchId,
       }));
 
-      // ── Attempt Database Sync ─────────────────────────────────────────────
+      const createdNewOrder = !params.existingOrderId;
       let finalOrder: any = null;
+      let printItems: any[] = rows;
       try {
-        const { error: itemsError } = await supabase.from('order_items').insert(rows);
-        if (itemsError) throw itemsError;
+        const { data: priced, error: rpcErr } = await supabase.rpc('submit_order_items', {
+          p_order_id: orderId,
+          p_branch_id: branchId,
+          p_added_by: params.addedBy,
+          p_added_by_name: params.addedByName,
+          p_items: rpcItems,
+        });
+        if (rpcErr) throw rpcErr;
 
-        // Update Order Totals
-        const { data: allItems } = await supabase.from('order_items').select('subtotal').eq('order_id', orderId);
-        const subtotal = (allItems || []).reduce((s, r: any) => s + Number(r.subtotal), 0);
-        const tax = 0;
-        await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
+        // Print the SERVER-priced items (product_name → productName for the ticket).
+        printItems = (priced ?? []).map((r: any) => ({ ...r, productName: r.product_name }));
 
         // A dine-in table only becomes "occupied" once real items are sent — this
         // covers group orders, whose shared order is created empty on scan.
@@ -142,37 +159,46 @@ export class OrderController {
 
         const { data: saved } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
         if (saved) finalOrder = mapOrder(saved);
-      } catch (dbErr) {
+      } catch (dbErr: any) {
+        // Only queue offline when the device is genuinely offline. An ONLINE
+        // failure (e.g. the RPC rejected an unavailable product) is a real error
+        // to surface — not something to silently queue as if it succeeded.
+        if (navigator.onLine) {
+          console.error('[OrderController] submit_order_items failed', dbErr);
+          if (createdNewOrder) {
+            // Drop the empty order row we created a moment ago so a failed submit
+            // doesn't leave a phantom open order/occupied table behind.
+            await supabase.from('orders').delete().eq('id', orderId);
+          }
+          return { success: false, error: dbErr?.message || 'Failed to submit order.' };
+        }
         console.warn('[OrderController] Offline detected, queuing order locally', dbErr);
-        // Queue for background sync
         OfflineSyncEngine.addToQueue('order', { order: { id: orderId, branch_id: branchId, status: 'open' }, items: rows });
-        // Create a temporary order object for printing
         finalOrder = { id: orderId, tableNumber: params.table?.number || 0, items: rows };
+        printItems = rows;
       }
 
       if (!finalOrder) return { success: false, error: 'Failed to process order.' };
 
       // ── AUTOMATED STATION-BASED PRINTING ──
-      // Split items by station and send to respective printers
+      // Split items by station and send to respective printers.
       try {
         const printersRaw = localStorage.getItem('alnawras_printers');
         if (printersRaw) {
           const printers = JSON.parse(printersRaw);
           const activePrinters = printers.filter((p: any) => p.isActive && p.type === 'network');
-          
-          // Group rows (new items) by their station
+
+          // Group new items by their station.
           const itemsByStation: Record<string, any[]> = {};
-          rows.forEach(item => {
+          printItems.forEach(item => {
             const station = item.station || 'kitchen';
             if (!itemsByStation[station]) itemsByStation[station] = [];
             itemsByStation[station].push(item);
           });
 
-          // Send to each printer that covers the station
+          // Send to each printer that covers the station.
           for (const printer of activePrinters) {
-            // A printer might cover multiple stations (e.g. 'kitchen' and 'shawarma')
-            const printerStations = printer.stations || ['kitchen']; 
-            
+            const printerStations = printer.stations || ['kitchen'];
             for (const station of printerStations) {
               const stationItems = itemsByStation[station];
               if (stationItems && stationItems.length > 0) {

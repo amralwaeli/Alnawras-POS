@@ -10,6 +10,7 @@ import {
 import { usePOS } from '../context/POSContext';
 import { useBranch } from '../context/BranchContext';
 import { useDeviceAuth } from '../context/DeviceAuthContext';
+import { isNativeApp } from '../../lib/platform';
 import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
 
 export function Layout() {
@@ -106,6 +107,14 @@ export function Layout() {
   const handleDeviceSignOut = async () => {
     if (!confirm('Sign this device out of the branch account? Staff will need the branch email and password to use it again.')) return;
     await signOutDevice();
+    logout();
+  };
+
+  // On the website the branch login IS the admin session, so logging out must
+  // also sign the device out — otherwise it would immediately re-log in as admin.
+  // In the installed app, logout just drops the staff PIN; the device stays bound.
+  const handleLogout = async () => {
+    if (!isNativeApp() && deviceGateRequired) await signOutDevice();
     logout();
   };
 
@@ -262,7 +271,7 @@ export function Layout() {
               <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>
             </div>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               title="Logout"
               className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/10 transition-colors shrink-0"
             >
@@ -270,9 +279,10 @@ export function Layout() {
             </button>
           </div>
 
-          {/* Admin-only: unbind this device from its branch account. Only shown
-              when the device-login gate is active (a branch account exists). */}
-          {currentUser.role === 'admin' && deviceGateRequired && (
+          {/* App only, admin only: unbind this device from its branch account.
+              (On the website, Logout above already signs the device out.) Shown
+              only when the device-login gate is active. */}
+          {isNativeApp() && currentUser.role === 'admin' && deviceGateRequired && (
             <button
               onClick={handleDeviceSignOut}
               title="Sign this device out of the branch account"

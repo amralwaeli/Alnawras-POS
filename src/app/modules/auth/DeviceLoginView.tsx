@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { UtensilsCrossed, Lock, Loader2 } from 'lucide-react';
 import { useDeviceAuth } from '../../context/DeviceAuthContext';
+import { isNativeApp } from '../../../lib/platform';
 
 /**
- * DeviceLoginView — the branch email+password gate shown before the staff PIN
- * pad. A device signs in here once; it then stays bound to the branch account
- * (staff just PIN in) until an admin signs the device out. Rendered by App.tsx
- * only when the gate is active (a branch device account exists) and this device
- * isn't already unlocked. Styled to match the staff PIN screen (LoginView).
+ * DeviceLoginView — the branch email+password gate.
+ *
+ * On the WEBSITE this is the tenant admin sign-in: on success App.tsx logs
+ * straight in as admin (no PIN pad). In the installed APP it binds the device
+ * to the branch account, after which staff sign in with their PIN. Same screen,
+ * platform-aware wording. Styled to match the staff PIN screen (LoginView).
  */
 export function DeviceLoginView() {
   const { signInDevice } = useDeviceAuth();
@@ -15,6 +17,7 @@ export function DeviceLoginView() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const native = isNativeApp();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +27,8 @@ export function DeviceLoginView() {
     const res = await signInDevice(email, password);
     setLoading(false);
     if (!res.success) setError(res.error || 'Sign-in failed');
-    // On success the gate re-evaluates and App.tsx swaps to the staff PIN pad.
+    // On success the gate re-evaluates: the app swaps to the staff PIN pad, the
+    // website logs straight in as the tenant admin.
   };
 
   return (
@@ -36,13 +40,21 @@ export function DeviceLoginView() {
             <UtensilsCrossed className="size-7 text-white" />
           </div>
           <p className="font-black text-white text-2xl uppercase italic tracking-tighter">Alnawras POS</p>
-          <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">Device Sign-in</p>
+          <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">
+            {native ? 'Device Sign-in' : 'Admin Sign-in'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-[#161B22] border border-gray-800 rounded-2xl p-6 space-y-4">
           <div className="text-center mb-2">
-            <h2 className="text-lg font-black text-white tracking-tight uppercase italic">Sign this device in</h2>
-            <p className="text-gray-500 text-xs font-medium mt-1">Use the branch email &amp; password from your administrator.</p>
+            <h2 className="text-lg font-black text-white tracking-tight uppercase italic">
+              {native ? 'Sign this device in' : 'Sign in'}
+            </h2>
+            <p className="text-gray-500 text-xs font-medium mt-1">
+              {native
+                ? 'Use the branch email & password from your administrator.'
+                : 'Use your branch email & password.'}
+            </p>
           </div>
 
           {error && (
@@ -74,12 +86,14 @@ export function DeviceLoginView() {
             className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-orange-600 active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" />}
-            Unlock Device
+            {native ? 'Unlock Device' : 'Sign In'}
           </button>
 
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-600 pt-1">
             <Lock className="size-3" />
-            Stays signed in until an administrator signs this device out.
+            {native
+              ? 'Stays signed in until an administrator signs this device out.'
+              : 'Stays signed in until you sign out.'}
           </p>
         </form>
       </div>

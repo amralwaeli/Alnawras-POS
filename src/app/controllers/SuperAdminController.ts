@@ -39,6 +39,21 @@ export class SuperAdminController {
     return data === true;
   }
 
+  // ── Tenant onboarding (Edge Function: org+branch+admin login + emailed invite) ──
+  static async inviteTenant(input: {
+    tenantName: string; email: string; branchName?: string;
+    contractStart?: string; contractEnd?: string;
+  }): Promise<{ success: boolean; data?: { email: string; tempPassword: string; setPasswordUrl: string; emailSent: boolean; branchId: string }; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('admin-invite-tenant', { body: input });
+    // Edge Functions return their error body on a non-2xx status via error.context.
+    let payload: any = data;
+    if (error && (error as any).context instanceof Response) {
+      try { payload = await (error as any).context.json(); } catch { /* keep payload */ }
+    }
+    if (payload?.success) return { success: true, data: payload };
+    return { success: false, error: payload?.error || error?.message || 'Failed to create tenant' };
+  }
+
   // ── Organizations ──────────────────────────────────────────────────────────
   static async listOrganizations(): Promise<{ success: boolean; data?: OrgWithBranches[]; error?: string }> {
     try {

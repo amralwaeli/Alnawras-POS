@@ -11,7 +11,7 @@ import { User } from './models/types';
 
 // Routes that bypass the staff PIN login: customer QR/pickup pages, and the
 // super-admin panel (which uses its own separate Supabase Auth login).
-const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/', '#/superadmin'];
+const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/', '#/superadmin', '#/set-password'];
 
 function isPublicRoute(): boolean {
   return PUBLIC_HASH_PREFIXES.some(prefix => window.location.hash.startsWith(prefix));

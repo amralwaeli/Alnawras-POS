@@ -67,6 +67,7 @@ const InvoicesView           = lazy(() => import('./modules/invoices').then(m =>
 const PickupOrderingView     = lazy(() => import('./modules/pickup/PickupOrderingView').then(m => ({ default: m.PickupOrderingView })));
 const PickupBoardView         = lazy(() => import('./modules/pickup/PickupBoardView').then(m => ({ default: m.PickupBoardView })));
 const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
+const SetPasswordView        = lazy(() => import('./modules/auth').then(m => ({ default: m.SetPasswordView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
 const BusinessSettingsView   = lazy(() => import('./modules/settings').then(m => ({ default: m.BusinessSettingsView })));
@@ -217,6 +218,7 @@ export const router = createHashRouter([
     ],
   },
   { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
+  { path: '/set-password',        element: <Lazy><SetPasswordView /></Lazy> },
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
 
   // ── Secure QR ordering (legacy single-session) — token-based ──

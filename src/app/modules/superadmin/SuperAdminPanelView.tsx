@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ShieldCheck, LogOut, Plus, Building2, Store, Loader2, X,
-  Save, Ban, CheckCircle2, AlertTriangle,
+  Save, Ban, CheckCircle2, AlertTriangle, Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SuperAdminController, OrgWithBranches } from '../../controllers/SuperAdminController';
@@ -163,46 +163,87 @@ function AddBranchForm({ orgId, onDone }: { orgId: string; onDone: () => void })
   );
 }
 
-// ─── Add-organization modal ──────────────────────────────────────────────────
-function AddOrgModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+// ─── Copyable read-only field (invite result) ────────────────────────────────
+function FieldCopy({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold text-gray-500 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <input readOnly value={value} onFocus={e => e.currentTarget.select()}
+          className={`flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50 ${mono ? 'font-mono' : ''}`} />
+        <button onClick={() => { navigator.clipboard?.writeText(value); toast.success('Copied'); }}
+          className="px-2.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600" title="Copy">
+          <Copy className="size-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add-tenant modal (creates org + branch + admin login, emails the invite) ─
+type InviteResult = { email: string; tempPassword: string; setPasswordUrl: string; emailSent: boolean };
+
+function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [ownerEmail, setOwnerEmail] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [contractEnd, setContractEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<InviteResult | null>(null);
 
   const create = async () => {
-    if (!name.trim()) { toast.error('Organization name is required'); return; }
+    if (!name.trim()) { toast.error('Tenant name is required'); return; }
+    if (!email.trim()) { toast.error('Admin email is required'); return; }
     setSaving(true);
-    const res = await SuperAdminController.createOrganization({ name, ownerName, ownerEmail, ownerPhone });
+    const res = await SuperAdminController.inviteTenant({
+      tenantName: name.trim(), email: email.trim(),
+      contractStart: todayStr(), contractEnd: contractEnd || undefined,
+    });
     setSaving(false);
-    if (res.success) { toast.success('Organization created'); onDone(); }
-    else toast.error(res.error || 'Failed to create');
+    if (res.success && res.data) { setResult(res.data); onDone(); }
+    else toast.error(res.error || 'Failed to create tenant');
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h3 className="font-bold text-gray-900">New Organization (Tenant)</h3>
+          <h3 className="font-bold text-gray-900">{result ? 'Tenant created' : 'Add Tenant'}</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>
         </div>
-        <div className="p-5 space-y-3">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Organization / business name *"
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" autoFocus />
-          <input value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Owner name"
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
-          <input value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} placeholder="Owner email"
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
-          <input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} placeholder="Owner phone"
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
-        </div>
-        <div className="flex justify-end gap-2 px-5 py-4 border-t">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button onClick={create} disabled={saving} className="px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">
-            {saving ? 'Creating…' : 'Create'}
-          </button>
-        </div>
+
+        {!result ? (
+          <>
+            <div className="p-5 space-y-3">
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Restaurant / business name *" autoFocus
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
+              <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Tenant admin email *"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Contract end (optional)</label>
+                <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
+              </div>
+              <p className="text-[11px] text-gray-400">Creates the organization, one branch, and the admin's login, then emails them a link to set their password.</p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={create} disabled={saving} className="px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                {saving ? 'Creating…' : 'Create & Invite'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="p-5 space-y-3">
+            <div className={`text-xs font-semibold px-3 py-2 rounded-lg ${result.emailSent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              {result.emailSent ? `✓ Invite email sent to ${result.email}` : '⚠ Email could not be sent — share the details below with the tenant.'}
+            </div>
+            <FieldCopy label="Email" value={result.email} />
+            <FieldCopy label="Temporary password" value={result.tempPassword} mono />
+            <FieldCopy label="Set-password link" value={result.setPasswordUrl} mono />
+            <p className="text-[11px] text-gray-400">The tenant can click the link to set their own password, or sign in with the temporary password and change it later.</p>
+            <button onClick={onClose} className="w-full px-4 py-2.5 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Done</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -213,7 +254,7 @@ export function SuperAdminPanelView() {
   const navigate = useNavigate();
   const [orgs, setOrgs] = useState<OrgWithBranches[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddOrg, setShowAddOrg] = useState(false);
+  const [showAddTenant, setShowAddTenant] = useState(false);
   const [addingBranchFor, setAddingBranchFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -269,8 +310,8 @@ export function SuperAdminPanelView() {
             <h2 className="text-lg font-bold text-gray-900">Organizations</h2>
             <p className="text-sm text-gray-500">{orgs.length} tenant{orgs.length !== 1 ? 's' : ''}</p>
           </div>
-          <button onClick={() => setShowAddOrg(true)} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
-            <Plus className="size-4" /> Add Organization
+          <button onClick={() => setShowAddTenant(true)} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
+            <Plus className="size-4" /> Add Tenant
           </button>
         </div>
 
@@ -316,7 +357,7 @@ export function SuperAdminPanelView() {
         ))}
       </main>
 
-      {showAddOrg && <AddOrgModal onClose={() => setShowAddOrg(false)} onDone={() => { setShowAddOrg(false); void load(); }} />}
+      {showAddTenant && <AddTenantModal onClose={() => setShowAddTenant(false)} onDone={() => { void load(); }} />}
     </div>
   );
 }

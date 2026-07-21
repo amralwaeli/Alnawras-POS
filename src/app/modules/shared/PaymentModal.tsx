@@ -19,16 +19,7 @@ import type { Customer, DiscountPreset } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
-
-/** Compute the tax on a post-discount amount for the current branch settings.
- *  Exclusive tax is added on top; inclusive tax is backed out of the amount. */
-function computeTax(netAmount: number, taxEnabled: boolean, taxRate: number, taxInclusive: boolean) {
-  if (!taxEnabled || taxRate <= 0 || netAmount <= 0) return 0;
-  const raw = taxInclusive
-    ? netAmount - netAmount / (1 + taxRate / 100)
-    : netAmount * (taxRate / 100);
-  return Math.round(raw * 100) / 100;
-}
+import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -370,10 +361,10 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   );
   // What the selected guest actually pays — the RPC adds exclusive branch tax
   // per split, so the button/validation must show the same tax-inclusive figure.
-  const splitSelectedDue = useMemo(() => {
-    const t = computeTax(splitSelectedTotal, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive);
-    return branchSettings.taxInclusive ? splitSelectedTotal : splitSelectedTotal + t;
-  }, [splitSelectedTotal, branchSettings]);
+  const splitSelectedDue = useMemo(
+    () => taxInclusiveDue(splitSelectedTotal, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive),
+    [splitSelectedTotal, branchSettings]
+  );
 
   const baseTotals = useMemo(() => calcOrderTotals(order), [order]);
   const totals = useMemo(() => {
@@ -388,10 +379,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // Apply / clear a one-tap discount preset (Student 10%, etc.).
   const applyPreset = (preset: DiscountPreset) => {
     if (appliedPresetId === preset.id) { setPresetDiscount(0); setAppliedPresetId(null); return; }
-    const amount = preset.type === 'percentage'
-      ? Math.round(baseTotals.subtotal * (preset.value / 100) * 100) / 100
-      : Math.min(preset.value, baseTotals.subtotal);
-    setPresetDiscount(amount);
+    setPresetDiscount(presetDiscountAmount(baseTotals.subtotal, preset));
     setAppliedPresetId(preset.id);
   };
   

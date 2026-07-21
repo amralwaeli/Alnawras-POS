@@ -302,6 +302,7 @@ export interface SalesAnalytics {
   totalRevenue: number;
   totalOrders: number;
   averageOrderValue: number;
+  itemsSold: number;
   topProducts: {
     productId: string;
     productName: string;

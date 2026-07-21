@@ -38,6 +38,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Unit tests
+        run: pnpm test
+
+      # Advisory for now: the codebase carries pre-existing type debt (vendored
+      # shadcn UI + a legacy attendance model). This surfaces type errors in the
+      # log without blocking the deploy; make it a hard gate once that backlog
+      # is cleared (drop `continue-on-error`).
+      - name: Typecheck (advisory)
+        run: pnpm typecheck
+        continue-on-error: true
+
       - name: Create .env from secrets
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env

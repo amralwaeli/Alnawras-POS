@@ -41,7 +41,7 @@ export function DeviceLoginView() {
           </div>
           <p className="font-black text-white text-2xl uppercase italic tracking-tighter">Alnawras POS</p>
           <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">
-            {native ? 'Device Sign-in' : 'Admin Sign-in'}
+            {native ? 'Device Sign-in' : 'Sign in'}
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export function DeviceLoginView() {
           )}
 
           <div>
-            <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest">Branch Email</label>
+            <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest">Email</label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} autoFocus autoComplete="username"
               className="w-full px-4 py-3 bg-gray-800/40 border border-gray-800 rounded-xl text-white text-sm focus:outline-none focus:border-orange-500 transition-colors"

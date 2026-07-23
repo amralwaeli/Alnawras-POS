@@ -54,42 +54,55 @@ function NeutralLoader() {
 
 function AppContent() {
   const { currentUser, authLoading, setCurrentUser } = usePOS();
-  const { loading: deviceLoading, deviceGateRequired, deviceUnlocked, deviceBranchId } = useDeviceAuth();
+  const { loading: deviceLoading, deviceGateRequired, deviceUnlocked, deviceBranchId, isSuperAdmin } = useDeviceAuth();
+  const [, bumpOnHashChange] = useState(0);
 
-  // WEB ONLY: the branch email+password is the tenant admin. Once the device is
-  // unlocked, log straight in as admin — the website never shows the PIN pad.
-  // The installed app skips this and asks staff for their PIN instead.
+  // Re-render on hash changes so a programmatic redirect (e.g. to the super-admin
+  // panel below) re-evaluates the public-route check.
+  useEffect(() => {
+    const onHash = () => bumpOnHashChange(n => n + 1);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // WEB: the branch email+password is the tenant admin — once the branch session
+  // is present, log straight in as admin (the website never shows the PIN pad).
   useEffect(() => {
     if (isNativeApp()) return;
     if (currentUser || !deviceUnlocked || !deviceBranchId) return;
     setCurrentUser(makeDeviceAdmin(deviceBranchId));
   }, [currentUser, deviceUnlocked, deviceBranchId, setCurrentUser]);
 
+  // A signed-in super-admin belongs in the super-admin panel — send them there
+  // from wherever they land (they log in from the same email+password screen).
+  useEffect(() => {
+    if (isSuperAdmin && !isPublicRoute()) window.location.hash = '#/superadmin';
+  }, [isSuperAdmin]);
+
   const publicRoute = isPublicRoute();
 
-  // While auth is initializing (fetching the staff list), show a neutral
-  // loading screen — prevents the PIN pad flashing when a customer scans a QR.
+  // While auth is initializing, show a neutral loader (prevents a login flash
+  // when a customer scans a QR).
   if (authLoading) return <NeutralLoader />;
 
-  // Customer QR/pickup pages and the super-admin panel bypass every staff gate.
+  // Customer QR/pickup pages, the super-admin panel, and set-password bypass the
+  // staff gates entirely.
   if (!publicRoute) {
-    // Still resolving whether this device is signed into a branch account.
     if (deviceLoading) return <NeutralLoader />;
 
-    // 1) DEVICE / TENANT GATE — branch email+password, on both web and app.
-    //    Dormant (skipped) until a branch account is provisioned (0024), so
-    //    deploying never locks anyone out.
-    if (deviceGateRequired && !deviceUnlocked) return <DeviceLoginView />;
+    // A super-admin session is being redirected to the panel (effect above).
+    if (isSuperAdmin) return <NeutralLoader />;
 
-    // 2a) WEB: device unlocked but the admin session hasn't been set yet — show
-    //     the loader for the one tick the effect above needs to log in as admin,
-    //     never the PIN pad.
-    if (!currentUser && !isNativeApp() && deviceGateRequired && deviceUnlocked) {
-      return <NeutralLoader />;
+    if (!isNativeApp()) {
+      // WEBSITE: email + password is the default front door — no PIN here, and
+      // it's always shown until a branch session exists (super-admins log in here too).
+      if (!deviceUnlocked) return <DeviceLoginView />;
+      if (!currentUser) return <NeutralLoader />; // the web-admin effect is signing in
+    } else {
+      // INSTALLED APP: branch email+password (dormant until provisioned) then PIN.
+      if (deviceGateRequired && !deviceUnlocked) return <DeviceLoginView />;
+      if (!currentUser) return <LoginView onLoginSuccess={() => {}} />;
     }
-
-    // 2b) APP: after the device is bound, staff sign in with their PIN.
-    if (!currentUser) return <LoginView onLoginSuccess={() => {}} />;
   }
 
   return <RouterProvider router={router} />;

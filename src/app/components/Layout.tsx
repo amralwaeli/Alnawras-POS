@@ -114,7 +114,9 @@ export function Layout() {
   // also sign the device out — otherwise it would immediately re-log in as admin.
   // In the installed app, logout just drops the staff PIN; the device stays bound.
   const handleLogout = async () => {
-    if (!isNativeApp() && deviceGateRequired) await signOutDevice();
+    // On the website the branch/super-admin login IS the session, so Logout must
+    // clear it; in the installed app, Logout just drops the staff PIN.
+    if (!isNativeApp()) await signOutDevice();
     logout();
   };
 

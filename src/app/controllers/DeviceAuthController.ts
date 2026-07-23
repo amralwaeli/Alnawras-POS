@@ -17,16 +17,20 @@ export class DeviceAuthController {
   /** Sign the device into a branch account. Rejects any Supabase account that
    *  isn't a registered device login (e.g. a super-admin), signing it back out
    *  so a stray session can't half-unlock the device. */
-  static async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  static async signIn(email: string, password: string): Promise<{ success: boolean; role?: 'superadmin' | 'branch'; error?: string }> {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return { success: false, error: error.message };
 
+    // Super-admins log in from the same screen and are routed to the panel.
+    const { data: isSA } = await supabase.rpc('is_current_user_super_admin');
+    if (isSA === true) return { success: true, role: 'superadmin' };
+
+    // Otherwise the account must be a branch/tenant login.
     const branchId = await DeviceAuthController.getDeviceBranch();
-    if (!branchId) {
-      await supabase.auth.signOut();
-      return { success: false, error: 'This account is not registered as a device login for any branch.' };
-    }
-    return { success: true };
+    if (branchId) return { success: true, role: 'branch' };
+
+    await supabase.auth.signOut();
+    return { success: false, error: 'This account is not set up to log in here.' };
   }
 
   /** Sign the device out of its branch account (admin action). */

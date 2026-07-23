@@ -3,16 +3,17 @@ import { supabase } from '../../lib/supabase';
 import { DeviceAuthController } from '../controllers/DeviceAuthController';
 
 interface DeviceAuthContextType {
-  /** True while the initial device-session check is in flight. */
+  /** True while the initial session check is in flight. */
   loading: boolean;
-  /** True once >=1 branch device account exists — i.e. the gate is switched on.
-   *  When false the whole layer is dormant and the app behaves as PIN-only. */
+  /** True once >=1 branch device account exists (used by the installed app only). */
   deviceGateRequired: boolean;
-  /** True when a valid branch device session is present on this device. */
+  /** True when a valid branch session is present on this device. */
   deviceUnlocked: boolean;
   /** The branch id this device is bound to (null if not unlocked). */
   deviceBranchId: string | null;
-  signInDevice: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  /** True when the current session belongs to a super-admin. */
+  isSuperAdmin: boolean;
+  signInDevice: (email: string, password: string) => Promise<{ success: boolean; role?: 'superadmin' | 'branch'; error?: string }>;
   signOutDevice: () => Promise<void>;
 }
 
@@ -22,17 +23,28 @@ export function DeviceAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [deviceGateRequired, setDeviceGateRequired] = useState(false);
   const [deviceBranchId, setDeviceBranchId] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Re-derive both facts: (a) is the gate switched on at all, and (b) does this
-  // device currently hold a valid branch session. Runs on load and on any auth
-  // state change (sign-in/out here, token refresh, or a sign-out in another tab).
+  // Re-derive session facts on load and on any auth change (sign-in/out here,
+  // token refresh, or a sign-out in another tab). Skips the per-session RPCs
+  // when there's no session (customer / logged-out) to keep public pages light.
   const evaluate = useCallback(async () => {
-    const [required, branchId] = await Promise.all([
-      DeviceAuthController.isRequired(),
+    const required = await DeviceAuthController.isRequired();
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session) {
+      setDeviceGateRequired(required);
+      setDeviceBranchId(null);
+      setIsSuperAdmin(false);
+      setLoading(false);
+      return;
+    }
+    const [branchId, saRes] = await Promise.all([
       DeviceAuthController.getDeviceBranch(),
+      supabase.rpc('is_current_user_super_admin'),
     ]);
     setDeviceGateRequired(required);
     setDeviceBranchId(branchId);
+    setIsSuperAdmin(saRes.data === true);
     setLoading(false);
   }, []);
 
@@ -58,6 +70,7 @@ export function DeviceAuthProvider({ children }: { children: ReactNode }) {
     deviceGateRequired,
     deviceUnlocked: !!deviceBranchId,
     deviceBranchId,
+    isSuperAdmin,
     signInDevice,
     signOutDevice,
   };

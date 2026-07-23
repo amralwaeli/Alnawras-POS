@@ -66,11 +66,17 @@ function AppContent() {
   }, []);
 
   // WEB: the branch email+password is the tenant admin — once the branch session
-  // is present, log straight in as admin (the website never shows the PIN pad).
+  // is present, log straight in as admin (the website never shows the PIN pad),
+  // and land on the admin dashboard rather than a leftover staff-kiosk route
+  // (#/check-in / #/fingerprint-checkin only belong in the installed app).
   useEffect(() => {
     if (isNativeApp()) return;
     if (currentUser || !deviceUnlocked || !deviceBranchId) return;
     setCurrentUser(makeDeviceAdmin(deviceBranchId));
+    const hash = window.location.hash;
+    if (hash.startsWith('#/check-in') || hash.startsWith('#/fingerprint-checkin')) {
+      window.location.hash = '#/';
+    }
   }, [currentUser, deviceUnlocked, deviceBranchId, setCurrentUser]);
 
   // A signed-in super-admin belongs in the super-admin panel — send them there

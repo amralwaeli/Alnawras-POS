@@ -73,8 +73,7 @@ const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => 
 const BusinessSettingsView   = lazy(() => import('./modules/settings').then(m => ({ default: m.BusinessSettingsView })));
 const CustomerMonitorView    = lazy(() => import('./modules/shared/CustomerMonitorView').then(m => ({ default: m.CustomerMonitorView })));
 
-// ── Super-admin (separate Supabase Auth login, own route tree) ────────────────
-const SuperAdminLoginView    = lazy(() => import('./modules/superadmin').then(m => ({ default: m.SuperAdminLoginView })));
+// ── Super-admin panel (signs in through the one shared email+password screen) ──
 const SuperAdminPanelView    = lazy(() => import('./modules/superadmin').then(m => ({ default: m.SuperAdminPanelView })));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
@@ -237,7 +236,10 @@ export const router = createHashRouter([
 
   { path: '/customer-monitor',    element: <Lazy><CustomerMonitorView /></Lazy> },
 
-  // ── Super-admin panel (gated on its own Supabase Auth session, not staff PIN) ──
-  { path: '/superadmin/login',    element: <Lazy><SuperAdminLoginView /></Lazy> },
+  // ── Super-admin panel — there is only ONE sign-in screen (the root "/"),
+  //     which routes a super-admin session here automatically (see App.tsx).
+  //     The old separate super-admin login screen is retired; redirect any
+  //     stale bookmark/link straight to the shared login. ──
+  { path: '/superadmin/login',    element: <Navigate to="/" replace /> },
   { path: '/superadmin',          element: <Lazy><SuperAdminPanelView /></Lazy> },
 ]);

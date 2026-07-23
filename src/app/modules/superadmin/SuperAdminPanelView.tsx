@@ -265,15 +265,17 @@ export function SuperAdminPanelView() {
   }, []);
 
   useEffect(() => {
+    // Not a valid super-admin session (e.g. a stale bookmark) -> the one
+    // shared email+password screen at the root, not a separate login page.
     SuperAdminController.isSuperAdmin().then(ok => {
-      if (!ok) { navigate('/superadmin/login', { replace: true }); return; }
+      if (!ok) { navigate('/', { replace: true }); return; }
       void load();
     });
   }, [navigate, load]);
 
   const handleLogout = async () => {
     await SuperAdminController.logout();
-    navigate('/superadmin/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   const toggleOrgStatus = async (org: OrgWithBranches) => {

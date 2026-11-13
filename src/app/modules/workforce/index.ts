@@ -5,3 +5,4 @@ export { WorkforceAttendanceView }   from './attendance/WorkforceAttendanceView'
 export { PayrollView }               from './payroll/PayrollView';
 export { LeaveManagementView }       from './leave/LeaveManagementView';
 export { BiometricsView }            from './biometrics/BiometricsView';
+export { PerformanceView }           from './performance/PerformanceView';

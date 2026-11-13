@@ -11,7 +11,7 @@ import {
   AttendanceLog, EmployeeFingerprint, PayrollSummary, Customer, LoyaltyTransaction,
   ModifierGroup, ModifierOption, Organization, Branch, BranchFeatures, ALL_FEATURES_ON,
   BranchSettings, DiscountPreset, DEFAULT_BRANCH_SETTINGS,
-  DEFAULT_LOYALTY_SETTINGS,
+  DEFAULT_LOYALTY_SETTINGS, PerformanceObservation,
 } from './types';
 
 // ── Multi-tenant: organizations & branches ───────────────────────────────────
@@ -295,6 +295,28 @@ export const mapPayroll = (row: any): PayrollSummary => ({
   approvedAt: row.approved_at ? new Date(row.approved_at) : undefined,
   branchId: row.branch_id,
   createdAt: new Date(row.created_at),
+});
+
+// ── Performance observations (0026) ───────────────────────────────────────────
+export const mapPerformanceObservation = (row: any): PerformanceObservation => ({
+  id: row.id,
+  employeeId: row.employee_id ?? undefined,
+  originalEmployeeId: row.original_employee_id ?? undefined,
+  branchId: row.branch_id,
+  source: row.source,
+  category: row.category,
+  observedAt: new Date(row.observed_at),
+  metricValue: row.metric_value == null ? undefined : Number(row.metric_value),
+  metricUnit: row.metric_unit ?? undefined,
+  summary: row.summary,
+  evidence: row.evidence ?? undefined,
+  confidence: row.confidence == null ? undefined : Number(row.confidence),
+  reviewStatus: row.review_status,
+  reviewedBy: row.reviewed_by ?? undefined,
+  reviewedAt: row.reviewed_at ? new Date(row.reviewed_at) : undefined,
+  reviewNote: row.review_note ?? undefined,
+  createdBy: row.created_by ?? undefined,
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
 });
 
 // ── Loyalty ──────────────────────────────────────────────────────────────────

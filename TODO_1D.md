@@ -17,6 +17,11 @@ built, NOT merged, NOT deployed. Full detail: `PHASE1D_STATUS.md` and
 
 ## ⛔ Do NOT do until ready + tested
 - Do **not** apply migrations `0024`, `0025`, `0026` to production yet.
+  (These are the files **on the `feature/1d-auth-rls` branch**. `main` has its
+  own, different `0024`–`0026` — e.g. `main`'s `0026_employee_performance.sql`
+  is safe to apply. Renumber the branch's files after `main`'s when merging, and
+  add RLS policies for `employee_performance_observations` (branch-scoped,
+  HR/manager read+write) in the RLS migration.)
 - `0026` turns RLS ON — if applied before the steps below, it **blacks out the
   whole app**. It is always the **LAST** step, after everything is tested.
 

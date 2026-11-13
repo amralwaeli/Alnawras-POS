@@ -750,6 +750,44 @@ export interface PayrollSummary {
   createdAt: Date;
 }
 
+// ==================== Performance (extends HR; see migration 0026) ====================
+// Observations reference an EXISTING employee via employees.employee_id. They
+// are advisory only: never read by payroll, never trigger disciplinary action.
+
+export type ObservationSource = 'ai_cctv' | 'manager' | 'customer';
+export type ObservationCategory =
+  | 'service_response'     // seconds
+  | 'table_attendance'
+  | 'table_cleaning'       // minutes
+  | 'customer_complaint'
+  | 'customer_compliment'
+  | 'manager_evaluation'   // rating 1..5
+  | 'other';
+export type ObservationReviewStatus = 'pending' | 'verified' | 'corrected' | 'dismissed';
+
+export interface PerformanceObservation {
+  id: string;
+  /** employees.employee_id; undefined = AI could not reliably identify anyone. */
+  employeeId?: string;
+  /** The AI's attribution before a manager corrected it (audit trail). */
+  originalEmployeeId?: string;
+  branchId: string;
+  source: ObservationSource;
+  category: ObservationCategory;
+  observedAt: Date;
+  metricValue?: number;
+  metricUnit?: 'seconds' | 'minutes' | 'rating' | 'count';
+  summary: string;
+  evidence?: Record<string, unknown>;
+  confidence?: number;
+  reviewStatus: ObservationReviewStatus;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  reviewNote?: string;
+  createdBy?: string;
+  createdAt: Date;
+}
+
 export interface ShiftRule {
   id: string;
   employeeId: string;

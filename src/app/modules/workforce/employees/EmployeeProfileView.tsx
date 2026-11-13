@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router';
 import {
   ArrowLeft, Edit2, UserX, UserCheck, Phone, Mail, Calendar,
   DollarSign, Clock, Fingerprint, FileText, RefreshCw,
-  CheckCircle, XCircle, AlertCircle, Building2, Activity,
+  CheckCircle, XCircle, AlertCircle, Building2, Activity, TrendingUp,
 } from 'lucide-react';
+import { EmployeePerformanceTab } from '../performance/EmployeePerformanceTab';
 import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { HRController } from '../../../controllers/HRController';
@@ -48,7 +49,7 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-type Tab = 'attendance' | 'payroll' | 'biometrics';
+type Tab = 'attendance' | 'payroll' | 'biometrics' | 'performance';
 
 // ─────────────────────────────────────────────────────────────────────────────
 export function EmployeeProfileView() {
@@ -179,6 +180,7 @@ export function EmployeeProfileView() {
     { id: 'attendance', label: 'Attendance', icon: Clock },
     { id: 'payroll',    label: 'Payroll',    icon: DollarSign },
     { id: 'biometrics', label: 'Biometrics', icon: Fingerprint },
+    { id: 'performance', label: 'Performance', icon: TrendingUp },
   ];
 
   return (
@@ -334,6 +336,11 @@ export function EmployeeProfileView() {
               {/* ── Biometrics Tab ── */}
               {activeTab === 'biometrics' && (
                 <BiometricsTab employee={employee} onRefresh={loadEmployee} />
+              )}
+
+              {/* ── Performance Tab (loads its own data) ── */}
+              {activeTab === 'performance' && (
+                <EmployeePerformanceTab employee={employee} />
               )}
             </>
           )}

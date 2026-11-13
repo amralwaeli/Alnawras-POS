@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router';
-import { Users, Clock, DollarSign, CalendarOff, Fingerprint } from 'lucide-react';
+import { Users, Clock, DollarSign, CalendarOff, Fingerprint, TrendingUp } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ROLE_PERMISSIONS } from '../../models/types';
 
@@ -8,6 +8,7 @@ const subNav = [
   { path: '/workforce/attendance', label: 'Attendance', icon: Clock,       permission: 'canViewAttendance' as const },
   { path: '/workforce/payroll',    label: 'Payroll',    icon: DollarSign,  permission: 'canManagePayroll' as const },
   { path: '/workforce/leave',      label: 'Leave',      icon: CalendarOff, permission: 'canManageLeave' as const },
+  { path: '/workforce/performance', label: 'Performance', icon: TrendingUp, permission: 'canManageStaff' as const },
   { path: '/workforce/biometrics', label: 'Biometrics', icon: Fingerprint, permission: 'canManageStaff' as const },
 ];
 

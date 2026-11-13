@@ -16,6 +16,8 @@ production and have been removed.
 | `0004_pin_auth.sql` | DDL — hashes PINs + adds `verify_staff_pin`/`set_staff_pin` RPCs | **Recommended.** Safe (no RLS, keeps `pin`); see `SECURITY.md` |
 | `0005_secure_qr_tokens.sql` | DDL — token-based secure QR ordering | Required for secure QR ordering |
 | `0006_add_swaiter_role.sql` | DDL — adds the `swaiter` (Super Waiter) role to the `users.role` CHECK | **Yes — required** before creating a Super Waiter |
+| … | (0007–0025: see each file's header) | |
+| `0026_employee_performance.sql` | DDL — adds `employee_performance_observations` (AI CCTV / manager / customer observations linked to existing `employees.employee_id`) + validation trigger | **Yes — required** for Workforce → Performance. Purely additive (no existing table touched); rollback SQL at the bottom of the file. **Not** the same file as `0026_enable_rls.sql` on the `feature/1d-auth-rls` branch |
 
 ## How to apply
 

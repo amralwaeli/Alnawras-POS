@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const raw = readFileSync(fileURLToPath(new URL('./0026_employee_performance.sql', import.meta.url)), 'utf8');
 // Executable SQL only: strip `--` comments (the rollback block is commented out).
-const sql = raw.split('\n').map(l => l.replace(/--.*$/, '')).join('\n');
+const sql = raw.split(/\r?\n/).map(l => l.replace(/--.*$/, '')).join('\n');
 const EXISTING = ['employees', 'users', 'attendance_logs', 'payroll_summary', 'leave_requests',
   'employee_fingerprints', 'orders', 'order_items', 'order_payments'];
 

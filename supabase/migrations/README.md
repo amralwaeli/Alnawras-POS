@@ -18,6 +18,8 @@ production and have been removed.
 | `0006_add_swaiter_role.sql` | DDL — adds the `swaiter` (Super Waiter) role to the `users.role` CHECK | **Yes — required** before creating a Super Waiter |
 | … | (0007–0025: see each file's header) | |
 | `0026_employee_performance.sql` | DDL — adds `employee_performance_observations` (AI CCTV / manager / customer observations linked to existing `employees.employee_id`) + validation trigger | **Yes — required** for Workforce → Performance. Purely additive (no existing table touched); rollback SQL at the bottom of the file. **Not** the same file as `0026_enable_rls.sql` on the `feature/1d-auth-rls` branch |
+| `0027_shifts_and_attendance_hours.sql` | DDL — creates `shifts` and adds `attendance_logs.total_hours`, both used by the app but never created by a migration | **Yes — required.** Until applied, Shift Management and every clock-out fail in prod. Additive; rollback at the bottom of the file |
+| `0028_lock_control_plane.sql` | RLS — locks `super_admins`, `branch_logins`, `organizations`, `branches` so only a super-admin can change who is a tenant/admin | **Yes — required.** Does not affect staff/customer flows (they never write these tables). Verify + rollback SQL at the bottom of the file |
 
 ## How to apply
 

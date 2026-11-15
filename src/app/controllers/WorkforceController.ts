@@ -479,7 +479,7 @@ export class WorkforceController {
     try {
       let query = supabase
         .from('leave_requests')
-        .select('*, employees(full_name)')
+        .select('*')
         .eq('branch_id', branchId)
         .order('created_at', { ascending: false });
 
@@ -496,7 +496,15 @@ export class WorkforceController {
       const { data, error } = await query;
       if (error) throw error;
 
-      return { success: true, data: (data ?? []).map(mapLeaveRequest) };
+      // Names are looked up separately: leave_requests has no foreign key to
+      // employees, so PostgREST cannot embed `employees(full_name)` (it 400s).
+      const { data: emps } = await supabase
+        .from('employees').select('employee_id, full_name').eq('branch_id', branchId);
+      const names = new Map((emps ?? []).map((e: any) => [e.employee_id, e.full_name]));
+      return {
+        success: true,
+        data: (data ?? []).map(row => mapLeaveRequest({ ...row, employees: { full_name: names.get(row.employee_id) } })),
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }

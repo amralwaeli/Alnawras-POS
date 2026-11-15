@@ -9,6 +9,8 @@ import {
 import { orderTotal, fmt } from '../../../lib/currency';
 import { useMemo, useState, useEffect } from 'react';
 import { WorkforceController } from '../../controllers/WorkforceController';
+import { fetchAll } from '../../../lib/fetchAll';
+import { toast } from 'sonner';
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
@@ -387,24 +389,27 @@ export function AdminDashboardView() {
       const tables = ['categories', 'products', 'orders', 'order_items', 'expenses', 'customers', 'loyalty_transactions'];
       const backupData: any = {};
 
+      // Paged: a plain select stops at 1000 rows without saying so.
       for (const table of tables) {
-        let query = supabase.from(table).select('*');
-        if (branchId) query = query.eq('branch_id', branchId);
-        const { data } = await query;
-        backupData[table] = data ?? [];
+        backupData[table] = await fetchAll(() => {
+          const query = supabase.from(table).select('*').order('id');
+          return branchId ? query.eq('branch_id', branchId) : query;
+        });
       }
 
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `alnawras-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `alnawras-sales-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Backup failed:', err);
+    } catch (err: any) {
+      // Never hand over a partial file as if it were complete.
+      console.error('Export failed:', err);
+      toast.error(`Export failed — nothing was downloaded. ${err?.message ?? ''}`);
     } finally {
       setIsBackingUp(false);
     }
@@ -427,7 +432,7 @@ export function AdminDashboardView() {
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >
             <Download className={`size-4 ${isBackingUp ? 'animate-bounce' : ''}`} />
-            {isBackingUp ? 'Backing up...' : 'Download Backup'}
+            {isBackingUp ? 'Exporting...' : 'Export Sales Data'}
           </button>
           <Link to="/inventory" className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
             <Package className="size-4" /> Manage Inventory

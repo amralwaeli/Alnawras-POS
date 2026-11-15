@@ -5,6 +5,7 @@ import {
 } from '../models/types';
 import { mapEmployee, mapAttendanceLog, mapPerformanceObservation } from '../models/mappers';
 import { localDateStr } from '../../lib/date';
+import { fetchAll } from '../../lib/fetchAll';
 import {
   summarizeEmployee, buildWeeklyTrend, resolveAiAttribution, validateObservationDraft,
   metricUnitFor, EmployeePerformanceSummary, TrendPoint, OrderActivityRow,
@@ -22,7 +23,6 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TABLE = 'employee_performance_observations';
-const PAGE = 1000;          // PostgREST's default max rows per request
 const MAX_RANGE_DAYS = 93;  // keep overview queries bounded
 
 const uid = (prefix: string) =>
@@ -46,18 +46,6 @@ function checkRange(range: PeriodRange): string | null {
   }
   const days = (range.to.getTime() - range.from.getTime()) / 86_400_000;
   return days > MAX_RANGE_DAYS ? `Please choose a period of ${MAX_RANGE_DAYS} days or less.` : null;
-}
-
-/** Pages through a query so large months are not silently truncated at 1000 rows. */
-async function fetchAll<T = any>(build: () => any): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await build().range(from, from + PAGE - 1);
-    if (error) throw error;
-    out.push(...(data ?? []));
-    if (!data || data.length < PAGE) break;
-  }
-  return out;
 }
 
 const toOrderRow = (r: any): OrderActivityRow => ({

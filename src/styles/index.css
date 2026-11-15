@@ -12,3 +12,10 @@
   75%       { transform: translateX(-2px); }
   90%       { transform: translateX(2px); }
 }
+
+/* Safe-area padding + scrollbar helpers used by the customer phone screens.
+   Defined once here (they used to exist only inside two unrelated screens). */
+.pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }

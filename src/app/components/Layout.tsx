@@ -30,7 +30,25 @@ export function Layout() {
   // reaches Invoices/Quotations through the in-screen "Options" menu instead.
   const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter', 'swaiter'].includes(currentUser.role);
   if (isPOSOnlyRole) {
-    return <div className="h-screen w-screen overflow-hidden"><Outlet /></div>;
+    // These roles only exist in the installed app, where logout just drops the
+    // staff PIN (the device stays bound) — so the next person can PIN in.
+    return (
+      <div className="h-screen w-screen overflow-hidden flex flex-col">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-1.5 bg-gray-900 text-white">
+          <p className="text-sm truncate">
+            <span className="font-semibold">{currentUser.name}</span>
+            <span className="text-gray-400 capitalize"> · {currentUser.role}</span>
+          </p>
+          <button
+            onClick={logout}
+            className="min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold"
+          >
+            Switch user
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div>
+      </div>
+    );
   }
 
   const permissions = ROLE_PERMISSIONS[currentUser.role];

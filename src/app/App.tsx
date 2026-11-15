@@ -8,6 +8,7 @@ import { AlertOverlay } from './components/AlertOverlay';
 import { checkSupabaseConnection } from '../lib/supabase';
 import { isNativeApp } from '../lib/platform';
 import { User } from './models/types';
+import { Toaster } from 'sonner';
 
 // Routes that bypass the staff PIN login: customer QR/pickup pages, and the
 // super-admin panel (which uses its own separate Supabase Auth login).
@@ -135,6 +136,8 @@ export default function App() {
         )}
         <AppContent />
         <AlertOverlay />
+        {/* Every toast() in the app renders through this — without it they are all silent. */}
+        <Toaster position="top-center" richColors closeButton />
       </POSProvider>
     </DeviceAuthProvider>
   );

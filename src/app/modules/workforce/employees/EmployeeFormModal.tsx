@@ -37,7 +37,8 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
     if (!form.fullName.trim())  { setError('Full name is required'); return; }
     if (!form.email.trim())     { setError('Email is required'); return; }
     if (!isEdit && !form.pin.trim()) { setError('PIN is required'); return; }
-    if (!isEdit && form.pin.length < 4) { setError('PIN must be at least 4 digits'); return; }
+    // The login pad accepts exactly 4 digits — anything else can never log in.
+    if (form.pin && !/^\d{4}$/.test(form.pin)) { setError('PIN must be exactly 4 digits'); return; }
 
     setLoading(true);
     setError('');
@@ -139,14 +140,14 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
               </select>
             </div>
 
-            {/* PIN (only on create) */}
-            {!isEdit && (
+            {/* PIN — required on create; on edit, fill it in only to reset it */}
+            {(
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">PIN * (4–6 digits)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{isEdit ? 'New PIN (leave blank to keep)' : 'PIN * (4 digits)'}</label>
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={4}
                   value={form.pin}
                   onChange={e => set('pin', e.target.value.replace(/\D/g, ''))}
                   placeholder="••••"

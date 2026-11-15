@@ -15,6 +15,7 @@ import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
 import type { Customer, DiscountPreset } from '../../models/types';
+import { ROLE_PERMISSIONS } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
@@ -29,7 +30,8 @@ interface SplitEntry { method: SimpleMethod; amount: string; }
 export function calcOrderTotals(order: any) {
   if (!order) return { subtotal: 0, tax: 0, discount: 0, total: 0 };
   const total = orderTotal(order);
-  const items: any[] = order?.items ?? order?.order_items ?? [];
+  // Voided (cancelled) items stay on the order for the audit trail but are never charged.
+  const items: any[] = (order?.items ?? order?.order_items ?? []).filter((i: any) => i.status !== 'cancelled');
   const subtotal = items.reduce((s, i) => s + Number(i.price ?? i.unit_price ?? 0) * Number(i.quantity ?? i.qty ?? 1), 0);
   const tax = Number(order?.tax ?? order?.tax_amount ?? 0);
   const discount = Number(order?.discount ?? order?.discount_amount ?? 0);
@@ -718,7 +720,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
               ) : (order.items ?? []).map((item: any) => {
                 const isPaid = item.status !== 'cancelled' && (item.paid || paidItemIds.has(item.id));
                 return (
-                <div key={item.id} className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${isPaid ? 'opacity-50' : ''}`}>
+                <div key={item.id} className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${isPaid || item.status === 'cancelled' ? 'opacity-50' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
                     {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
@@ -733,7 +735,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
                     )}
                     <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
-                    <span className="text-sm font-semibold w-24 text-right">{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
+                    <span className={`text-sm font-semibold w-24 text-right ${item.status === 'cancelled' ? 'line-through' : ''}`}>{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
                   </div>
                 </div>
                 );
@@ -749,7 +751,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
               <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
             </div>
 
-            {(currentUser.role === 'cashier' || currentUser.role === 'admin') && order.status !== 'completed' && (
+            {ROLE_PERMISSIONS[currentUser.role as keyof typeof ROLE_PERMISSIONS]?.canProcessPayments && order.status !== 'completed' && (
               <div className="px-6 py-4 border-t space-y-3">
                 <CustomerPanel
                   branchId={currentUser.branchId}

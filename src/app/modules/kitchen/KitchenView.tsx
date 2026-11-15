@@ -25,6 +25,7 @@ export function KitchenView() {
   const [newAlert, setNewAlert]   = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
   const [connected, setConnected] = useState(true);
+  const [loadState, setLoadState] = useState<'loading' | 'ok' | 'error'>('loading');
 
   const loadTickets = useCallback(async () => {
     if (!currentUser) return;
@@ -34,7 +35,8 @@ export function KitchenView() {
       .eq('status', 'open')
       .eq('branch_id', currentUser.branchId)
       .order('created_at', { ascending: true });
-    if (error) return;
+    if (error) { setLoadState('error'); return; }
+    setLoadState('ok');
     if (orders) {
       const active = orders
         .map(o => ({ ...o, items: (o.order_items || []).filter((i: any) => i.status !== 'served' && i.status !== 'cancelled') }))
@@ -132,7 +134,7 @@ export function KitchenView() {
   if (!currentUser) return null;
 
   return (
-    <div className="h-screen flex flex-col bg-[#0B0E14] text-white overflow-hidden">
+    <div className="h-full flex flex-col bg-[#0B0E14] text-white overflow-hidden">
 
       <header className="shrink-0 h-20 bg-[#161B22] border-b border-white/[0.06] px-8 flex items-center justify-between shadow-2xl z-10">
         <div className="flex items-center gap-4">
@@ -176,7 +178,20 @@ export function KitchenView() {
         {tab === 'order-request' ? (
           <IngredientOrdersTab currentUser={currentUser} />
         ) : tab === 'orders' ? (
-          tickets.length === 0 ? (
+          // Never say "Kitchen Clear" unless a load actually succeeded.
+          loadState !== 'ok' && tickets.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center gap-4 text-center">
+              <p className="text-xl font-bold text-gray-300">
+                {loadState === 'loading' ? 'Loading orders…' : 'Could not load orders'}
+              </p>
+              {loadState === 'error' && (
+                <>
+                  <p className="text-base text-gray-400">Check the internet connection. Orders may be waiting.</p>
+                  <button onClick={() => void loadTickets()} className="min-h-11 px-6 rounded-xl bg-orange-600 text-white font-bold">Try again</button>
+                </>
+              )}
+            </div>
+          ) : tickets.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-700">
               <div className="bg-gray-900/50 p-10 rounded-[50px] mb-6">
                 <CheckCircle2 className="size-24 opacity-10" />

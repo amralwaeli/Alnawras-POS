@@ -6,7 +6,7 @@ export const CURRENCY = 'RM';
 export function orderTotal(order: any): number {
   const dbTotal = Number(order?.total ?? 0);
   if (dbTotal > 0) return dbTotal;
-  return (order?.items ?? []).reduce(
+  return (order?.items ?? []).filter((i: any) => i.status !== 'cancelled').reduce(
     (s: number, i: any) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1),
     0
   );

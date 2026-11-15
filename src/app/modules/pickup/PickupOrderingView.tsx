@@ -9,7 +9,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
+import { Product, Category, ModifierGroup, SelectedModifier, DEFAULT_BRANCH_SETTINGS } from '../../models/types';
+import { SettingsController } from '../../controllers/SettingsController';
+import { computeTax } from '../../../lib/money';
 import { PickupController } from '../../controllers/PickupController';
 import { ModifierController } from '../../controllers/ModifierController';
 import { BranchController } from '../../controllers/BranchController';
@@ -90,6 +92,7 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
   const [picking, setPicking] = useState<Product | null>(null);
+  const [taxSettings, setTaxSettings] = useState(DEFAULT_BRANCH_SETTINGS);
 
   // checkout fields
   const [name, setName] = useState('');
@@ -106,6 +109,7 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      void SettingsController.getSettings(branchId).then(setTaxSettings);
       const [productsRes, categoriesRes] = await Promise.all([
         supabase.from('products').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
         supabase.from('categories').select('*').eq('branch_id', branchId).eq('is_active', true).order('display_order'),
@@ -141,8 +145,10 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   }, [products, categories, selectedCategory, searchQuery]);
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = cart.reduce((s, i) => s + i.price * i.quantity * (i.taxRate || 0), 0);
-  const total = subtotal + tax;
+  // Same tax the till charges: the branch setting. (The per-product tax_rate is
+  // a percent and was being multiplied as a fraction — 8.25 became 825%.)
+  const tax = computeTax(subtotal, taxSettings.taxEnabled, taxSettings.taxRate, taxSettings.taxInclusive);
+  const total = taxSettings.taxInclusive ? subtotal : subtotal + tax;
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
 
   const addToCart = (p: Product) => {
@@ -343,7 +349,7 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
           {/* Summary */}
           <Section title="Order Summary">
             <Row k="Subtotal" v={RM(subtotal)} />
-            <Row k="Tax" v={RM(tax)} />
+            {tax > 0 && <Row k={taxSettings.taxInclusive ? `${taxSettings.taxLabel} (included)` : taxSettings.taxLabel} v={RM(tax)} />}
             <div className="flex justify-between font-black text-gray-900 pt-1 border-t"><span>Total</span><span>{RM(total)}</span></div>
             {method && <p className="text-xs text-gray-500 mt-2">Pickup via <b className="capitalize">{method === 'self' ? 'Self Pickup' : method}</b></p>}
           </Section>

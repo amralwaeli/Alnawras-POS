@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
 import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package, ArrowLeftRight, X, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
+import { ROLE_PERMISSIONS } from '../../models/types';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
 import { TableController } from '../../controllers/TableController';
@@ -173,6 +174,9 @@ export function TablesView() {
   };
 
   if (!currentUser) return null;
+  // Who may take payment is the permission matrix's call, not a role name
+  // (admin on the website and managers were locked out of takeaway/pickup).
+  const canPay = ROLE_PERMISSIONS[currentUser.role]?.canProcessPayments;
 
   const getOrder = (tableId: string) => {
     const t = tables.find(t => t.id === tableId);
@@ -437,7 +441,7 @@ export function TablesView() {
         </div>
 
         {/* Takeaway Orders Section - Only for Cashier */}
-        {currentUser.role === 'cashier' && takeawayOrders.length > 0 && (
+        {canPay && takeawayOrders.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <ShoppingBag className="size-5 text-purple-600" />
@@ -501,7 +505,7 @@ export function TablesView() {
         )}
 
         {/* Pickup Orders — full inline management for the Cashier */}
-        {currentUser.role === 'cashier' && pickupOrders.length > 0 && (
+        {canPay && pickupOrders.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Package className="size-5 text-orange-600" />
@@ -636,7 +640,7 @@ export function TablesView() {
                         <span className="font-bold text-gray-900">{fmt(total)}</span>
                       </div>
                     </div>
-                    {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
+                    {canPay && (
                       <button 
                         onClick={() => void openOrderModal(table.id)} 
                         className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors"

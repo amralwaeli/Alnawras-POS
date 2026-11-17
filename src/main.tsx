@@ -12,6 +12,10 @@
   // Start the offline sync background process
   OfflineSyncEngine.start();
 
+  // Never run inside another site's frame (click-jacking); GitHub Pages can't send
+  // the X-Frame-Options header, so the page refuses here instead.
+  if (window.top !== window.self) throw new Error('Alnawras POS cannot be shown inside another page.');
+
   createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
       <App />

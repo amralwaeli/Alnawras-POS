@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { isNativeApp } from '../../lib/platform';
 
 /**
  * DeviceAuthController — the branch/terminal login layer.
@@ -62,7 +63,8 @@ export class DeviceAuthController {
   static async getDeviceBranch(): Promise<string | null> {
     const { data: sess } = await supabase.auth.getSession();
     // Offline launch with an expired token: the stored session can't refresh yet.
-    if (!sess.session) return navigator.onLine ? (forgetBranch(), null) : lastBranch();
+    // Tablets only — on the website no session means signed out (it would be admin).
+    if (!sess.session) return navigator.onLine || !isNativeApp() ? (forgetBranch(), null) : lastBranch();
     const { data, error } = await supabase.rpc('current_device_branch');
     // A network/server hiccup is not an answer: keep the tablet usable.
     if (error) return lastBranch();

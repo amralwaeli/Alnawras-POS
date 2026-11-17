@@ -3,8 +3,11 @@ import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt } from '../../../lib/currency';
 import { QrCode, CheckCircle, ShoppingCart, User } from 'lucide-react';
 import QRCode from 'qrcode';
+import { usePOS } from '../../context/POSContext';
+import { DeviceService } from '../../services/DeviceService';
 
 export function CustomerMonitorView() {
+  const { currentUser } = usePOS();
   const [order, setOrder] = useState<any>(null);
   const [paymentQR, setPaymentQR] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -18,7 +21,8 @@ export function CustomerMonitorView() {
 
   useEffect(() => {
     // Listen for broadcast messages from the cashier window
-    const channel = supabase.channel('customer-monitor')
+    if (!currentUser) return;
+    const channel = supabase.channel(DeviceService.customerMonitorChannel(currentUser.branchId))
       .on('broadcast', { event: 'update-bill' }, (payload) => {
         setOrder(payload.payload.order);
         setPaymentQR(payload.payload.paymentQR || null);
@@ -31,7 +35,7 @@ export function CustomerMonitorView() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [currentUser?.branchId]);
 
   if (!order) {
     return (

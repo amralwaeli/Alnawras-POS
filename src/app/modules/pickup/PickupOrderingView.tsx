@@ -9,8 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { Product, Category, ModifierGroup, SelectedModifier, DEFAULT_BRANCH_SETTINGS } from '../../models/types';
-import { SettingsController } from '../../controllers/SettingsController';
+import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
 import { computeTax } from '../../../lib/money';
 import { PickupController } from '../../controllers/PickupController';
 import { ModifierController } from '../../controllers/ModifierController';
@@ -55,12 +54,12 @@ export function PickupOrderingView() {
         <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
           <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5"><ShieldAlert className="size-10 text-red-500" /></div>
           <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Link Unavailable</h2>
-          <p className="text-sm text-gray-400">This pickup link is invalid, expired, or the order has already been completed. Please ask the restaurant for a new link.</p>
+          <p className="text-sm text-gray-400">This pickup link is invalid, expired, or has already been used to place an order. Please ask the restaurant for a new link.</p>
         </div>
       </div>
     );
   }
-  return <PickupFlow token={session.token} branchId={session.branchId} />;
+  return <PickupFlow token={session.token} branchId={session.branchId} taxSettings={session.tax} />;
 }
 
 function Splash({ label }: { label: string }) {
@@ -81,7 +80,7 @@ type PayType = 'cash' | 'online';
 
 const NOTICE = 'Please DO NOT book Grab Express or Lalamove until the restaurant marks your order as READY. You will receive an email notification once the order is ready for collection.';
 
-function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
+function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId: string; taxSettings: PickupToken['tax'] }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -92,7 +91,6 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
   const [picking, setPicking] = useState<Product | null>(null);
-  const [taxSettings, setTaxSettings] = useState(DEFAULT_BRANCH_SETTINGS);
 
   // checkout fields
   const [name, setName] = useState('');
@@ -109,7 +107,6 @@ function PickupFlow({ token, branchId }: { token: string; branchId: string }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      void SettingsController.getSettings(branchId).then(setTaxSettings);
       const [productsRes, categoriesRes] = await Promise.all([
         supabase.from('products').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
         supabase.from('categories').select('*').eq('branch_id', branchId).eq('is_active', true).order('display_order'),

@@ -7,8 +7,8 @@
  * the preparing → ready → picked status workflow, and audit logging.
  */
 import { supabase } from '../../lib/supabase';
-import { OrderController, SubmitOrderItem } from './OrderController';
-import { attachOrderToToken, completePickupToken } from '../services/PickupService';
+import type { SubmitOrderItem } from './OrderController';
+import { completePickupToken } from '../services/PickupService';
 import { mapOrder } from '../models/mappers';
 import { Order, Result } from '../models/types';
 
@@ -44,33 +44,24 @@ export interface SubmitPickupParams {
 }
 
 export class PickupController {
-  /** Customer submits their pickup order from the secure link. */
-  static async submitPickupOrder(params: SubmitPickupParams): Promise<Result<Order>> {
-    const result = await OrderController.submitOrder({
-      branchId: params.branchId,
-      orderType: 'pickup',
-      table: null,
-      items: params.items,
-      addedBy: 'pickup-customer',
-      addedByName: params.customerName || 'Pickup Customer',
-      pickup: {
-        method: params.method,
-        payType: params.payType,
-        customerName: params.customerName,
-        customerPhone: params.customerPhone,
-        customerEmail: params.customerEmail,
-        receiptUrl: params.receiptUrl,
-        paymentStatus: params.payType === 'online' ? 'pending_verification' : 'unpaid',
+  /** Customer submits their pickup order from the secure link. Prices, the
+   *  one-order-per-link rule, field checks and the audit row are all enforced
+   *  by pickup_submit (migration 0029), not here. */
+  static async submitPickupOrder(params: SubmitPickupParams): Promise<Result<{ id: string }>> {
+    const { data, error } = await supabase.rpc('pickup_submit', {
+      p_token: params.token,
+      p_details: {
+        customerName: params.customerName, customerPhone: params.customerPhone,
+        customerEmail: params.customerEmail ?? null, method: params.method,
+        payType: params.payType, receiptUrl: params.receiptUrl ?? null,
       },
+      p_items: params.items.map(i => ({
+        product_id: i.productId, quantity: i.quantity, notes: i.notes || null,
+        option_ids: (i.modifiers ?? []).map(m => m.optionId).filter(Boolean),
+      })),
     });
-
-    if (result.success && result.data) {
-      await attachOrderToToken(params.token, result.data.id);
-      await audit('pickup.order_submitted', 'order', result.data.id, { branchId: params.branchId }, {
-        method: params.method, payType: params.payType, customer: params.customerName,
-      });
-    }
-    return result;
+    if (error) return { success: false, error: error.message || 'Could not place order.' };
+    return { success: true, data: { id: data.order_id } };
   }
 
   /** Staff approves an online payment after checking the receipt. */

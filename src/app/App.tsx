@@ -12,7 +12,8 @@ import { Toaster } from 'sonner';
 
 // Routes that bypass the staff PIN login: customer QR/pickup pages, and the
 // super-admin panel (which uses its own separate Supabase Auth login).
-const PUBLIC_HASH_PREFIXES = ['#/table/', '#/order/', '#/pickup/', '#/superadmin', '#/set-password'];
+// '#/table/' is NOT public: it is the staff "Add Items" page and wrote orders with no token.
+const PUBLIC_HASH_PREFIXES = ['#/order/', '#/pickup/', '#/superadmin', '#/set-password'];
 
 function isPublicRoute(): boolean {
   return PUBLIC_HASH_PREFIXES.some(prefix => window.location.hash.startsWith(prefix));
@@ -55,7 +56,7 @@ function NeutralLoader() {
 
 function AppContent() {
   const { currentUser, authLoading, setCurrentUser } = usePOS();
-  const { loading: deviceLoading, deviceGateRequired, deviceUnlocked, deviceBranchId, isSuperAdmin } = useDeviceAuth();
+  const { loading: deviceLoading, deviceUnlocked, deviceBranchId, isSuperAdmin } = useDeviceAuth();
   const [, bumpOnHashChange] = useState(0);
 
   // Re-render on hash changes so a programmatic redirect (e.g. to the super-admin
@@ -107,7 +108,8 @@ function AppContent() {
       if (!currentUser) return <NeutralLoader />; // the web-admin effect is signing in
     } else {
       // INSTALLED APP: branch email+password (dormant until provisioned) then PIN.
-      if (deviceGateRequired && !deviceUnlocked) return <DeviceLoginView />;
+      // Always required: with row-level security every staff request needs the branch session.
+      if (!deviceUnlocked) return <DeviceLoginView />;
       if (!currentUser) return <LoginView onLoginSuccess={() => {}} />;
     }
   }

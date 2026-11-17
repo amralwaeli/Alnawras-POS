@@ -1,71 +1,82 @@
 /**
  * OfflineSyncEngine
- * 
- * Ensures that orders are persisted locally and printed even if the internet is down.
- * It periodically tries to sync local orders to Supabase when connection returns.
+ *
+ * When a device loses the network while sending items to an open bill, the
+ * request is kept here and replayed through the same server function
+ * (submit_order_items) once the connection returns — so prices, totals and
+ * branch checks are still decided by the server. A replay the server REFUSES
+ * (e.g. the bill was paid meanwhile, or a dish was removed) is dropped and the
+ * staff are told, instead of retrying forever.
  */
-
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
+
+interface QueuedItems {
+  id: string;
+  type: 'order_items';
+  timestamp: string;
+  orderId: string;
+  branchId: string;
+  addedBy: string;
+  addedByName: string;
+  items: { product_id: string; quantity: number; notes: string | null; option_ids: string[] }[];
+}
+
+const QUEUE_KEY = 'alnawras_offline_queue';
+let syncing = false;
+
+// A failed fetch (no network) vs. the server answering "no".
+const isNetworkError = (e: any) =>
+  !navigator.onLine || e?.name === 'TypeError' || /fetch|network/i.test(String(e?.message ?? ''));
+
+function readQueue(): QueuedItems[] {
+  try {
+    const all = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    // Entries from the old format wrote rows directly with client prices; they cannot be replayed safely.
+    return Array.isArray(all) ? all.filter((q: any) => q?.type === 'order_items') : [];
+  } catch { return []; }
+}
+
+function writeQueue(q: QueuedItems[]) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch { /* storage full / private mode */ }
+}
 
 export class OfflineSyncEngine {
-  private static QUEUE_KEY = 'alnawras_offline_queue';
-
-  /**
-   * Adds an order to the local offline queue
-   */
-  static addToQueue(type: 'order' | 'payment', data: any) {
-    const queue = this.getQueue();
-    queue.push({ id: Date.now(), type, data, timestamp: new Date().toISOString() });
-    localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
-    console.log(`[OfflineSync] Added ${type} to queue. Total: ${queue.length}`);
+  static addToQueue(entry: Omit<QueuedItems, 'id' | 'type' | 'timestamp'>) {
+    const q = readQueue();
+    q.push({ ...entry, id: crypto.randomUUID(), type: 'order_items', timestamp: new Date().toISOString() });
+    writeQueue(q);
   }
 
-  /**
-   * Attempts to sync the offline queue to the server
-   */
+  static pendingCount(): number { return readQueue().length; }
+
   static async sync() {
-    if (!navigator.onLine) return;
-    
-    const queue = this.getQueue();
-    if (queue.length === 0) return;
-
-    console.log(`[OfflineSync] Attempting to sync ${queue.length} items...`);
-    const remaining = [];
-
-    for (const item of queue) {
-      try {
-        let success = false;
-        if (item.type === 'order') {
-          const { error } = await supabase.from('orders').upsert(item.data.order);
-          if (!error) {
-            const { error: itemError } = await supabase.from('order_items').upsert(item.data.items);
-            if (!itemError) success = true;
-          }
-        } else if (item.type === 'payment') {
-          const { error } = await supabase.from('orders').update(item.data).eq('id', item.data.id);
-          if (!error) success = true;
+    if (syncing || !navigator.onLine) return;
+    syncing = true;
+    try {
+      const remaining: QueuedItems[] = [];
+      for (const item of readQueue()) {
+        try {
+          const { error } = await supabase.rpc('submit_order_items', {
+            p_order_id: item.orderId, p_branch_id: item.branchId,
+            p_added_by: item.addedBy, p_added_by_name: item.addedByName, p_items: item.items,
+          });
+          if (!error) { toast.success('Items sent while offline have now reached the kitchen and the bill.'); continue; }
+          if (isNetworkError(error)) { remaining.push(item); continue; }
+          toast.error(`Items sent while offline could not be added: ${error.message}. Please re-enter them.`, { duration: 15000 });
+        } catch (err) {
+          if (isNetworkError(err)) remaining.push(item);
         }
-
-        if (!success) remaining.push(item);
-      } catch (err) {
-        remaining.push(item);
       }
+      writeQueue(remaining);
+    } finally {
+      syncing = false;
     }
-
-    localStorage.setItem(this.QUEUE_KEY, JSON.stringify(remaining));
   }
 
-  private static getQueue(): any[] {
-    const raw = localStorage.getItem(this.QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  /**
-   * Start the background sync process
-   */
   static start() {
-    window.addEventListener('online', () => this.sync());
-    setInterval(() => this.sync(), 60000); // Check every minute
-    void this.sync();
+    window.addEventListener('online', () => void OfflineSyncEngine.sync());
+    setInterval(() => void OfflineSyncEngine.sync(), 60000);
+    void OfflineSyncEngine.sync();
   }
 }

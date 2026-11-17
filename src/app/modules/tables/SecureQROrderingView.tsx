@@ -4,19 +4,14 @@
  * Customer-facing ordering page reached via a secure QR code.
  * The URL contains only a random token — the real table ID is never exposed.
  *
- * Flow:
- *   1. Read token from URL param.
- *   2. Validate token against qr_sessions in Supabase (checks active + expiry).
- *   3. Resolve the real tableId internally.
- *   4. Render the full ordering UI with the resolved tableId.
+ * The page only holds a guest-session token (from guest_join). Everything it
+ * reads or changes about the table and the bill goes through the token-checked
+ * functions in migration 0029; the server enforces the ordering rules.
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { validateQrToken, QrSession } from '../../services/QrService';
-import { Product, Category, Table, ModifierGroup, SelectedModifier } from '../../models/types';
-import { OrderController } from '../../controllers/OrderController';
+import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
 import { ModifierController } from '../../controllers/ModifierController';
 import { BranchController } from '../../controllers/BranchController';
 import { ModifierPickerModal } from '../../components/ModifierPickerModal';
@@ -26,64 +21,6 @@ import {
   CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, ShieldAlert,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
-
-// ─── Token validation wrapper ─────────────────────────────────────────────────
-
-type ValidationState = 'loading' | 'valid' | 'invalid';
-
-export function SecureQROrderingView() {
-  const { token } = useParams<{ token: string }>();
-  const [state, setState] = useState<ValidationState>('loading');
-  const [session, setSession] = useState<QrSession | null>(null);
-
-  useEffect(() => {
-    const validate = async () => {
-      if (!token) { setState('invalid'); return; }
-      const result = await validateQrToken(token);
-      if (!result) { setState('invalid'); return; }
-      setSession(result);
-      setState('valid');
-    };
-    void validate();
-  }, [token]);
-
-  if (state === 'loading') {
-    return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3]">
-        <div className="flex flex-col items-center gap-5">
-          <div className="bg-orange-500 rounded-[28px] p-5 shadow-2xl shadow-orange-200">
-            <UtensilsCrossed className="size-10 text-white" />
-          </div>
-          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Verifying QR Code…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === 'invalid') {
-    return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
-        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
-          <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5">
-            <ShieldAlert className="size-10 text-red-500" />
-          </div>
-          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Invalid QR Code</h2>
-          <p className="text-sm text-gray-400">
-            This QR code is invalid or has expired. Please scan the QR code on your table
-            or ask a team member for help.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (session) {
-    return <SecureOrderingUI tableId={session.tableId} />;
-  }
-
-  return null;
-}
 
 // ─── Full ordering UI (receives tableId as prop, never from URL) ──────────────
 
@@ -108,9 +45,19 @@ interface ExistingItem {
   addedByName?: string;
 }
 
-export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Guest', groupOrderId }: { tableId: string; addedBy?: string; addedByName?: string; groupOrderId?: string }) {
-  const [table, setTable]                 = useState<Table | null>(null);
-  const [orderId, setOrderId]             = useState<string | null>(null);
+interface GuestTable { number: number; branchId: string; orderingEnabled: boolean; needsWaiter: boolean }
+
+const toExisting = (items: any[]): ExistingItem[] => (items ?? []).map((item: any) => ({
+  id: item.id, productId: item.product_id, productName: item.product_name,
+  price: Number(item.price), quantity: Number(item.quantity), status: item.status,
+  addedByName: item.added_by_name,
+}));
+
+// shortcut: polls instead of realtime (anon can't see realtime rows once RLS is on); 8s is fine for a menu.
+const POLL_MS = 8000;
+
+export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
+  const [table, setTable]                 = useState<GuestTable | null>(null);
   const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
   const [products, setProducts]           = useState<Product[]>([]);
   const [categories, setCategories]       = useState<Category[]>([]);
@@ -128,26 +75,28 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
   const [mobileView, setMobileView]       = useState<'menu' | 'cart'>('menu');
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
 
+  // Applies a guest_state() result; null means the party was closed (bill paid) or the token is stale.
+  const applyState = (st: any) => {
+    if (!st) { setInvalidTable(true); return; }
+    setTable({
+      number: st.table_number, branchId: st.branch_id,
+      orderingEnabled: !!st.ordering_enabled, needsWaiter: !!st.needs_waiter,
+    });
+    setExistingItems(toExisting(st.items));
+    const soldOut = new Set<string>(st.unavailable_product_ids ?? []);
+    setProducts(prev => prev.map(p => ({ ...p, kitchenStatus: soldOut.has(p.id) ? 'finished' : 'available' })));
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data: tableRow, error } = await supabase
-        .from('tables').select('*').eq('id', tableId).single();
-      if (error || !tableRow) { setInvalidTable(true); setLoading(false); return; }
-
-      const branchId = tableRow.branch_id;
+      const { data: st } = await supabase.rpc('guest_state', { p_session_token: sessionToken });
+      if (!st) { setInvalidTable(true); setLoading(false); return; }
+      const branchId = st.branch_id;
 
       // Contract expired / branch suspended → customers can't order.
       const access = await BranchController.getAccess(branchId);
       if (!access.allowed) { setBranchClosed(true); setLoading(false); return; }
-      setTable({
-        id: tableRow.id, number: tableRow.number, capacity: tableRow.capacity,
-        status: tableRow.status, branchId,
-        currentOrderId: tableRow.current_order_id,
-        assignedCashierId: tableRow.assigned_cashier_id,
-        needsWaiter: tableRow.needs_waiter ?? false,
-        orderingEnabled: tableRow.ordering_enabled ?? false,
-      });
 
       const [productsRes, categoriesRes] = await Promise.all([
         supabase.from('products').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
@@ -164,8 +113,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
         isActive: p.is_active ?? true, createdAt: new Date(p.created_at),
       }));
       setProducts(prods);
-      const productIds = prods.map(p => p.id);
-      setModifierMap(await ModifierController.getGroupsForProducts(productIds));
+      setModifierMap(await ModifierController.getGroupsForProducts(prods.map(p => p.id)));
 
       const cats: Category[] = (categoriesRes.data ?? [])
         .map((c: any) => ({
@@ -178,77 +126,25 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       setCategories(cats);
       if (cats.length) setSelectedCategory(cats[0].id);
 
-      // In group mode use the group's single shared order; otherwise the table's.
-      const loadOrderId = groupOrderId || tableRow.current_order_id;
-      if (loadOrderId) {
-        const { data: orderData } = await supabase
-          .from('orders').select('*, order_items(*)')
-          .eq('id', loadOrderId).single();
-        if (orderData) {
-          setOrderId(orderData.id);
-          setExistingItems((orderData.order_items ?? []).map((item: any) => ({
-            id: item.id, productId: item.product_id, productName: item.product_name,
-            price: Number(item.price), quantity: Number(item.quantity), status: item.status,
-            addedByName: item.added_by_name,
-          })));
-        }
-      }
+      applyState(st);
       setLoading(false);
     };
     void load();
-  }, [tableId, groupOrderId]);
+  }, [sessionToken]);
 
-  // Group mode: keep the SHARED cart live so every guest sees everyone's items.
+  // Keep the shared bill, ordering switch, waiter-call state and sold-out dishes current.
   useEffect(() => {
-    if (!groupOrderId) return;
-    const refetch = async () => {
-      const { data } = await supabase.from('orders').select('order_items(*)').eq('id', groupOrderId).single();
-      if (data) {
-        setExistingItems((data.order_items ?? []).map((item: any) => ({
-          id: item.id, productId: item.product_id, productName: item.product_name,
-          price: Number(item.price), quantity: Number(item.quantity), status: item.status,
-          addedByName: item.added_by_name,
-        })));
-      }
+    if (loading || invalidTable || branchClosed) return;
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { data: st, error } = await supabase.rpc('guest_state', { p_session_token: sessionToken });
+      if (!error) applyState(st);
     };
-    const channel = supabase
-      .channel(`group-order-${groupOrderId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${groupOrderId}` }, () => { void refetch(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [groupOrderId]);
-
-  // Realtime: react live if a waiter turns this table's QR ordering on/off
-  // while the customer already has the page open.
-  useEffect(() => {
-    if (!tableId) return;
-    const channel = supabase
-      .channel(`secure-qr-table-${tableId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, (payload) => {
-        const up = payload.new as any;
-        // needs_waiter flips back to false when staff acknowledge the call, which re-enables "Call Waiter".
-        setTable(prev => prev ? { ...prev, orderingEnabled: up.ordering_enabled ?? false, needsWaiter: up.needs_waiter ?? false } : prev);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [tableId]);
-
-  // Realtime product availability sync
-  useEffect(() => {
-    if (!table?.branchId) return;
-    const channel = supabase
-      .channel(`secure-qr-products-${table.branchId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products', filter: `branch_id=eq.${table.branchId}` }, (payload) => {
-        const up = payload.new as any;
-        setProducts(prev => prev.map(p =>
-          p.id === up.id
-            ? { ...p, kitchenStatus: up.kitchen_status ?? 'available', availabilityStatus: up.availability_status ?? 'available' }
-            : p
-        ));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [table?.branchId]);
+    const t = setInterval(() => { void tick(); }, POLL_MS);
+    const onVisible = () => { void tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
+  }, [sessionToken, loading, invalidTable, branchClosed]);
 
   const filteredProducts = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -290,8 +186,8 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
   const handleCallWaiter = async () => {
     if (!table) return;
     setCallingWaiter(true);
-    const { error } = await supabase.from('tables').update({ needs_waiter: true }).eq('id', table.id);
-    if (error) toast.error('Could not call waiter. Try again.');
+    const { data: ok, error } = await supabase.rpc('guest_call_waiter', { p_session_token: sessionToken });
+    if (error || !ok) toast.error('Could not call waiter. Try again.');
     else {
       setTable(prev => prev ? { ...prev, needsWaiter: true } : prev);
       toast.success('Waiter has been notified!');
@@ -303,28 +199,16 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
     if (!table || cartItems.length === 0) { toast.error('Add items to your order first.'); return; }
     setSubmitting(true);
     try {
-      const result = await OrderController.submitOrder({
-        branchId: table.branchId,
-        orderType: 'dine-in',
-        table: { id: table.id, number: table.number },
-        // Always target the ONE shared group order so the whole party = one bill.
-        existingOrderId: groupOrderId ?? orderId ?? table.currentOrderId,
-        items: cartItems.map(item => ({
-          productId: item.productId, productName: item.productName,
-          quantity: item.quantity, price: item.price,
-          notes: item.notes, station: item.station, modifiers: item.modifiers,
+      const { data: st, error } = await supabase.rpc('guest_submit', {
+        p_session_token: sessionToken,
+        p_items: cartItems.map(item => ({
+          product_id: item.productId, quantity: item.quantity, notes: item.notes || null,
+          option_ids: (item.modifiers ?? []).map(m => m.optionId).filter(Boolean),
         })),
-        addedBy,
-        addedByName,
       });
-      if (!result.success) { toast.error(result.error); return; }
-      setOrderId(result.data.id);
-      setTable(prev => prev ? { ...prev, status: 'occupied', currentOrderId: result.data.id } : prev);
-      setExistingItems((result.data.items ?? []).map((item: any) => ({
-        id: item.id, productId: item.productId, productName: item.productName,
-        price: item.price, quantity: item.quantity, status: item.status,
-        addedByName: item.addedByName,
-      })));
+      // The server's message is written for customers (e.g. "… is not available right now").
+      if (error) { toast.error(error.message || 'Could not send your order. Please try again.'); return; }
+      applyState(st);
       setCartItems([]);
       setExpandedNotes(null);
       setSuccess(true);
@@ -529,12 +413,12 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
 
           {existingItems.length > 0 && (
             <div className="bg-white rounded-2xl p-4 space-y-2">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{groupOrderId ? 'Table Order · everyone' : 'Already Ordered'}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">'Table Order · everyone'</p>
               {existingItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm gap-2">
                   <span className="text-gray-700 flex-1 min-w-0">
                     {item.quantity}× {item.productName}
-                    {groupOrderId && item.addedByName && <em className="text-gray-400 not-italic"> · {item.addedByName}</em>}
+                    {item.addedByName && <em className="text-gray-400 not-italic"> · {item.addedByName}</em>}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
                     {item.status}

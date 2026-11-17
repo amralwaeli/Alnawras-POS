@@ -20,14 +20,14 @@ export class SuperAdminController {
     if (error) return { success: false, error: error.message };
     const ok = await SuperAdminController.isSuperAdmin();
     if (!ok) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       return { success: false, error: 'This account is not a super-admin.' };
     }
     return { success: true };
   }
 
   static async logout(): Promise<void> {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
   }
 
   /** Is there a current Supabase Auth session that belongs to a super-admin? */

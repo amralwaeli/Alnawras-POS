@@ -51,7 +51,7 @@ export function KitchenView() {
 
     const channel = supabase
       .channel('kitchen-tickets')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, async (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `branch_id=eq.${currentUser.branchId}` }, async (payload) => {
         // A cancellation is an UPDATE transitioning INTO 'cancelled' — flag it
         // distinctly (red, sticky) instead of the generic new-item alert, so
         // the kitchen notices an already-fired item was pulled.
@@ -85,7 +85,7 @@ export function KitchenView() {
         void loadTickets();
         toast('New Order Received!', { style: { background: '#f97316', color: '#fff', fontWeight: 700 } });
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => void loadTickets())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `branch_id=eq.${currentUser.branchId}` }, () => void loadTickets())
       .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
 
     const poll = setInterval(loadTickets, 30_000); // Safety fallback every 30s (was 250ms — caused massive egress)

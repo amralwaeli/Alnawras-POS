@@ -51,7 +51,10 @@ export function DeviceAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void evaluate();
     const { data: sub } = supabase.auth.onAuthStateChange(() => { void evaluate(); });
-    return () => sub.subscription.unsubscribe();
+    // Re-check when the network comes back (an offline launch used the last known branch).
+    const onOnline = () => { void evaluate(); };
+    window.addEventListener('online', onOnline);
+    return () => { sub.subscription.unsubscribe(); window.removeEventListener('online', onOnline); };
   }, [evaluate]);
 
   const signInDevice = useCallback(async (email: string, password: string) => {

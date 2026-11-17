@@ -16,7 +16,7 @@ import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
 export function Layout() {
   const { currentUser, logout } = usePOS();
   const { hasFeature } = useBranch();
-  const { deviceGateRequired, signOutDevice } = useDeviceAuth();
+  const { deviceUnlocked, signOutDevice } = useDeviceAuth();
   const location = useLocation();
   const [collapsed, setCollapsed]     = useState(() => window.innerWidth < 1024);
   const [mobileOpen, setMobileOpen]   = useState(false);
@@ -305,7 +305,7 @@ export function Layout() {
           {/* App only, admin only: unbind this device from its branch account.
               (On the website, Logout above already signs the device out.) Shown
               only when the device-login gate is active. */}
-          {isNativeApp() && currentUser.role === 'admin' && deviceGateRequired && (
+          {isNativeApp() && currentUser.role === 'admin' && deviceUnlocked && (
             <button
               onClick={handleDeviceSignOut}
               title="Sign this device out of the branch account"

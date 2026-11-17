@@ -85,9 +85,6 @@ export function usePOS() {
     setUsers:       auth.setUsers,
     login:          auth.login,
     logout:         auth.logout,
-    addUser:        auth.addUser,
-    updateUser:     auth.updateUser,
-    deleteUser:     auth.deleteUser,
     // catalog
     products:       catalog.products,
     categories:     catalog.categories,

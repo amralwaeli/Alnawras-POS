@@ -13,6 +13,13 @@ import { supabase } from '../../lib/supabase';
  * provisioned: `isRequired()` returns false (or fails open on any error, e.g.
  * the migration not yet applied), and the app skips the gate entirely.
  */
+// Last branch this device was confirmed for. Only a UI hint for when the
+// network is down — the database still checks every request.
+const BRANCH_KEY = 'alnawras_device_branch';
+const lastBranch = () => { try { return localStorage.getItem(BRANCH_KEY); } catch { return null; } };
+const rememberBranch = (b: string) => { try { localStorage.setItem(BRANCH_KEY, b); } catch { /* ignore */ } };
+const forgetBranch = () => { try { localStorage.removeItem(BRANCH_KEY); } catch { /* ignore */ } };
+
 export class DeviceAuthController {
   /** Sign the device into a branch account. Rejects any Supabase account that
    *  isn't a registered device login (e.g. a super-admin), signing it back out
@@ -29,13 +36,16 @@ export class DeviceAuthController {
     const branchId = await DeviceAuthController.getDeviceBranch();
     if (branchId) return { success: true, role: 'branch' };
 
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { success: false, error: 'This account is not set up to log in here.' };
   }
 
   /** Sign the device out of its branch account (admin action). */
   static async signOut(): Promise<void> {
-    await supabase.auth.signOut();
+    // 'local': the default ('global') would revoke the branch login on EVERY tablet
+    // and the website at their next token refresh, because they share one account.
+    await supabase.auth.signOut({ scope: 'local' });
+    forgetBranch();
   }
 
   /** Is the device-login gate active (has any branch device account been set up)?
@@ -51,9 +61,13 @@ export class DeviceAuthController {
    *  current session isn't a registered device login (no session / super-admin). */
   static async getDeviceBranch(): Promise<string | null> {
     const { data: sess } = await supabase.auth.getSession();
-    if (!sess.session) return null;
+    // Offline launch with an expired token: the stored session can't refresh yet.
+    if (!sess.session) return navigator.onLine ? (forgetBranch(), null) : lastBranch();
     const { data, error } = await supabase.rpc('current_device_branch');
-    if (error) return null;
-    return typeof data === 'string' && data.length > 0 ? data : null;
+    // A network/server hiccup is not an answer: keep the tablet usable.
+    if (error) return lastBranch();
+    const branch = typeof data === 'string' && data.length > 0 ? data : null;
+    if (branch) rememberBranch(branch); else forgetBranch();
+    return branch;
   }
 }

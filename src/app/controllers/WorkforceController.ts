@@ -5,6 +5,7 @@ import {
 } from '../models/types';
 import { mapEmployee, mapLeaveRequest } from '../models/mappers';
 import { localDateStr } from '../../lib/date';
+import { STAFF_COLUMNS } from './StaffController';
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -65,7 +66,7 @@ export class WorkforceController {
         branch_id: input.branchId,
         hire_date: input.hireDate,
       })
-      .select()
+      .select(STAFF_COLUMNS)
       .single();
 
     if (userErr) return { success: false, error: userErr.message };
@@ -104,7 +105,7 @@ export class WorkforceController {
     const employee = mapEmployee(empRow);
     return {
       success: true,
-      data: { ...employee, pin: userRow.pin },
+      data: { ...employee, pin: input.pin },   // the database keeps only the hash
     };
   }
 
@@ -143,7 +144,7 @@ export class WorkforceController {
         try {
           const { data: usersData } = await supabase
             .from('users')
-            .select('*')
+            .select(STAFF_COLUMNS)
             .neq('role', 'admin')
             .order('name');
 

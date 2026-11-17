@@ -173,7 +173,8 @@ export class OrderController {
           return { success: false, error: dbErr?.message || 'Failed to submit order.' };
         }
         console.warn('[OrderController] Offline detected, queuing order locally', dbErr);
-        OfflineSyncEngine.addToQueue('order', { order: { id: orderId, branch_id: branchId, status: 'open' }, items: rows });
+        // Replayed through the same server function later (server prices, branch check).
+        OfflineSyncEngine.addToQueue({ orderId, branchId, addedBy: params.addedBy, addedByName: params.addedByName, items: rpcItems });
         finalOrder = { id: orderId, tableNumber: params.table?.number || 0, items: rows };
         printItems = rows;
       }

@@ -418,7 +418,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // ── Customer Monitor Sync ──────────────────────────────────────────────────
   useEffect(() => {
     if (!order || !isOpen) return;
-    const channel = supabase.channel('customer-monitor');
+    const channel = supabase.channel(DeviceService.customerMonitorChannel(currentUser.branchId));
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.send({
@@ -500,7 +500,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     // Notify customer monitor of success (one-shot). Remove the channel after
     // sending so a completed payment doesn't leak a realtime subscription
     // every time — hundreds would otherwise accumulate over a shift.
-    const successCh = supabase.channel('customer-monitor');
+    const successCh = supabase.channel(DeviceService.customerMonitorChannel(currentUser.branchId));
     successCh.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await successCh.send({ type: 'broadcast', event: 'payment-success', payload: {} });

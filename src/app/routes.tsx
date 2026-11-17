@@ -30,10 +30,8 @@ const TablesView             = lazy(() => import('./modules/tables').then(m => (
 const TableManagementView    = lazy(() => import('./modules/tables').then(m => ({ default: m.TableManagementView })));
 const TableOrderingView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableOrderingView })));
 const QROrderingView         = lazy(() => import('./modules/tables').then(m => ({ default: m.QROrderingView })));
-const SecureQROrderingView   = lazy(() => import('./modules/tables').then(m => ({ default: m.SecureQROrderingView })));
 const GroupOrderingView      = lazy(() => import('./modules/tables/GroupOrderingView').then(m => ({ default: m.GroupOrderingView })));
 const TableQRView            = lazy(() => import('./modules/tables').then(m => ({ default: m.TableQRView })));
-const TableRedirectView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableRedirectView })));
 
 const KitchenView            = lazy(() => import('./modules/kitchen').then(m => ({ default: m.KitchenView })));
 
@@ -223,7 +221,7 @@ export const router = createHashRouter([
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
 
   // ── Secure QR ordering (legacy single-session) — token-based ──
-  { path: '/order/qr/:token',     element: <Lazy><SecureQROrderingView /></Lazy> },
+  { path: '/order/qr/:token',     element: <Lazy><GroupOrderingView /></Lazy> },
 
   // ── Group ordering — stable table token, multi-device, no table ID in URL ──
   { path: '/order/t/:qrToken',    element: <Lazy><GroupOrderingView /></Lazy> },
@@ -233,8 +231,6 @@ export const router = createHashRouter([
 
   // ── Legacy QR routes — kept for backward compatibility ──
   { path: '/table/:tableId',      element: <Lazy><QROrderingView /></Lazy> },
-  { path: '/order/table-:tableNumber', element: <Lazy><TableRedirectView /></Lazy> },
-  { path: '/order/:tableSlug',    element: <Lazy><TableRedirectView /></Lazy> },
 
   { path: '/customer-monitor',    element: <Lazy><CustomerMonitorView /></Lazy> },
 

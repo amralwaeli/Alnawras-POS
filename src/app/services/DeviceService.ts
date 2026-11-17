@@ -19,10 +19,16 @@ export class DeviceService {
   static getDeviceId(): string {
     let id = localStorage.getItem(DeviceService.DEVICE_ID_KEY);
     if (!id) {
-      id = `dev-${Math.random().toString(36).slice(2, 11)}`;
+      id = `dev-${crypto.randomUUID()}`;   // unguessable: it also names this till's customer-display channel
       localStorage.setItem(DeviceService.DEVICE_ID_KEY, id);
     }
     return id;
+  }
+
+  /** Realtime channel between this till and its customer-facing display (same browser).
+   *  Was one global name, so every till's bill showed on every display, in every branch. */
+  static customerMonitorChannel(branchId: string): string {
+    return `customer-monitor-${branchId}-${DeviceService.getDeviceId()}`;
   }
 
   /**

@@ -94,51 +94,6 @@ export async function createQrSession(
 }
 
 /**
- * Validate a token from the URL and return the resolved session.
- * Returns null if the token is unknown, expired, or deactivated.
- */
-export async function validateQrToken(token: string): Promise<QrSession | null> {
-  if (!token || token.length !== 64) return null; // quick sanity check
-
-  const { data, error } = await supabase
-    .from('qr_sessions')
-    .select('token, table_id, branch_id, active, expires_at')
-    .eq('token', token)
-    .eq('active', true)
-    .single();
-
-  if (error || !data) return null;
-
-  // Check expiry
-  if (data.expires_at && new Date(data.expires_at) < new Date()) {
-    // Silently deactivate the expired session
-    await supabase.from('qr_sessions').update({ active: false }).eq('token', token);
-    return null;
-  }
-
-  // Fetch the table number for display purposes
-  const { data: tableRow } = await supabase
-    .from('tables')
-    .select('number')
-    .eq('id', data.table_id)
-    .single();
-
-  // Bump last_activity_at
-  await supabase
-    .from('qr_sessions')
-    .update({ last_activity_at: new Date().toISOString() })
-    .eq('token', token);
-
-  return {
-    token: data.token,
-    tableId: data.table_id,
-    tableNumber: tableRow?.number ?? 0,
-    branchId: data.branch_id,
-    expiresAt: data.expires_at,
-  };
-}
-
-/**
  * Immediately revoke a QR session for a table (e.g. when the table is cleared).
  */
 export async function revokeQrSession(tableId: string): Promise<void> {

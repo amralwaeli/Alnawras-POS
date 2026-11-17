@@ -36,19 +36,10 @@ export interface PickupToken {
   status: 'new' | 'ordered' | 'completed' | 'expired';
   active: boolean;
   expiresAt: string | null;
+  /** The branch's tax rule, so the customer sees the same tax as the till. */
+  tax: { taxEnabled: boolean; taxRate: number; taxInclusive: boolean; taxLabel: string };
 }
 
-function mapToken(row: any): PickupToken {
-  return {
-    id: row.id,
-    token: row.token,
-    branchId: row.branch_id,
-    orderId: row.order_id ?? null,
-    status: row.status,
-    active: row.active,
-    expiresAt: row.expires_at ?? null,
-  };
-}
 
 /** Create a fresh, unique, single-use pickup link. */
 export async function createPickupToken(
@@ -95,35 +86,18 @@ export async function createPickupToken(
 }
 
 /**
- * Validate a token from the URL. Returns null if unknown, expired, deactivated,
- * or already completed (order picked) — so completed orders can't be reopened.
+ * Check a pickup link through pickup_open (migration 0029). Returns null if the
+ * link is unknown, expired, already used for an order, or the branch is closed.
  */
 export async function validatePickupToken(token: string): Promise<PickupToken | null> {
   if (!token || token.length !== 64) return null;
-
-  const { data, error } = await supabase
-    .from('pickup_tokens')
-    .select('*')
-    .eq('token', token)
-    .eq('active', true)
-    .single();
-
-  if (error || !data) return null;
-  if (data.status === 'completed' || data.status === 'expired') return null;
-
-  if (data.expires_at && new Date(data.expires_at) < new Date()) {
-    await supabase.from('pickup_tokens').update({ active: false, status: 'expired' }).eq('token', token);
-    return null;
-  }
-  return mapToken(data);
-}
-
-/** Link a submitted order to its token and mark the token as used (ordered). */
-export async function attachOrderToToken(token: string, orderId: string): Promise<void> {
-  await supabase
-    .from('pickup_tokens')
-    .update({ order_id: orderId, status: 'ordered' })
-    .eq('token', token);
+  const { data, error } = await supabase.rpc('pickup_open', { p_token: token });
+  if (error || !data || data.status !== 'new') return null;
+  const t = data.tax ?? {};
+  return {
+    id: '', token, branchId: data.branch_id, orderId: data.order_id ?? null, status: data.status, active: true, expiresAt: null,
+    tax: { taxEnabled: !!t.enabled, taxRate: Number(t.rate ?? 0), taxInclusive: !!t.inclusive, taxLabel: t.label || 'Tax' },
+  };
 }
 
 /** Permanently invalidate a token (called when the order is marked picked). */

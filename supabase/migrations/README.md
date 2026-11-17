@@ -20,6 +20,21 @@ production and have been removed.
 | `0026_employee_performance.sql` | DDL — adds `employee_performance_observations` (AI CCTV / manager / customer observations linked to existing `employees.employee_id`) + validation trigger | **Yes — required** for Workforce → Performance. Purely additive (no existing table touched); rollback SQL at the bottom of the file. **Not** the same file as `0026_enable_rls.sql` on the `feature/1d-auth-rls` branch |
 | `0027_shifts_and_attendance_hours.sql` | DDL — creates `shifts` and adds `attendance_logs.total_hours`, both used by the app but never created by a migration | **Yes — required.** Until applied, Shift Management and every clock-out fail in prod. Additive; rollback at the bottom of the file |
 | `0028_lock_control_plane.sql` | RLS — locks `super_admins`, `branch_logins`, `organizations`, `branches` so only a super-admin can change who is a tenant/admin | **Yes — required.** Does not affect staff/customer flows (they never write these tables). Verify + rollback SQL at the bottom of the file |
+| `0029_customer_rpcs.sql` | Functions — token-checked customer functions (QR group ordering, pickup); server-side item checks; fixes 0022's order-submit function (it failed on every call: ambiguous column) | **Yes.** Additive |
+| `0030_staff_pin.sql` | Security — PIN login scoped to the device's branch + throttled; plaintext PINs blanked; PIN columns hidden from the API | **Yes.** Blanks plaintext PINs (hashes keep working) |
+| `0031_money_rpcs_branch_check.sql` | Security — money/order functions require the caller's own branch; fixes split payments (the last split always failed) | **Yes** — but only right AFTER the new client is live (see order below) |
+| `0032_enable_rls.sql` | Security — Row-Level Security on every table (tenant isolation) | **Yes, last.** Rollback block at the bottom |
+
+## Security cutover order (0029–0032) — follow exactly
+
+1. Every staff device (website + installed app) must already sign in with its branch email + password.
+2. Apply `0026` → `0027` → `0028` → `0029` → `0030` (the current app keeps working).
+3. Push the new client (`main`) and wait for the deploy to finish.
+4. Apply `0031` (the old client's customer QR page would fail on it — hence after the push).
+5. Apply `0032`. Then check: website login, a PIN login on a tablet, a QR order from a phone, a pickup order, a whole-bill and a split payment.
+6. If anything is locked out: run the ROLLBACK block at the bottom of `0032` (instant).
+
+Tests: `pnpm test` executes every migration on an in-process Postgres (`testdb.ts`) — 88 database tests, including a per-table isolation test. They do not cover the real Supabase API / Realtime / Auth.
 
 ## How to apply
 

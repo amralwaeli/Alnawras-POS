@@ -7,21 +7,24 @@
  */
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { joinTable, GuestSession } from '../../services/GroupOrderService';
+import { joinTable } from '../../services/GroupOrderService';
 import { SecureOrderingUI } from './SecureQROrderingView';
 import { UtensilsCrossed, ShieldAlert } from 'lucide-react';
 
 export function GroupOrderingView() {
-  const { qrToken } = useParams<{ qrToken: string }>();
-  const [state, setState] = useState<'loading' | 'valid' | 'invalid'>('loading');
-  const [session, setSession] = useState<GuestSession | null>(null);
+  // /order/t/:qrToken (printed table QR) and the older /order/qr/:token both land here.
+  const { qrToken: tableToken, token } = useParams<{ qrToken?: string; token?: string }>();
+  const qrToken = tableToken ?? token;
+  const [state, setState] = useState<'loading' | 'valid' | 'invalid' | 'closed'>('loading');
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       if (!qrToken) { setState('invalid'); return; }
       const s = await joinTable(qrToken);
+      if (s === 'closed') { setState('closed'); return; }
       if (!s) { setState('invalid'); return; }
-      setSession(s);
+      setSessionToken(s);
       setState('valid');
     })();
   }, [qrToken]);
@@ -38,17 +41,17 @@ export function GroupOrderingView() {
     );
   }
 
-  if (state === 'invalid' || !session) {
+  if (state === 'invalid' || state === 'closed' || !sessionToken) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
         <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
           <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5"><ShieldAlert className="size-10 text-red-500" /></div>
-          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Table Unavailable</h2>
-          <p className="text-sm text-gray-400">This QR code is invalid, or the table session was closed. Please ask a team member or scan the table QR again.</p>
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">{state === 'closed' ? 'Temporarily Unavailable' : 'Table Unavailable'}</h2>
+          <p className="text-sm text-gray-400">{state === 'closed' ? 'Online ordering is not available right now. Please order with a team member.' : 'This QR code is invalid, or the table session was closed. Please ask a team member or scan the table QR again.'}</p>
         </div>
       </div>
     );
   }
 
-  return <SecureOrderingUI tableId={session.tableId} addedBy={session.sessionId} addedByName={session.guestLabel} groupOrderId={session.orderId} />;
+  return <SecureOrderingUI sessionToken={sessionToken} />;
 }

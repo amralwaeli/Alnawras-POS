@@ -122,6 +122,19 @@ CREATE POLICY branch_isolation ON employee_fingerprints FOR ALL TO authenticated
   USING      (EXISTS (SELECT 1 FROM employees e WHERE e.employee_id = employee_fingerprints.employee_id AND e.branch_id = (SELECT public.current_device_branch())))
   WITH CHECK (EXISTS (SELECT 1 FROM employees e WHERE e.employee_id = employee_fingerprints.employee_id AND e.branch_id = (SELECT public.current_device_branch())));
 
+-- Tables found on production that no migration creates (created by hand earlier).
+-- printers carries branch_id; shift_rules hangs off an employee.
+SELECT pg_temp.branch_policy('printers');
+DO $$ BEGIN
+  IF to_regclass('public.shift_rules') IS NOT NULL THEN
+    ALTER TABLE shift_rules ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS branch_isolation ON shift_rules;
+    CREATE POLICY branch_isolation ON shift_rules FOR ALL TO authenticated
+      USING      (EXISTS (SELECT 1 FROM employees e WHERE e.employee_id = shift_rules.employee_id AND e.branch_id = (SELECT public.current_device_branch())))
+      WITH CHECK (EXISTS (SELECT 1 FROM employees e WHERE e.employee_id = shift_rules.employee_id AND e.branch_id = (SELECT public.current_device_branch())));
+  END IF;
+END $$;
+
 -- ── Functions-only bookkeeping ───────────────────────────────
 ALTER TABLE bill_counters ENABLE ROW LEVEL SECURITY;      -- no policy
 REVOKE ALL ON bill_counters FROM anon, authenticated;
@@ -163,6 +176,28 @@ CREATE POLICY "merchant_qr_write" ON storage.objects FOR INSERT TO authenticated
 -- may LIST the bucket any more — the list API exposed every branch's customer
 -- receipts. The bucket is public, so a receipt still opens from its own URL.
 DROP POLICY IF EXISTS "pickup_receipts_read" ON storage.objects;
+
+-- ── Anything else in the schema: locked by default ───────────
+-- A table nobody has written a policy for is closed to the API (RLS on, no
+-- policy) instead of silently left open.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND NOT rowsecurity LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    RAISE NOTICE 'RLS enabled with no policy (API access closed): %', t;
+  END LOOP;
+END $$;
+
+-- ── Realtime: never broadcast the staff table ─────────────────
+-- Its rows carry pin_hash (a 4-digit PIN's hash cracks in seconds), and Supabase
+-- does not apply RLS to DELETE events. The app never subscribes to it.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime'
+             AND schemaname = 'public' AND tablename = 'users') THEN
+    ALTER PUBLICATION supabase_realtime DROP TABLE public.users;
+  END IF;
+END $$;
 
 NOTIFY pgrst, 'reload schema';
 

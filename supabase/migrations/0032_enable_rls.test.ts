@@ -7,6 +7,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { makeDb, as, one, fails } from './testdb';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const DEV_A = '11111111-1111-1111-1111-111111111111';
 const DEV_B = '22222222-2222-2222-2222-222222222222';
@@ -183,6 +185,24 @@ describe("the security review's attacks", () => {
     });
     expect(await as(db, 'anon', null, () => fails(db, `INSERT INTO storage.objects(bucket_id, name) VALUES ('merchant-qr', 'A.png')`))).toMatch(/row-level security/);
   });
+});
+
+describe('tables no migration knows about', () => {
+  it('a hand-made table is locked by default; printers / shift_rules get branch policies', async () => {
+    const fresh = await makeDb('0031_money_rpcs_branch_check.sql');
+    await fresh.exec(`
+      CREATE TABLE public.handmade (id text);
+      CREATE TABLE public.printers (id text PRIMARY KEY, name text, branch_id text);
+      CREATE TABLE public.shift_rules (id text PRIMARY KEY, employee_id text);
+      CREATE PUBLICATION supabase_realtime FOR TABLE public.users, public.orders;`);
+    await fresh.exec(readFileSync(fileURLToPath(new URL('./0032_enable_rls.sql', import.meta.url)), 'utf8'));
+    const open = (await fresh.query<any>(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity`)).rows;
+    expect(open).toEqual([]);
+    const pols = (await fresh.query<any>(`SELECT tablename FROM pg_policies WHERE tablename IN ('printers','shift_rules','handmade') ORDER BY 1`)).rows;
+    expect(pols.map(r => r.tablename)).toEqual(['printers', 'shift_rules']);
+    const pub = (await fresh.query<any>(`SELECT tablename FROM pg_publication_tables WHERE pubname = 'supabase_realtime' ORDER BY 1`)).rows;
+    expect(pub.map(r => r.tablename)).toEqual(['orders']);                      // users removed
+  }, 60000);
 });
 
 describe('accounts that are not a branch device', () => {

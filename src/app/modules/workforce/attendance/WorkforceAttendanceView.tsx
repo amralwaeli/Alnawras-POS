@@ -103,7 +103,7 @@ export function WorkforceAttendanceView() {
   const checkedOutLogs = logs.filter(l => l.checkOutTime);
 
   // Build dept map for log rows
-  const empDeptMap = new Map(employees.map(e => [e.employeeId, e.department ?? '']));
+  const empDeptMap = new Map<string, string>(employees.map(e => [e.employeeId, e.department ?? '']));
 
   const filteredLogs   = logs.filter(l =>
     l.fullName.toLowerCase().includes(search.toLowerCase()) ||
@@ -276,7 +276,7 @@ export function WorkforceAttendanceView() {
                           {log.status.replace('-', ' ')}
                         </span>
                         {log.checkInMethod === 'fingerprint' && (
-                          <Fingerprint className="size-3.5 text-amber-500" title="Fingerprint" />
+                          <Fingerprint className="size-3.5 text-amber-500" aria-label="Fingerprint" />
                         )}
                       </div>
                     </td>

@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { ProductImage } from '../../components/ProductImage';
 import { compressImage, blobToDataUrl } from '../../../lib/image';
 import { uploadProductImage } from '../../services/ProductImageService';
+import { friendlyError } from '../../../lib/errors';
 
 export function ProductManagementView() {
   const { products, categories, currentUser, addProduct, updateProduct, deleteProduct, importProducts, addCategory, updateCategory, deleteCategory } = usePOS();
@@ -177,7 +178,7 @@ export function ProductManagementView() {
           setIsProductDialogOpen(false);
           resetProductForm();
         } else {
-          toast.error(result.error || 'Failed to update product');
+          toast.error(friendlyError(result.error, 'Failed to update product'));
         }
       } else {
         const result = await addProduct(productData);
@@ -186,7 +187,7 @@ export function ProductManagementView() {
           setIsProductDialogOpen(false);
           resetProductForm();
         } else {
-          toast.error(result.error || 'Failed to add product');
+          toast.error(friendlyError(result.error, 'Failed to add product'));
         }
       }
     } catch (error) {
@@ -226,7 +227,7 @@ export function ProductManagementView() {
           setIsCategoryDialogOpen(false);
           resetCategoryForm();
         } else {
-          toast.error(result.error || 'Failed to update category');
+          toast.error(friendlyError(result.error, 'Failed to update category'));
         }
       } else {
         const result = await addCategory(categoryData);
@@ -235,7 +236,7 @@ export function ProductManagementView() {
           setIsCategoryDialogOpen(false);
           resetCategoryForm();
         } else {
-          toast.error(result.error || 'Failed to add category');
+          toast.error(friendlyError(result.error, 'Failed to add category'));
         }
       }
     } catch (error) {
@@ -280,7 +281,7 @@ export function ProductManagementView() {
       if (result.success) {
         toast.success('Product deleted successfully');
       } else {
-        toast.error(result.error || 'Failed to delete product');
+        toast.error(friendlyError(result.error, 'Failed to delete product'));
       }
     } catch (error) {
       toast.error('An error occurred');
@@ -293,7 +294,7 @@ export function ProductManagementView() {
       if (result.success) {
         toast.success('Category deleted successfully');
       } else {
-        toast.error(result.error || 'Failed to delete category');
+        toast.error(friendlyError(result.error, 'Failed to delete category'));
       }
     } catch (error) {
       toast.error('An error occurred');
@@ -365,10 +366,14 @@ export function ProductManagementView() {
         toast.success(`Successfully imported ${result.data.imported} products`);
         if (result.data.errors && result.data.errors.length > 0) {
           console.warn('Import errors:', result.data.errors);
-          toast.warning(`${result.data.errors.length} rows had errors — check the console for details`);
+          toast.warning(`${result.data.errors.length} row(s) were not imported`, {
+            description: result.data.errors.slice(0, 5).map((e: any) => String(e?.message ?? e)).join(' · ')
+              + (result.data.errors.length > 5 ? ` · and ${result.data.errors.length - 5} more` : ''),
+            duration: 15000,
+          });
         }
       } else {
-        toast.error(result.error || 'Failed to import products');
+        toast.error(friendlyError(result.error, 'Failed to import products'));
       }
     } catch (error) {
       console.error('Import error:', error);

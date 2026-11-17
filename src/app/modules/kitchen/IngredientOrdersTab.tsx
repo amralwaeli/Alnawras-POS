@@ -3,6 +3,7 @@ import { Plus, Trash2, Send, Clock, CheckCircle2, ShoppingCart, RefreshCw } from
 import { toast } from 'sonner';
 import { useBranch } from '../../context/BranchContext';
 import { supabase } from '../../../lib/supabase';
+import { friendlyError } from '../../../lib/errors';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
       await loadHistory();
       setView('history');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to submit order');
+      toast.error(friendlyError(err, 'Failed to submit order'));
     } finally {
       setSubmitting(false);
     }

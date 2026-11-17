@@ -514,7 +514,14 @@ export class HRController {
       
       const netSalary = Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus);
 
-      const id = uid('pay');
+      // One row per employee per month: a stable id (a new one on every recompute
+      // broke the Approve button), and never overwrite an approved/paid month.
+      const id = `pay-${employee.branchId}-${employeeId}-${year}-${String(month).padStart(2, '0')}`;
+      const { data: existing } = await supabase.from('payroll_summary').select('status')
+        .eq('employee_id', employeeId).eq('month', month).eq('year', year).maybeSingle();
+      if (existing && existing.status !== 'draft') {
+        return { success: false, error: `Payroll for ${employee.fullName} is already ${existing.status} for this month.` };
+      }
       const { data: payRow, error } = await supabase
         .from('payroll_summary')
         .upsert({

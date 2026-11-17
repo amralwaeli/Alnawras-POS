@@ -41,13 +41,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      # Advisory for now: the codebase carries pre-existing type debt (vendored
-      # shadcn UI + a legacy attendance model). This surfaces type errors in the
-      # log without blocking the deploy; make it a hard gate once that backlog
-      # is cleared (drop `continue-on-error`).
-      - name: Typecheck (advisory)
+      # Blocking: the type-error backlog was cleared (Nov 2026), keep it at zero.
+      - name: Typecheck
         run: pnpm typecheck
-        continue-on-error: true
 
       - name: Create .env from secrets
         run: |

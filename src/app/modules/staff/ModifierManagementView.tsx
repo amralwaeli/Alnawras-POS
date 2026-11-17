@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { ModifierController } from '../../controllers/ModifierController';
 import type { ModifierGroup } from '../../models/types';
+import { friendlyError } from '../../../lib/errors';
 
 interface OptionRow { name: string; addOnPrice: string; isDefault: boolean }
 
@@ -39,7 +40,7 @@ export function ModifierManagementView() {
     setLoading(true);
     const res = await ModifierController.getGroups(branchId);
     if (res.success && res.groups) setGroups(res.groups);
-    else toast.error(res.error || 'Failed to load modifier groups');
+    else toast.error(friendlyError(res.error, 'Failed to load modifier groups'));
     setLoading(false);
   };
 
@@ -109,7 +110,7 @@ export function ModifierManagementView() {
         addOnPrice: parseFloat(o.addOnPrice) || 0,
         isDefault: o.isDefault,
       })),
-      productIds: Array.from(linkedIds),
+      productIds: Array.from(linkedIds) as string[],
     };
     const res = editing
       ? await ModifierController.updateGroup(editing.id, input)
@@ -121,14 +122,14 @@ export function ModifierManagementView() {
       setDialogOpen(false);
       load();
     } else {
-      toast.error(res.error || 'Failed to save modifier group');
+      toast.error(friendlyError(res.error, 'Failed to save modifier group'));
     }
   };
 
   const handleDelete = async (g: ModifierGroup) => {
     const res = await ModifierController.deleteGroup(g.id);
     if (res.success) { toast.success('Modifier group deleted'); load(); }
-    else toast.error(res.error || 'Failed to delete');
+    else toast.error(friendlyError(res.error, 'Failed to delete'));
   };
 
   return (

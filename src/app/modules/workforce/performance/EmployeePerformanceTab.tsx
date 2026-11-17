@@ -8,6 +8,7 @@ import { EmployeePerformanceSummary, TrendPoint, MetricKey, METRIC_LABELS } from
 import {
   AdvisoryBanner, PeriodPicker, PeriodKey, periodRange, ObservationList, AddObservationButton, pct,
 } from './performanceUi';
+import { friendlyError } from '../../../../lib/errors';
 
 /** "Performance" tab inside the existing employee profile. */
 export function EmployeePerformanceTab({ employee }: { employee: Employee }) {
@@ -24,7 +25,7 @@ export function EmployeePerformanceTab({ employee }: { employee: Employee }) {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     const r = await PerformanceController.getEmployeePerformance(employee, periodRange(period));
-    if (r.success === false) setError(r.error);
+    if (r.success === false) setError(friendlyError(r.error));
     else { setSummary(r.data.summary); setTrend(r.data.trend); setObservations(r.data.observations); }
     setLoading(false);
   }, [employee, period]);

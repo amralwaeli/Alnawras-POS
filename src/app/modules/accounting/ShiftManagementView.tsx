@@ -5,6 +5,7 @@ import { fmt } from '../../../lib/currency';
 import { toast } from 'sonner';
 import { ReportsController } from '../../controllers/ReportsController';
 import { Clock, Banknote, CheckCircle, AlertCircle, FileText, ArrowRight } from 'lucide-react';
+import { friendlyError } from '../../../lib/errors';
 
 export function ShiftManagementView() {
   const { currentUser } = usePOS();
@@ -40,7 +41,7 @@ export function ShiftManagementView() {
       setCashInput('');
       toast.success('Shift opened successfully');
     } else {
-      toast.error(res.error);
+      toast.error(friendlyError(res.error));
     }
   };
 
@@ -67,7 +68,7 @@ export function ShiftManagementView() {
       toast.success('Shift ended successfully');
       generateShiftReport(endedShift, cashSales);
     } else {
-      toast.error(res.error);
+      toast.error(friendlyError(res.error));
     }
   };
 

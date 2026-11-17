@@ -5,6 +5,7 @@ import { usePOS } from '../../context/POSContext';
 import { useBranch } from '../../context/BranchContext';
 import { SettingsController } from '../../controllers/SettingsController';
 import { BranchSettings, DiscountPreset, DEFAULT_BRANCH_SETTINGS } from '../../models/types';
+import { friendlyError } from '../../../lib/errors';
 
 const uid = () => `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -50,7 +51,7 @@ export function BusinessSettingsView() {
     const res = await SettingsController.saveSettings(currentUser.branchId, s);
     setSaving(false);
     if (res.success) { toast.success('Settings saved'); reloadSettings(); }
-    else toast.error(res.error || 'Failed to save');
+    else toast.error(friendlyError(res.error, 'Failed to save'));
   };
 
   if (loading) {

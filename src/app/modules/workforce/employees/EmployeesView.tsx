@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogCancel,
 } from '../../../components/ui/alert-dialog';
+import { friendlyError } from '../../../../lib/errors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // Role labels & badge colours come from the central ROLE_META registry in
@@ -79,7 +80,7 @@ export function EmployeesView() {
       search: search.trim() || undefined,
     });
     if (result.success) setEmployees(result.data);
-    else setError(result.error);
+    else setError(friendlyError(result.error));
     setLoading(false);
   }, [filters, search]);
 

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { useBranchProfile } from '../../hooks/useBranchProfile';
+import { friendlyError } from '../../../lib/errors';
 
 // ─── Full ordering UI (receives tableId as prop, never from URL) ──────────────
 
@@ -209,7 +210,7 @@ export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
         })),
       });
       // The server's message is written for customers (e.g. "… is not available right now").
-      if (error) { toast.error(error.message || 'Could not send your order. Please try again.'); return; }
+      if (error) { toast.error(friendlyError(error, 'Could not send your order. Please try again.')); return; }
       applyState(st);
       setCartItems([]);
       setExpandedNotes(null);

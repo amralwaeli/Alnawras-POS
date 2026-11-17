@@ -1,7 +1,9 @@
 // ==================== Shared result envelope ====================
 
 // Discriminated union returned by all async controller methods.
-export type Result<T> = { success: true; data: T } | { success: false; error: string };
+// `error`/`data` are declared on both branches so callers can read `res.error` after `if (!res.success)`
+// without strict null checks (which this project does not use) narrowing the union.
+export type Result<T> = { success: true; data: T; error?: undefined } | { success: false; error: string; data?: undefined };
 
 // ==================== User & Authentication ====================
 

@@ -9,6 +9,7 @@ import { ROLE_PERMISSIONS } from '../../models/types';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
 import { TableController } from '../../controllers/TableController';
+import { friendlyError } from '../../../lib/errors';
 
 // ─── Move Table modal ───────────────────────────────────────────────────────
 function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (toTableId: string) => void; onClose: () => void }) {
@@ -104,7 +105,7 @@ export function TablesView() {
       ));
       setMovingTable(null);
     } else {
-      toast.error(res.error || 'Failed to move table');
+      toast.error(friendlyError(res.error, 'Failed to move table'));
     }
   };
 
@@ -115,7 +116,7 @@ export function TablesView() {
       setTables(prev => prev.map(t => t.id === table.id ? { ...t, orderingEnabled: next } : t));
       toast.success(next ? `QR ordering enabled for Table ${table.number}` : `QR ordering disabled for Table ${table.number}`);
     } else {
-      toast.error(res.error || 'Failed to update ordering status');
+      toast.error(friendlyError(res.error, 'Failed to update ordering status'));
     }
   };
 
@@ -130,7 +131,7 @@ export function TablesView() {
     const res = await fn();
     setPickupBusy(null);
     if (res.success) { toast.success(okMsg); setOrders(prev => apply(prev)); }
-    else toast.error(res.error || 'Action failed');
+    else toast.error(friendlyError(res.error, 'Action failed'));
   };
 
   const handlePaid = async (orderId: string, _billNo: string, _summary: string) => {

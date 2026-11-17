@@ -21,6 +21,7 @@ import { PrintService } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 import QRCode from 'qrcode';
+import { friendlyError } from '../../../lib/errors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -151,7 +152,7 @@ function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedempti
     setSearching(true);
     const res = await LoyaltyController.createCustomer({ name: newName.trim(), phone: phone.trim(), branchId });
     setSearching(false);
-    if (!res.success) { toast.error(res.error || 'Failed to add'); return; }
+    if (!res.success) { toast.error(friendlyError(res.error, 'Failed to add')); return; }
     onCustomerChange(res.customer!);
     setAddMode(false);
     toast.success('Customer added to loyalty program');
@@ -613,7 +614,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
       toast.success(`Payment of ${fmt(paid.total)} processed via ${summary}`);
       await finalizeCompletedOrder(billNo, summary, paid);
     } catch (err: any) {
-      toast.error('Payment failed: ' + (err.message || 'Please try again'));
+      toast.error(friendlyError(err, 'Payment failed. Please try again.'));
     } finally {
       setProcessing(false);
     }
@@ -653,7 +654,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
         await finalizeCompletedOrder(row.bill_number, 'Split Payment');
       }
     } catch (err: any) {
-      toast.error('Payment failed: ' + (err.message || 'Please try again'));
+      toast.error(friendlyError(err, 'Payment failed. Please try again.'));
     } finally {
       setSplitProcessing(false);
     }

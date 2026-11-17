@@ -12,6 +12,7 @@ import {
   CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, Ban,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
+import { friendlyError } from '../../../lib/errors';
 
 interface CartItem {
   id: string;
@@ -81,7 +82,7 @@ export function QROrderingView() {
       setVoidTarget(null);
       setVoidReason('');
     } else {
-      toast.error(res.error || 'Failed to void item');
+      toast.error(friendlyError(res.error, 'Failed to void item'));
     }
   };
 
@@ -264,7 +265,7 @@ export function QROrderingView() {
       });
 
       if (!result.success) {
-        toast.error(result.error);
+        toast.error(friendlyError(result.error));
         return;
       }
 

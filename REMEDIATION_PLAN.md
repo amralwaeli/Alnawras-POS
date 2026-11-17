@@ -1,3 +1,5 @@
+> **Historical (July 2026).** Superseded: Auth + Row-Level Security, server-side pricing and payments are live since November 2026. See `SECURITY.md` for the current model and `supabase/migrations/README.md` for migrations.
+
 # AlnawrasPOS — Production Remediation Plan & Handoff
 
 > Living handoff doc. If a work session ends mid-task, resume from here. It records

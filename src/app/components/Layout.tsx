@@ -24,7 +24,7 @@ export function Layout() {
     () => location.pathname.startsWith('/workforce')
   );
 
-  if (!currentUser) return <Navigate to="/check-in" replace />;
+  if (!currentUser) return <Navigate to="/" replace />;
 
   // Roles that run full-screen with no sidebar. Super Waiter is included: it
   // reaches Invoices/Quotations through the in-screen "Options" menu instead.

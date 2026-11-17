@@ -46,32 +46,6 @@ export class DeviceService {
   }
 
   /**
-   * Sync station binding with the server to allow remote updates.
-   */
-  static async syncBinding(branchId: string): Promise<void> {
-    const deviceId = DeviceService.getDeviceId();
-    const station = DeviceService.getStationType();
-
-    const { data, error } = await supabase
-      .from('device_bindings')
-      .upsert({ 
-        device_id: deviceId, 
-        branch_id: branchId, 
-        station_type: station,
-        last_seen: new Date().toISOString()
-      }, { onConflict: 'device_id' })
-      .select('station_type')
-      .single();
-
-    if (!error && data) {
-      // Update local storage if the admin changed the station remotely
-      if (data.station_type !== station) {
-        DeviceService.setStationType(data.station_type as DeviceStation);
-      }
-    }
-  }
-
-  /**
    * Check if the current device is authorized to perform an action.
    * e.g. only 'cashier' station can process payments.
    */

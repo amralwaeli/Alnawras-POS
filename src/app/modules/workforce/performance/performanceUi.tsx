@@ -7,6 +7,7 @@ import {
   CATEGORY_LABELS, isCategoryRelevant, validateObservationDraft,
 } from '../../../models/performance';
 import { PerformanceController, PeriodRange, Reviewer } from '../../../controllers/PerformanceController';
+import { friendlyError } from '../../../../lib/errors';
 
 // ─── Period ────────────────────────────────────────────────────────────────────
 export type PeriodKey = 'this-month' | 'last-month' | 'last-30';
@@ -118,7 +119,7 @@ export function ObservationList({
       action, reviewer, note, correctedEmployeeId: action === 'correct' ? target : undefined,
     });
     setBusy(null);
-    if (r.success === false) { setError(r.error); return; }
+    if (r.success === false) { setError(friendlyError(r.error)); return; }
     setCorrecting(null); setTarget(''); setNote('');
     onChanged();
   };
@@ -281,7 +282,7 @@ function AddObservationModal({
       category, summary, metricValue, reviewer,
     });
     setSaving(false);
-    if (r.success === false) { setError(r.error); return; }
+    if (r.success === false) { setError(friendlyError(r.error)); return; }
     onSaved();
   };
 

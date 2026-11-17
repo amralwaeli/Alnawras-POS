@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { Employee, CreateEmployeeInput, UserRole, ASSIGNABLE_ROLES } from '../../../models/types';
+import { friendlyError } from '../../../../lib/errors';
 
 interface Props {
   initial?: Employee;
@@ -46,11 +47,11 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
     try {
       if (isEdit && initial) {
         const result = await WorkforceController.updateEmployee(initial.employeeId, form);
-        if (!result.success) { setError(result.error); return; }
+        if (!result.success) { setError(friendlyError(result.error)); return; }
         onSave(result.data);
       } else {
         const result = await WorkforceController.createEmployee(form);
-        if (!result.success) { setError(result.error); return; }
+        if (!result.success) { setError(friendlyError(result.error)); return; }
         onSave(result.data);
       }
     } finally {

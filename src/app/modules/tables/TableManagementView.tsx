@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
+import { friendlyError } from '../../../lib/errors';
 
 export function TableManagementView() {
   const { tables, addTable, updateTable, deleteTable, users } = usePOS();
@@ -49,7 +50,7 @@ export function TableManagementView() {
           setIsAddDialogOpen(false);
           resetForm();
         } else {
-          toast.error(result.error || 'Failed to update table');
+          toast.error(friendlyError(result.error, 'Failed to update table'));
         }
       } else {
         const result = await addTable(tableData);
@@ -58,7 +59,7 @@ export function TableManagementView() {
           setIsAddDialogOpen(false);
           resetForm();
         } else {
-          toast.error(result.error || 'Failed to add table');
+          toast.error(friendlyError(result.error, 'Failed to add table'));
         }
       }
     } catch (error) {
@@ -82,7 +83,7 @@ export function TableManagementView() {
       if (result.success) {
         toast.success('Table deleted successfully');
       } else {
-        toast.error(result.error || 'Failed to delete table');
+        toast.error(friendlyError(result.error, 'Failed to delete table'));
       }
     } catch (error) {
       toast.error('An error occurred');

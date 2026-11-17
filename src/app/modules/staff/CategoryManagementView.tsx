@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Card, CardContent } from '../../components/ui/card';
 import { Checkbox } from '../../components/ui/checkbox';
 import { toast } from 'sonner';
+import { friendlyError } from '../../../lib/errors';
 
 export function CategoryManagementView() {
   const { categories, products, addCategory, updateCategory, deleteCategory, updateProduct } = usePOS();
@@ -112,7 +113,7 @@ export function CategoryManagementView() {
         : await addCategory(categoryData);
 
       if (!result.success) {
-        toast.error(result.error || `Failed to ${editingCategory ? 'update' : 'add'} category`);
+        toast.error(friendlyError(result.error, `Failed to ${editingCategory ? 'update' : 'add'} category`));
         return;
       }
 
@@ -142,7 +143,7 @@ export function CategoryManagementView() {
       if (result.success) {
         toast.success('Category deleted successfully');
       } else {
-        toast.error(result.error || 'Failed to delete category');
+        toast.error(friendlyError(result.error, 'Failed to delete category'));
       }
     } catch (error) {
       toast.error('An error occurred');

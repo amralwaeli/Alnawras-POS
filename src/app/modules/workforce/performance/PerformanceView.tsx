@@ -8,6 +8,7 @@ import { EmployeePerformanceSummary, MetricKey } from '../../../models/performan
 import {
   AdvisoryBanner, PeriodPicker, PeriodKey, periodRange, ObservationList, AddObservationButton, pct,
 } from './performanceUi';
+import { friendlyError } from '../../../../lib/errors';
 
 /** HR dashboard → Performance: team indicators + the AI observation review queue. */
 export function PerformanceView() {
@@ -28,7 +29,7 @@ export function PerformanceView() {
       PerformanceController.getTeamPerformance(branchId, periodRange(period)),
       PerformanceController.listObservations({ branchId, status: 'pending' }),
     ]);
-    if (t.success === false) setError(t.error); else setTeam(t.data);
+    if (t.success === false) setError(friendlyError(t.error)); else setTeam(t.data);
     if (q.success === false) { const msg = q.error; setError(prev => prev || msg); } else setQueue(q.data);
     setLoading(false);
   }, [branchId, period]);

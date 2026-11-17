@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogCancel,
 } from '../../../components/ui/alert-dialog';
+import { friendlyError } from '../../../../lib/errors';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt  = (d?: Date | string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -84,7 +85,7 @@ export function EmployeeProfileView() {
     setLoading(true);
     const result = await WorkforceController.getEmployee(employeeId);
     if (result.success) setEmployee(result.data);
-    else setError(result.error);
+    else setError(friendlyError(result.error));
     setLoading(false);
   };
 

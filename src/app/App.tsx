@@ -5,7 +5,6 @@ import { DeviceAuthProvider, useDeviceAuth } from './context/DeviceAuthContext';
 import { router } from './routes';
 import { LoginView, DeviceLoginView } from './modules/auth';
 import { AlertOverlay } from './components/AlertOverlay';
-import { checkSupabaseConnection } from '../lib/supabase';
 import { isNativeApp } from '../lib/platform';
 import { User } from './models/types';
 import { Toaster } from 'sonner';
@@ -118,24 +117,9 @@ function AppContent() {
 }
 
 export default function App() {
-  const [supabaseOk, setSupabaseOk] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    checkSupabaseConnection().then(setSupabaseOk);
-  }, []);
-
   return (
     <DeviceAuthProvider>
       <POSProvider>
-        {supabaseOk === false && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-            background: '#f59e0b', color: '#1c1917', padding: '6px 16px',
-            fontSize: '13px', textAlign: 'center',
-          }}>
-            ⚠️ Supabase connection failed — check your API key in .env and rebuild.
-          </div>
-        )}
         <AppContent />
         <AlertOverlay />
         {/* Every toast() in the app renders through this — without it they are all silent. */}

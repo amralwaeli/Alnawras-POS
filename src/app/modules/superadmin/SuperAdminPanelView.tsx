@@ -11,6 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '../../components/ui/alert-dialog';
+import { friendlyError } from '../../../lib/errors';
 
 const FEATURE_KEYS = Object.keys(FEATURE_LABELS) as BranchFeatureKey[];
 
@@ -39,14 +40,14 @@ function BranchCard({ branch, onChanged }: { branch: Branch; onChanged: () => vo
     });
     setSaving(false);
     if (res.success) { toast.success('Branch updated'); onChanged(); }
-    else toast.error(res.error || 'Update failed');
+    else toast.error(friendlyError(res.error, 'Update failed'));
   };
 
   const toggleStatus = async () => {
     const next = branch.status === 'suspended' ? 'active' : 'suspended';
     const res = await SuperAdminController.updateBranch(branch.id, { status: next });
     if (res.success) { toast.success(next === 'suspended' ? 'Branch suspended' : 'Branch reactivated'); onChanged(); }
-    else toast.error(res.error || 'Update failed');
+    else toast.error(friendlyError(res.error, 'Update failed'));
   };
 
   const statusBadge = branch.status === 'active'
@@ -158,7 +159,7 @@ function AddBranchForm({ orgId, onDone }: { orgId: string; onDone: () => void })
     });
     setSaving(false);
     if (res.success) { toast.success('Branch created'); onDone(); }
-    else toast.error(res.error || 'Failed to create branch');
+    else toast.error(friendlyError(res.error, 'Failed to create branch'));
   };
 
   return (
@@ -222,7 +223,7 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
     });
     setSaving(false);
     if (res.success && res.data) { setResult(res.data); onDone(); }
-    else toast.error(res.error || 'Failed to create tenant');
+    else toast.error(friendlyError(res.error, 'Failed to create tenant'));
   };
 
   return (
@@ -283,7 +284,7 @@ export function SuperAdminPanelView() {
   const load = useCallback(async () => {
     const res = await SuperAdminController.listOrganizations();
     if (res.success) setOrgs(res.data!);
-    else toast.error(res.error || 'Failed to load tenants');
+    else toast.error(friendlyError(res.error, 'Failed to load tenants'));
     setLoading(false);
   }, []);
 
@@ -305,7 +306,7 @@ export function SuperAdminPanelView() {
     const next = org.status === 'suspended' ? 'active' : 'suspended';
     const res = await SuperAdminController.setOrganizationStatus(org.id, next);
     if (res.success) { toast.success(`Organization ${next}`); void load(); }
-    else toast.error(res.error || 'Update failed');
+    else toast.error(friendlyError(res.error, 'Update failed'));
   };
 
   if (loading) {

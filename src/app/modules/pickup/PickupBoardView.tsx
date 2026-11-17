@@ -24,6 +24,7 @@ import {
   Package, RefreshCw, CheckCircle2, XCircle, Clock, Bike, Truck, Store,
   Image as ImageIcon, QrCode, ChefHat, BadgeCheck, ArrowLeft, Ban, Wallet,
 } from 'lucide-react';
+import { friendlyError } from '../../../lib/errors';
 
 const methodIcon: Record<string, any> = { grab: Bike, lalamove: Truck, self: Store };
 const methodLabel: Record<string, string> = { grab: 'Grab Express', lalamove: 'Lalamove', self: 'Self Pickup' };
@@ -72,7 +73,7 @@ export function PickupBoardView() {
     const res = await fn();
     setBusy(null);
     if (res.success) { toast.success(ok); load(); }
-    else toast.error(res.error || 'Action failed');
+    else toast.error(friendlyError(res.error, 'Action failed'));
   };
 
   const askConfirm = (kind: 'reject' | 'cancel', order: Order) => { setReason(''); setConfirm({ kind, order }); };
@@ -94,9 +95,9 @@ export function PickupBoardView() {
     setQrUploading(false);
     if ('url' in res) toast.success('Payment QR set');
     else if (res.alreadyExists) {
-      toast.error('A payment QR is already set. To replace it, delete the old one in the Supabase Storage dashboard first.');
+      toast.error('A payment QR is already set. To replace it, ask the system administrator to remove the old one first.');
     } else {
-      toast.error(res.error || 'QR upload failed');
+      toast.error(friendlyError(res.error, 'QR upload failed'));
     }
   };
 

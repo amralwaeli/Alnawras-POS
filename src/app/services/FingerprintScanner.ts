@@ -36,7 +36,8 @@ const KNOWN_FINGERPRINT_VIDS = [
 ];
 
 export class FingerprintScanner {
-  private static device: HIDDevice | null = null;
+  // WebHID types are not in TypeScript's DOM lib.
+  private static device: any | null = null;
   private static isConnected = false;
 
   static isWebHIDSupported(): boolean {

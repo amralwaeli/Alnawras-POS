@@ -3,6 +3,7 @@ import { CalendarOff, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-reac
 import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { LeaveRequest, ROLE_PERMISSIONS } from '../../../models/types';
+import { friendlyError } from '../../../../lib/errors';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -38,7 +39,7 @@ export function LeaveManagementView() {
       status: statusFilter === 'all' ? undefined : statusFilter,
     });
     if (result.success) setRequests(result.data);
-    else setError(result.error);
+    else setError(friendlyError(result.error));
     setLoading(false);
   }, [branchId, statusFilter]);
 
@@ -56,7 +57,7 @@ export function LeaveManagementView() {
         )
       );
     } else {
-      setError(result.error);
+      setError(friendlyError(result.error));
     }
     setActionLoading(null);
   };

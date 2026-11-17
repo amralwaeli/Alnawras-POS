@@ -7,6 +7,7 @@ import { ReportsController, ProductSaleRow } from '../../controllers/ReportsCont
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { periodRange, usePeriod, PeriodPicker } from './period';
 import { ReportsController as RC, SalesSummary, CompletedOrderRow } from '../../controllers/ReportsController';
+import { friendlyError } from '../../../lib/errors';
 
 type SortKey = 'unitsSold' | 'revenue';
 
@@ -27,7 +28,7 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
     ReportsController.getProductSales(branchId, from, to).then(res => {
       if (cancelled) return;
       if (res.success) { setRows(res.data!); setError(''); }
-      else setError(res.error || 'Failed to load product sales');
+      else setError(friendlyError(res.error, 'Failed to load product sales'));
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -141,7 +142,7 @@ function OverviewTab({ branchId }: { branchId: string }) {
     const { from, to } = p.range;
     Promise.all([RC.getSalesSummary(branchId, from, to), RC.getCompletedOrders(branchId, from, to)]).then(([s, o]) => {
       if (cancelled) return;
-      if (s.success) { setSummary(s.data!); setError(''); } else setError(s.error || 'Could not load the report');
+      if (s.success) { setSummary(s.data!); setError(''); } else setError(friendlyError(s.error, 'Could not load the report'));
       if (o.success) setOrders(o.data!);
       setLoading(false);
     });

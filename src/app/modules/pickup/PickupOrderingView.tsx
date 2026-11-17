@@ -26,6 +26,7 @@ import {
   UtensilsCrossed, ShieldAlert, Bike, Truck, Store, Upload, ChevronDown, ArrowLeft,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
+import { friendlyError } from '../../../lib/errors';
 
 const RM = (n: number) => fmt(n);
 
@@ -202,7 +203,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
         items: cart.map(i => ({ productId: i.productId, productName: i.productName, quantity: i.quantity, price: i.price, notes: i.notes, station: i.station as any, modifiers: i.modifiers })),
         method: method!, payType: payType!, customerName: name.trim(), customerPhone: phone.trim(), customerEmail: email.trim(), receiptUrl,
       });
-      if (!res.success) { setError(res.error || 'Could not place order.'); setSubmitting(false); return; }
+      if (!res.success) { setError(friendlyError(res.error, 'Could not place order.')); setSubmitting(false); return; }
       setDone(true);
     } finally {
       setSubmitting(false);

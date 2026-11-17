@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { UtensilsCrossed, Lock, Loader2 } from 'lucide-react';
 import { useDeviceAuth } from '../../context/DeviceAuthContext';
 import { isNativeApp } from '../../../lib/platform';
+import { friendlyError } from '../../../lib/errors';
 
 /**
  * DeviceLoginView — the branch email+password gate.
@@ -26,7 +27,7 @@ export function DeviceLoginView() {
     setError('');
     const res = await signInDevice(email, password);
     setLoading(false);
-    if (!res.success) setError(res.error || 'Sign-in failed');
+    if (!res.success) setError(friendlyError(res.error, 'Sign-in failed'));
     // On success the gate re-evaluates: the app swaps to the staff PIN pad, the
     // website logs straight in as the tenant admin.
   };

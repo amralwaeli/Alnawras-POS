@@ -11,20 +11,3 @@ export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder-key'
 )
-
-export async function checkSupabaseConnection(): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('_health_check_').select('*').limit(1)
-    if (error && (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('does not exist'))) {
-      return true
-    }
-    if (error) {
-      console.warn('[Supabase] Connection failed:', error.message, 'code:', error.code)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.warn('[Supabase] Could not reach Supabase:', err)
-    return false
-  }
-}

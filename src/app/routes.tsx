@@ -15,7 +15,7 @@ function ProtectedRoute({ children, permission, adminOnly, feature }: {
 }) {
   const { currentUser } = usePOS();
   const { hasFeature } = useBranch();
-  if (!currentUser) return <Navigate to="/check-in" replace />;
+  if (!currentUser) return <Navigate to="/" replace />;
   if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
   if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/" replace />;
   if (feature && !hasFeature(feature)) return <Navigate to="/" replace />;
@@ -24,11 +24,9 @@ function ProtectedRoute({ children, permission, adminOnly, feature }: {
 
 // ── Lazy-load each module ─────────────────────────────────────────────────────
 const AdminDashboardView     = lazy(() => import('./modules/dashboard').then(m => ({ default: m.AdminDashboardView })));
-const DashboardView          = lazy(() => import('./modules/dashboard').then(m => ({ default: m.DashboardView })));
 
 const TablesView             = lazy(() => import('./modules/tables').then(m => ({ default: m.TablesView })));
 const TableManagementView    = lazy(() => import('./modules/tables').then(m => ({ default: m.TableManagementView })));
-const TableOrderingView      = lazy(() => import('./modules/tables').then(m => ({ default: m.TableOrderingView })));
 const QROrderingView         = lazy(() => import('./modules/tables').then(m => ({ default: m.QROrderingView })));
 const GroupOrderingView      = lazy(() => import('./modules/tables/GroupOrderingView').then(m => ({ default: m.GroupOrderingView })));
 const TableQRView            = lazy(() => import('./modules/tables').then(m => ({ default: m.TableQRView })));
@@ -65,7 +63,6 @@ const InvoicesView           = lazy(() => import('./modules/invoices').then(m =>
 
 const PickupOrderingView     = lazy(() => import('./modules/pickup/PickupOrderingView').then(m => ({ default: m.PickupOrderingView })));
 const PickupBoardView         = lazy(() => import('./modules/pickup/PickupBoardView').then(m => ({ default: m.PickupBoardView })));
-const CheckInView            = lazy(() => import('./modules/auth').then(m => ({ default: m.CheckInView })));
 const SetPasswordView        = lazy(() => import('./modules/auth').then(m => ({ default: m.SetPasswordView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
@@ -94,7 +91,7 @@ function Lazy({ children }: { children: React.ReactNode }) {
 // ── Role-aware landing page ───────────────────────────────────────────────────
 function LandingPage() {
   const { currentUser } = usePOS();
-  if (!currentUser) return <Navigate to="/check-in" replace />;
+  if (!currentUser) return <Navigate to="/" replace />;
 
   switch (currentUser.role) {
     // ── POS / Floor roles ──────────────────────────────────────────────────
@@ -216,7 +213,7 @@ export const router = createHashRouter([
       { path: 'table-qr',            element: <Lazy><ProtectedRoute adminOnly feature="groupOrdering"><TableQRView /></ProtectedRoute></Lazy> },
     ],
   },
-  { path: '/check-in',            element: <Lazy><CheckInView /></Lazy> },
+  { path: '/check-in',            element: <Navigate to="/" replace /> },
   { path: '/set-password',        element: <Lazy><SetPasswordView /></Lazy> },
   { path: '/fingerprint-checkin', element: <Lazy><FingerprintCheckInView /></Lazy> },
 

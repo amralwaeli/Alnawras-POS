@@ -47,7 +47,7 @@ export class WorkforceController {
   static async createEmployee(
     input: CreateEmployeeInput
   ): Promise<Result<EmployeeWithUser>> {
-    if (input.role === 'admin') {
+    if ((input.role as string) === 'admin') {   // defence in depth: the type excludes it, callers may not
       return { success: false, error: 'Admin cannot be created as an employee.' };
     }
 

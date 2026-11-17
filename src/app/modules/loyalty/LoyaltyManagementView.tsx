@@ -19,6 +19,7 @@ import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { SettingsController } from '../../controllers/SettingsController';
 import type { Customer, LoyaltyTransaction, LoyaltySettings } from '../../models/types';
 import { fmt } from '../../../lib/currency';
+import { friendlyError } from '../../../lib/errors';
 
 // ── Customer Form Dialog ──────────────────────────────────────────────────────
 function CustomerDialog({
@@ -62,7 +63,7 @@ function CustomerDialog({
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save customer');
+      toast.error(friendlyError(err, 'Failed to save customer'));
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ function AdjustPointsDialog({
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Adjustment failed');
+      toast.error(friendlyError(err, 'Adjustment failed'));
     } finally {
       setLoading(false);
     }
@@ -263,7 +264,7 @@ function SettingsPanel() {
   const save = async () => {
     // Persist loyalty within the full branch settings so tax/discounts survive.
     const res = await SettingsController.saveSettings(branchId, { ...branchSettings, loyalty: settings });
-    if (!res.success) { toast.error(res.error || 'Failed to save loyalty settings'); return; }
+    if (!res.success) { toast.error(friendlyError(res.error, 'Failed to save loyalty settings')); return; }
     reloadSettings();
     setSaved(true);
     toast.success('Loyalty settings saved');
@@ -349,7 +350,7 @@ export function LoyaltyManagementView() {
   const handleDelete = async (id: string) => {
     const res = await LoyaltyController.deleteCustomer(id);
     if (res.success) { toast.success('Customer deleted'); loadCustomers(); }
-    else toast.error(res.error || 'Delete failed');
+    else toast.error(friendlyError(res.error, 'Delete failed'));
   };
 
   const filtered = customers.filter(c =>

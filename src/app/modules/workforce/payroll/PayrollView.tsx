@@ -5,6 +5,7 @@ import { HRController } from '../../../controllers/HRController';
 import { WorkforceController } from '../../../controllers/WorkforceController';
 import { PayrollSummary, EmployeeWithUser, ROLE_PERMISSIONS } from '../../../models/types';
 import { downloadCsv } from '../../../../lib/csv';
+import { friendlyError } from '../../../../lib/errors';
 
 const cur = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -31,7 +32,7 @@ export function PayrollView() {
   const computeAll = async () => {
     if (!currentUser) return;
     const empResult = await WorkforceController.getEmployees({ status: 'active' });
-    if (!empResult.success) { setError(empResult.error); return; }
+    if (!empResult.success) { setError(friendlyError(empResult.error)); return; }
 
     for (const emp of empResult.data) {
       setComputing(emp.fullName);

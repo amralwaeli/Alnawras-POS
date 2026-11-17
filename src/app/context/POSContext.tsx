@@ -6,7 +6,7 @@
  * without any changes. New features should import the focused contexts directly.
  */
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Attendance, Expense } from '../models/types';
+import { Expense } from '../models/types';
 import { AuthProvider, useAuth } from './AuthContext';
 import { CatalogProvider, useCatalog } from './CatalogContext';
 import { TablesProvider, useTables } from './TablesContext';
@@ -17,21 +17,18 @@ import { supabase } from '../../lib/supabase';
 
 // ── Misc state that doesn't warrant its own context yet ──────────────────────
 interface MiscContextType {
-  attendance: Attendance[];
   expenses: Expense[];
   loading: boolean;
-  setAttendance: (a: Attendance[]) => void;
   setExpenses: (e: Expense[]) => void;
   setLoading: (v: boolean) => void;
 }
 const MiscContext = createContext<MiscContextType | undefined>(undefined);
 
 function MiscProvider({ children }: { children: ReactNode }) {
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   return (
-    <MiscContext.Provider value={{ attendance, expenses, loading, setAttendance, setExpenses, setLoading }}>
+    <MiscContext.Provider value={{ expenses, loading, setExpenses, setLoading }}>
       {children}
     </MiscContext.Provider>
   );
@@ -107,10 +104,8 @@ export function usePOS() {
     orders:         orders.orders,
     setOrders:      orders.setOrders,
     // misc
-    attendance:     misc.attendance,
     expenses:       misc.expenses,
     loading:        misc.loading,
-    setAttendance:  misc.setAttendance,
     setExpenses:    misc.setExpenses,
     // refreshData - no-op shim; RealtimeSyncEngine handles all syncing
     refreshData:    async () => {},

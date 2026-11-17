@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { UtensilsCrossed } from 'lucide-react';
+import { friendlyError } from '../../../lib/errors';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -57,7 +58,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
         // App.tsx detects the user change and shows the Router (Dashboard)
         onLoginSuccess();
       } else {
-        setError(result.error || 'Invalid PIN');
+        setError(friendlyError(result.error, 'Invalid PIN'));
         setShake(true);
         setTimeout(() => setShake(false), 500);
         setPin(''); // Reset on error

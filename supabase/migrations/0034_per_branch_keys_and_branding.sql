@@ -14,13 +14,20 @@
 --    public profile function for customer pages (anon can't read branch_settings).
 -- ============================================================
 
-ALTER TABLE employees       DROP CONSTRAINT IF EXISTS employees_employee_id_key;
-ALTER TABLE users           DROP CONSTRAINT IF EXISTS users_employment_number_key;
-ALTER TABLE users           DROP CONSTRAINT IF EXISTS users_email_key;
-ALTER TABLE products        DROP CONSTRAINT IF EXISTS products_sku_key;
-ALTER TABLE payroll_summary DROP CONSTRAINT IF EXISTS payroll_summary_employee_id_month_year_key;
-ALTER TABLE attendance_logs DROP CONSTRAINT IF EXISTS attendance_logs_employee_id_log_date_key;
+-- 1. Fingerprints / shift rules get their own branch_id, backfilled while
+--    employee_id is still unique.
+ALTER TABLE employee_fingerprints ADD COLUMN IF NOT EXISTS branch_id TEXT;
+UPDATE employee_fingerprints f SET branch_id = e.branch_id
+  FROM employees e WHERE e.employee_id = f.employee_id AND f.branch_id IS NULL;
+DO $$ BEGIN
+  IF to_regclass('public.shift_rules') IS NOT NULL THEN
+    ALTER TABLE shift_rules ADD COLUMN IF NOT EXISTS branch_id TEXT;
+    UPDATE shift_rules s SET branch_id = e.branch_id FROM employees e
+      WHERE e.employee_id = s.employee_id AND s.branch_id IS NULL;
+  END IF;
+END $$;
 
+-- 2. Per-branch unique keys (created before the global ones are dropped).
 CREATE UNIQUE INDEX IF NOT EXISTS ux_employees_branch_emp      ON employees (branch_id, employee_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_users_branch_empno        ON users (branch_id, employment_number);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_users_branch_email        ON users (branch_id, lower(email));
@@ -28,20 +35,53 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_products_branch_sku       ON products (bran
 CREATE UNIQUE INDEX IF NOT EXISTS ux_payroll_branch_emp_period ON payroll_summary (branch_id, employee_id, month, year);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_branch_emp_day ON attendance_logs (branch_id, employee_id, log_date);
 
--- Fingerprints: own branch_id (backfilled while employee_id is still unique).
-ALTER TABLE employee_fingerprints ADD COLUMN IF NOT EXISTS branch_id TEXT;
-UPDATE employee_fingerprints f SET branch_id = e.branch_id
-  FROM employees e WHERE e.employee_id = f.employee_id AND f.branch_id IS NULL;
+-- 3. Links to an employee by number alone (hand-made on production) become
+--    links by branch + number, keeping their delete behaviour.
+ALTER TABLE employee_fingerprints DROP CONSTRAINT IF EXISTS employee_fingerprints_employee_id_fkey;
+ALTER TABLE attendance_logs       DROP CONSTRAINT IF EXISTS attendance_logs_employee_id_fkey;
+ALTER TABLE payroll_summary       DROP CONSTRAINT IF EXISTS payroll_summary_employee_id_fkey;
+DO $$ BEGIN
+  IF to_regclass('public.shift_rules') IS NOT NULL THEN
+    ALTER TABLE shift_rules DROP CONSTRAINT IF EXISTS shift_rules_employee_id_fkey;
+  END IF;
+END $$;
+
+-- 4. Drop the all-restaurants unique keys.
+ALTER TABLE employees       DROP CONSTRAINT IF EXISTS employees_employee_id_key;
+ALTER TABLE users           DROP CONSTRAINT IF EXISTS users_employment_number_key;
+ALTER TABLE users           DROP CONSTRAINT IF EXISTS users_email_key;
+ALTER TABLE products        DROP CONSTRAINT IF EXISTS products_sku_key;
+ALTER TABLE payroll_summary DROP CONSTRAINT IF EXISTS payroll_summary_employee_id_month_year_key;
+ALTER TABLE attendance_logs DROP CONSTRAINT IF EXISTS attendance_logs_employee_id_log_date_key;
+
+-- 5. Recreate the employee links per branch (idempotent).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employee_fingerprints_branch_employee_fkey') THEN
+    ALTER TABLE employee_fingerprints ADD CONSTRAINT employee_fingerprints_branch_employee_fkey
+      FOREIGN KEY (branch_id, employee_id) REFERENCES employees (branch_id, employee_id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'attendance_logs_branch_employee_fkey') THEN
+    ALTER TABLE attendance_logs ADD CONSTRAINT attendance_logs_branch_employee_fkey
+      FOREIGN KEY (branch_id, employee_id) REFERENCES employees (branch_id, employee_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payroll_summary_branch_employee_fkey') THEN
+    ALTER TABLE payroll_summary ADD CONSTRAINT payroll_summary_branch_employee_fkey
+      FOREIGN KEY (branch_id, employee_id) REFERENCES employees (branch_id, employee_id);
+  END IF;
+  IF to_regclass('public.shift_rules') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'shift_rules_branch_employee_fkey') THEN
+    ALTER TABLE shift_rules ADD CONSTRAINT shift_rules_branch_employee_fkey
+      FOREIGN KEY (branch_id, employee_id) REFERENCES employees (branch_id, employee_id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- 6. RLS for the two tables that now carry their own branch_id.
 DROP POLICY IF EXISTS branch_isolation ON employee_fingerprints;
 CREATE POLICY branch_isolation ON employee_fingerprints FOR ALL TO authenticated
   USING (branch_id = (SELECT public.current_device_branch()))
   WITH CHECK (branch_id = (SELECT public.current_device_branch()));
-
 DO $$ BEGIN
   IF to_regclass('public.shift_rules') IS NOT NULL THEN
-    ALTER TABLE shift_rules ADD COLUMN IF NOT EXISTS branch_id TEXT;
-    UPDATE shift_rules s SET branch_id = e.branch_id FROM employees e
-      WHERE e.employee_id = s.employee_id AND s.branch_id IS NULL;
     DROP POLICY IF EXISTS branch_isolation ON shift_rules;
     CREATE POLICY branch_isolation ON shift_rules FOR ALL TO authenticated
       USING (branch_id = (SELECT public.current_device_branch()))

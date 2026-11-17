@@ -70,3 +70,28 @@ describe('branding', () => {
     expect(await as(db, 'anon', null, () => one(db, `SELECT public.branch_profile('nope')`))).toBeNull();
   });
 });
+
+describe('the production-only employee links', () => {
+  it('are rebuilt per branch: a fingerprint must name an employee of its own branch, and goes with them', async () => {
+    const fresh = await makeDb('0033_payments_and_reports.sql');
+    // recreate production's hand-made links by employee number alone
+    await fresh.exec(`
+      ALTER TABLE employee_fingerprints ADD CONSTRAINT employee_fingerprints_employee_id_fkey
+        FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE;
+      ALTER TABLE attendance_logs ADD CONSTRAINT attendance_logs_employee_id_fkey
+        FOREIGN KEY (employee_id) REFERENCES employees(employee_id);
+      INSERT INTO organizations(id, name) VALUES ('o', 'O');
+      INSERT INTO branches(id, org_id, name) VALUES ('A', 'o', 'A'), ('B', 'o', 'B');
+      INSERT INTO employees(id, employee_id, employee_number, full_name, role, branch_id) VALUES ('e1', 'EMP-001', 'EMP-001', 'N', 'waiter', 'A');
+      INSERT INTO employee_fingerprints(id, employee_id, template_data, template_hash, finger_index) VALUES ('f1', 'EMP-001', 'x', 'h', 1);`);
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    await fresh.exec(readFileSync(fileURLToPath(new URL('./0034_per_branch_keys_and_branding.sql', import.meta.url)), 'utf8'));
+    expect(await one(fresh, `SELECT branch_id FROM employee_fingerprints WHERE id = 'f1'`)).toBe('A');   // backfilled
+    expect(await fails(fresh, `INSERT INTO employee_fingerprints(id, employee_id, template_data, template_hash, finger_index, branch_id)
+                               VALUES ('f2', 'EMP-001', 'x', 'h', 1, 'B')`)).toMatch(/foreign key/);    // B has no EMP-001
+    await fresh.exec(`DELETE FROM employees WHERE id = 'e1'`);
+    expect(await one(fresh, `SELECT count(*)::int FROM employee_fingerprints`)).toBe(0);                  // still cascades
+    await expect(fresh.exec(readFileSync(fileURLToPath(new URL('./0034_per_branch_keys_and_branding.sql', import.meta.url)), 'utf8'))).resolves.toBeTruthy(); // idempotent
+  }, 60000);
+});

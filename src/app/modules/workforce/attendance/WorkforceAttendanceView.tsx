@@ -136,7 +136,7 @@ export function WorkforceAttendanceView() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="/fingerprint-checkin"
+            href="#/fingerprint-checkin"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors shadow-sm"

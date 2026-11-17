@@ -3,7 +3,7 @@ import { DollarSign, RefreshCw, TrendingUp, Download, CheckCircle } from 'lucide
 import { usePOS } from '../../../context/POSContext';
 import { HRController } from '../../../controllers/HRController';
 import { WorkforceController } from '../../../controllers/WorkforceController';
-import { PayrollSummary, EmployeeWithUser } from '../../../models/types';
+import { PayrollSummary, EmployeeWithUser, ROLE_PERMISSIONS } from '../../../models/types';
 import { downloadCsv } from '../../../../lib/csv';
 
 const cur = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -62,7 +62,7 @@ export function PayrollView() {
   const approved   = payroll.filter(p => p.status !== 'draft').length;
   const monthName  = new Date(year, month - 1).toLocaleString('en-US', { month: 'long' });
 
-  const canManage  = currentUser?.role === 'admin' || currentUser?.role === 'hr';
+  const canManage  = !!currentUser && !!ROLE_PERMISSIONS[currentUser.role]?.canManagePayroll;
 
   return (
     <div className="p-6 space-y-6">
@@ -141,7 +141,7 @@ export function PayrollView() {
               <DollarSign className="size-7 text-gray-300" />
             </div>
             <p className="font-medium text-gray-900">No payroll computed</p>
-            <p className="text-sm text-gray-500 mt-1">Click "Compute All" to generate payroll for {monthName} {year}.</p>
+            <p className="text-sm text-gray-500 mt-1">{canManage ? 'Click "Compute All" to generate payroll for' : 'Payroll has not been computed yet for'} {monthName} {year}.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -63,10 +63,13 @@ export function Layout() {
 
   const allNavItems: NavItem[] = [
     // Admin gets the full analytics dashboard; ordering roles get the menu/ordering UI
-    ...(currentUser.role === 'admin'
+    ...(currentUser.role === 'admin' || currentUser.role === 'manager'
       ? [{ path: '/admin-dashboard', label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewReports' as const }]
       : [{ path: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard, permission: 'canViewOrderingDashboard' as const }]
     ),
+    ...(currentUser.role === 'manager'
+      ? [{ path: '/dashboard', label: 'Take Order', icon: ShoppingCart, permission: 'canViewOrderingDashboard' as const }]
+      : []),
     { path: '/tables',             label: 'Tables',         icon: ShoppingCart,  permission: 'canViewTables' as const },
     { path: '/pickup-orders',      label: 'Pickup',         icon: PackageIcon,   permission: 'canViewTables' as const, feature: 'pickup' },
     { path: '/kitchen',            label: 'Kitchen',        icon: ChefHat,       permission: 'canManageInventory' as const },

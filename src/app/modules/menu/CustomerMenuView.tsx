@@ -5,7 +5,7 @@ import { OrderController } from '../../controllers/OrderController';
 import {
   Plus, Minus, ShoppingCart, Layers, X,
   Search, CheckCircle2, ShoppingBag, Utensils, ArrowLeft,
-  FileText, Receipt, ChevronDown, Package, Copy, Check
+  FileText, Receipt, ChevronDown, Package, Copy, Check, LayoutGrid
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { createPickupToken } from '../../services/PickupService';
@@ -212,7 +212,14 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
   }, [products, sortedCategories, selectedCategory, searchQuery]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
+  // Waiters have no sidebar here, so this is their only way to the real Tables screen (QR toggle, move, void).
+  const canViewTables = !!ROLE_PERMISSIONS[currentUser.role]?.canViewTables;
   const newItemsOnly = cartItems.filter(i => i.source === 'new');
+  // The cart lives only on this screen — warn before leaving with unsent items.
+  const goToTables = () => {
+    if (newItemsOnly.length > 0 && !confirm(`You have ${newItemsOnly.length} unsent item(s). Leave and lose them?`)) return;
+    navigate('/tables');
+  };
   const existingItemsOnly = cartItems.filter(i => i.source === 'existing');
   const cartTotal = cartItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
@@ -315,9 +322,16 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
               <ArrowLeft className="size-3.5 text-orange-500" /> Tables
             </button>
           ) : (
-            <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-1.5 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
-              <Layers className="size-3.5 text-orange-500" /> Tables ({activeTables.length})
-            </button>
+            <>
+              <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-1.5 min-h-11 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
+                <Layers className="size-3.5 text-orange-500" /> Open tables ({activeTables.length})
+              </button>
+              {canViewTables && (
+                <button onClick={goToTables} className="flex items-center gap-1.5 min-h-11 bg-white border px-3 py-2.5 rounded-xl text-xs font-black text-gray-700 shadow-sm whitespace-nowrap">
+                  <LayoutGrid className="size-3.5 text-orange-500" /> Tables
+                </button>
+              )}
+            </>
           )}
           <div className="text-right border-l pl-2.5 border-gray-100 min-w-fit">
             <p className="text-[9px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-0.5">{takeawayOnly ? 'Takeaway' : 'Waiter'}</p>
@@ -473,9 +487,16 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                 <ArrowLeft className="size-4 text-orange-500" /> Back to Tables
               </button>
             ) : (
-              <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
-                <Layers className="size-4 text-orange-500" /> Active Tables ({activeTables.length})
-              </button>
+              <>
+                <button onClick={() => setShowTableOverlay(true)} className="flex items-center gap-2 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                  <Layers className="size-4 text-orange-500" /> Active Tables ({activeTables.length})
+                </button>
+                {canViewTables && (
+                  <button onClick={goToTables} className="flex items-center gap-2 min-h-11 bg-white border px-5 py-2.5 rounded-2xl text-sm font-black text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                    <LayoutGrid className="size-4 text-orange-500" /> Tables Screen
+                  </button>
+                )}
+              </>
             )}
             <div className="text-right ml-4 border-l pl-4 border-gray-100">
               <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-1">{takeawayOnly ? 'Takeaway' : 'Waiter'}</p>

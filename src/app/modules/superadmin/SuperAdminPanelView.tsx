@@ -7,6 +7,10 @@ import {
 import { toast } from 'sonner';
 import { SuperAdminController, OrgWithBranches } from '../../controllers/SuperAdminController';
 import { Branch, BranchFeatures, BranchFeatureKey, FEATURE_LABELS } from '../../models/types';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '../../components/ui/alert-dialog';
 
 const FEATURE_KEYS = Object.keys(FEATURE_LABELS) as BranchFeatureKey[];
 
@@ -107,14 +111,32 @@ function BranchCard({ branch, onChanged }: { branch: Branch; onChanged: () => vo
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />} Save
         </button>
-        <button
-          onClick={toggleStatus}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-            branch.status === 'suspended' ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-          }`}
-        >
-          {branch.status === 'suspended' ? <><CheckCircle2 className="size-3.5" /> Reactivate</> : <><Ban className="size-3.5" /> Suspend</>}
-        </button>
+        {branch.status === 'suspended' ? (
+          <button onClick={toggleStatus} className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+            <CheckCircle2 className="size-3.5" /> Reactivate
+          </button>
+        ) : (
+          // Suspending locks a live restaurant out, so it needs a confirmation; reactivating stays one click.
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100">
+                <Ban className="size-3.5" /> Suspend
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Suspend branch "{branch.name}"?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  All staff at this branch will be locked out of the POS until you reactivate it.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="min-h-11">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={toggleStatus} className="min-h-11 bg-amber-600 text-white hover:bg-amber-700">Suspend branch</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </div>
   );
@@ -204,11 +226,12 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    // Once the one-time password is on screen, only "Done" may close the modal, so it can't be lost by a stray click.
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={result ? undefined : onClose}>
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h3 className="font-bold text-gray-900">{result ? 'Tenant created' : 'Add Tenant'}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>
+          {!result && <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>}
         </div>
 
         {!result ? (
@@ -338,9 +361,29 @@ export function SuperAdminPanelView() {
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${org.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                   {org.status === 'active' ? 'Active' : 'Suspended'}
                 </span>
-                <button onClick={() => toggleOrgStatus(org)} className="text-xs font-semibold text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg hover:bg-gray-100">
-                  {org.status === 'suspended' ? 'Reactivate' : 'Suspend'}
-                </button>
+                {org.status === 'suspended' ? (
+                  <button onClick={() => toggleOrgStatus(org)} className="min-h-11 text-xs font-semibold text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg hover:bg-gray-100">
+                    Reactivate
+                  </button>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button className="min-h-11 text-xs font-semibold text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg hover:bg-gray-100">Suspend</button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Suspend organization "{org.name}"?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Staff at all {org.branches.length} branch{org.branches.length !== 1 ? 'es' : ''} of this tenant will be locked out of the POS until you reactivate it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="min-h-11">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => toggleOrgStatus(org)} className="min-h-11 bg-amber-600 text-white hover:bg-amber-700">Suspend organization</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </div>
 

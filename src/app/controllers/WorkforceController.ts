@@ -124,9 +124,12 @@ export class WorkforceController {
       }
       if (filters.role) query = query.eq('role', filters.role);
       if (filters.department) query = query.eq('department', filters.department);
-      if (filters.search) {
+      // Commas, brackets and quotes are PostgREST filter syntax — a search box
+      // must not be able to rewrite the filter, so drop them from the term.
+      const search = filters.search?.replace(/[,()"\\]/g, ' ').trim();
+      if (search) {
         query = query.or(
-          `full_name.ilike.%${filters.search}%,employee_number.ilike.%${filters.search}%,email.ilike.%${filters.search}%`
+          `full_name.ilike.%${search}%,employee_number.ilike.%${search}%,email.ilike.%${search}%`
         );
       }
 

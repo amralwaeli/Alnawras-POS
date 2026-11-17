@@ -4,7 +4,6 @@ import { Layout } from './components/Layout';
 import { usePOS } from './context/POSContext';
 import { useBranch } from './context/BranchContext';
 import { ROLE_PERMISSIONS, BranchFeatureKey } from './models/types';
-import { ProductManagementView } from './modules/staff';
 
 function ProtectedRoute({ children, permission, adminOnly, feature }: {
   children: React.ReactNode;
@@ -40,6 +39,7 @@ const KitchenView            = lazy(() => import('./modules/kitchen').then(m => 
 
 const InventoryView          = lazy(() => import('./modules/inventory').then(m => ({ default: m.InventoryView })));
 
+const ProductManagementView  = lazy(() => import('./modules/staff').then(m => ({ default: m.ProductManagementView })));
 const CategoryManagementView = lazy(() => import('./modules/staff').then(m => ({ default: m.CategoryManagementView })));
 const ModifierManagementView = lazy(() => import('./modules/staff').then(m => ({ default: m.ModifierManagementView })));
 const PrinterManagementView  = lazy(() => import('./modules/staff').then(m => ({ default: m.PrinterManagementView })));
@@ -186,19 +186,19 @@ export const router = createHashRouter([
         path: 'workforce',
         element: (
           <Lazy>
-            <ProtectedRoute permission="canManageStaff" feature="workforce">
+            <ProtectedRoute feature="workforce">
               <WorkforceLayout />
             </ProtectedRoute>
           </Lazy>
         ),
         children: [
           { index: true, element: <Navigate to="employees" replace /> },
-          { path: 'employees',  element: <Lazy><EmployeesView /></Lazy> },
-          { path: 'employees/:employeeId', element: <Lazy><EmployeeProfileView /></Lazy> },
-          { path: 'attendance', element: <Lazy><WorkforceAttendanceView /></Lazy> },
+          { path: 'employees',  element: <Lazy><ProtectedRoute permission="canManageStaff"><EmployeesView /></ProtectedRoute></Lazy> },
+          { path: 'employees/:employeeId', element: <Lazy><ProtectedRoute permission="canManageStaff"><EmployeeProfileView /></ProtectedRoute></Lazy> },
+          { path: 'attendance', element: <Lazy><ProtectedRoute permission="canViewAttendance"><WorkforceAttendanceView /></ProtectedRoute></Lazy> },
           { path: 'payroll',    element: <Lazy><ProtectedRoute permission="canManagePayroll"><PayrollView /></ProtectedRoute></Lazy> },
           { path: 'leave',      element: <Lazy><ProtectedRoute permission="canManageLeave"><LeaveManagementView /></ProtectedRoute></Lazy> },
-          { path: 'biometrics', element: <Lazy><ProtectedRoute feature="biometrics"><BiometricsView /></ProtectedRoute></Lazy> },
+          { path: 'biometrics', element: <Lazy><ProtectedRoute permission="canManageStaff" feature="biometrics"><BiometricsView /></ProtectedRoute></Lazy> },
           { path: 'performance', element: <Lazy><ProtectedRoute permission="canManageStaff"><PerformanceView /></ProtectedRoute></Lazy> },
         ],
       },

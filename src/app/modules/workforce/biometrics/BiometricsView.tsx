@@ -200,7 +200,7 @@ export function BiometricsView() {
           </p>
         </div>
         <a
-          href="/fingerprint-checkin"
+          href="#/fingerprint-checkin"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600 transition-colors"

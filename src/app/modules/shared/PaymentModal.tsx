@@ -20,6 +20,7 @@ import { DeviceService } from '../../services/DeviceService';
 import { PrintService } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
+import QRCode from 'qrcode';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -313,6 +314,9 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [lastSummary, setLastSummary] = useState('');
   // Final money breakdown snapshot for the receipt (order prop isn't re-fetched).
   const [lastTotals, setLastTotals] = useState<{ subtotal: number; discount: number; tax: number; total: number } | null>(null);
+  // Own copy of the paid order: the parent drops it from the open-orders list while the print prompt is still showing.
+  const [receiptOrder, setReceiptOrder] = useState<any>(null);
+  const [lanPrinted, setLanPrinted] = useState(false);
   
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
@@ -340,6 +344,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setSplits([{ method: 'cash', amount: '' }]);
     setAmountReceived('');
     setShowPrint(false);
+    setLanPrinted(false);
     setLinkedCustomer(null);
     setLoyaltyDiscount(0);
     setLoyaltyPointsToRedeem(0);
@@ -429,6 +434,14 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     return () => { supabase.removeChannel(channel); };
   }, [order, isOpen, paymentMode, totals.total, totals.tax, totals.discount]);
 
+  // Drawn locally — the order id and total used to be sent to a third-party QR service.
+  const payQrText = order && paymentMode === 'qr' ? `ALNAWRAS-PAY-${order.id}-${totals.total}` : null;
+  const [payQrImage, setPayQrImage] = useState<string | null>(null);
+  useEffect(() => {
+    if (!payQrText) { setPayQrImage(null); return; }
+    QRCode.toDataURL(payQrText, { width: 150, margin: 1 }).then(setPayQrImage, () => setPayQrImage(null));
+  }, [payQrText]);
+
   if (!isOpen) return null;
 
   // SECURITY: Check if this device is authorized to handle payments
@@ -482,6 +495,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setLastBillNo(billNo);
     setLastSummary(summary);
     setLastTotals({ subtotal: totals.subtotal, discount: totals.discount, tax: totals.tax, total: totals.total });
+    setReceiptOrder(order);
 
     // Notify customer monitor of success (one-shot). Remove the channel after
     // sending so a completed payment doesn't leak a realtime subscription
@@ -600,6 +614,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
               printerPort: printer.port || 9100,
               content: receiptText
             });
+            setLanPrinted(true);
           }
         }
       } catch (printErr) {
@@ -662,21 +677,21 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
         <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
           <div className="flex items-center justify-between px-6 py-4 border-b">
             <div><h2 className="font-bold text-lg">Payment Completed</h2><p className="text-xs text-gray-400 mt-0.5">Bill #{lastBillNo}</p></div>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
+            <button onClick={onClose} aria-label="Close" className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
           </div>
           <div className="px-6 py-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
               <CheckCircle className="size-8 text-emerald-600" />
             </div>
-            <div><p className="text-lg font-semibold text-gray-900">Payment Successful!</p><p className="text-sm text-gray-500 mt-1">Would you like to print a receipt?</p></div>
+            <div><p className="text-lg font-semibold text-gray-900">Payment Successful!</p><p className="text-sm text-gray-500 mt-1">{lanPrinted ? 'Receipt sent to the printer.' : 'Would you like to print a receipt?'}</p></div>
           </div>
           <div className="px-6 py-4 border-t space-y-3">
-            <button onClick={() => { printReceipt({ ...order, billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo); onClose(); }}
+            <button onClick={() => { printReceipt({ ...(receiptOrder ?? order), billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo); onClose(); }}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              Print Receipt
+              {lanPrinted ? 'Print again' : 'Print Receipt'}
             </button>
-            <button onClick={onClose} className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">Skip Printing</button>
+            <button onClick={onClose} className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">{lanPrinted ? 'Done' : 'Skip Printing'}</button>
           </div>
         </div>
       </div>
@@ -804,7 +819,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                   <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 flex flex-col items-center text-center space-y-3 animate-in fade-in zoom-in duration-300">
                     <div className="bg-white p-2 rounded-lg shadow-sm border border-violet-100">
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`ALNAWRAS-PAY-${order.id}-${totals.total}`)}`} 
+                        src={payQrImage ?? undefined}
                         alt="Payment QR"
                         className="size-32"
                       />

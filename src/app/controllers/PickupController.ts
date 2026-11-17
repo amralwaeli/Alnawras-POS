@@ -87,12 +87,27 @@ export class PickupController {
   }
 
   /** Staff rejects an online payment (bad/illegible receipt). */
-  static async rejectPayment(orderId: string, actor: AuditActor): Promise<Result<void>> {
+  static async rejectPayment(orderId: string, actor: AuditActor, reason?: string): Promise<Result<void>> {
     try {
       const { error } = await supabase.from('orders')
         .update({ payment_status: 'rejected' }).eq('id', orderId);
       if (error) throw error;
-      await audit('pickup.payment_rejected', 'order', orderId, actor);
+      await audit('pickup.payment_rejected', 'order', orderId, actor, { reason: reason || null });
+      return { success: true, data: undefined };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Staff cancels a pickup order (e.g. after a rejected payment) so it leaves the kitchen screen. */
+  static async cancelOrder(orderId: string, actor: AuditActor, reason?: string): Promise<Result<void>> {
+    try {
+      const { error } = await supabase.from('orders')
+        .update({ status: 'cancelled' }).eq('id', orderId);
+      if (error) throw error;
+      // The customer's pickup link must stop working too.
+      await supabase.from('pickup_tokens').update({ active: false, status: 'expired' }).eq('order_id', orderId);
+      await audit('pickup.cancelled', 'order', orderId, actor, { reason: reason || null });
       return { success: true, data: undefined };
     } catch (err: any) {
       return { success: false, error: err.message };

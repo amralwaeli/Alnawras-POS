@@ -155,7 +155,7 @@ export function TablesView() {
         ? { ...t, status: 'available', currentOrderId: undefined }
         : t
     ));
-    setSelectedOrder(null);
+    // Don't unmount PaymentModal here: it still has to show the print-receipt prompt; its onClose clears selectedOrder.
 
     // 2. Harden security: close the group + all guest sessions and expire the
     //    legacy QR session for this table immediately after payment. This
@@ -184,12 +184,8 @@ export function TablesView() {
     return orders.find(o => o.id === t.currentOrderId) ?? null;
   };
 
-  const getFilteredTables = () => {
-    if (currentUser.role === 'cashier') {
-      return tables.filter(t => t.status === 'occupied');
-    }
-    return tables;
-  };
+  // Cashiers see available tables too, so they can switch QR ordering on for a party that was just seated.
+  const getFilteredTables = () => tables;
 
   // Memoize takeaway orders to ensure it updates when orders change
   const takeawayOrders = useMemo(() =>
@@ -413,9 +409,7 @@ export function TablesView() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Tables</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {currentUser.role === 'cashier' 
-                ? 'Occupied tables — ready for payment'
-                : 'Live table status — updates in real time'}
+              Live table status — updates in real time
             </p>
           </div>
           <div className="flex gap-3 items-stretch">
@@ -427,7 +421,7 @@ export function TablesView() {
                 <ShoppingBag className="size-4" /> New Takeaway
               </button>
             )}
-            {currentUser.role !== 'cashier' && (
+            {(
               <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
                 <p className="text-2xl font-bold text-emerald-600">{available}</p>
                 <p className="text-xs text-gray-400">Available</p>
@@ -547,13 +541,16 @@ export function TablesView() {
                         )}
                         <div className="grid grid-cols-2 gap-1.5">
                           <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.approvePayment(order.id, actor), 'Payment approved', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'paid' } : o))} className="py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold disabled:opacity-50">Approve</button>
-                          <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.rejectPayment(order.id, actor), 'Payment rejected', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'rejected' } : o))} className="py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-50">Reject</button>
+                          <button disabled={busy} onClick={() => confirm('Reject this payment? The order stays open until you cancel it.') && runPickup(order.id, () => PickupController.rejectPayment(order.id, actor), 'Payment rejected', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'rejected' } : o))} className="py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-50">Reject</button>
                         </div>
                       </div>
                     )}
 
                     {/* Status / collection actions */}
                     <div className="mt-auto space-y-1.5">
+                      {order.paymentStatus === 'rejected' && (
+                        <button disabled={busy} onClick={() => confirm('Cancel this pickup order? It is removed from the kitchen and the customer link stops working.') && runPickup(order.id, () => PickupController.cancelOrder(order.id, actor), 'Order cancelled', prev => prev.filter(o => o.id !== order.id))} className="w-full min-h-11 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Cancel order</button>
+                      )}
                       {canAdvance && order.pickupStatus !== 'ready' && (
                         <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.setPickupStatus(order.id, 'ready', actor), 'Marked Ready', prev => prev.map(o => o.id === order.id ? { ...o, pickupStatus: 'ready' } : o))} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Ready</button>
                       )}
@@ -618,7 +615,7 @@ export function TablesView() {
                 {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && (
                   <button
                     onClick={() => void handleToggleOrdering(table)}
-                    className={`w-full mb-3 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                    className={`w-full mb-3 flex items-center justify-center gap-1.5 min-h-11 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                       table.orderingEnabled
                         ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -677,7 +674,7 @@ export function TablesView() {
                         Open Bill
                       </button>
                     )}
-                    {(currentUser.role === 'waiter' || currentUser.role === 'swaiter' || currentUser.role === 'admin') && (
+                    {(currentUser.role === 'waiter' || currentUser.role === 'swaiter' || currentUser.role === 'admin' || currentUser.role === 'manager') && (
                       <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
                         Start Order
                       </button>
@@ -693,9 +690,7 @@ export function TablesView() {
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
             <UtensilsCrossed className="size-12 opacity-30" />
             <p className="text-sm text-center">
-              {currentUser.role === 'cashier' 
-                ? 'No occupied tables — all tables have been paid'
-                : 'No tables found — add tables in Manage Tables'}
+              {currentUser.role === 'admin' ? 'No tables found — add tables in Manage Tables' : 'No tables set up yet — ask an admin'}
             </p>
           </div>
         )}

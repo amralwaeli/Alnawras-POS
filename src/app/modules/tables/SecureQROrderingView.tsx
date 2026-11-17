@@ -226,7 +226,8 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       .channel(`secure-qr-table-${tableId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, (payload) => {
         const up = payload.new as any;
-        setTable(prev => prev ? { ...prev, orderingEnabled: up.ordering_enabled ?? false } : prev);
+        // needs_waiter flips back to false when staff acknowledge the call, which re-enables "Call Waiter".
+        setTable(prev => prev ? { ...prev, orderingEnabled: up.ordering_enabled ?? false, needsWaiter: up.needs_waiter ?? false } : prev);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -333,6 +334,22 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
     }
   };
 
+  // Shared by the ordering header and the "ordering locked" screen.
+  const callWaiterButton = (
+    <button
+      onClick={handleCallWaiter}
+      disabled={callingWaiter || table?.needsWaiter}
+      className={`flex items-center gap-1.5 min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+        table?.needsWaiter
+          ? 'bg-amber-100 text-amber-700 cursor-default'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
+      }`}
+    >
+      <Bell className="size-3.5" />
+      {table?.needsWaiter ? 'Called!' : 'Call Waiter'}
+    </button>
+  );
+
   if (loading) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3]">
@@ -384,6 +401,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
           </div>
           <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Ask Your Waiter</h2>
           <p className="text-sm text-gray-400">Ordering isn't open for this table yet — a team member needs to enable it first. This page will unlock automatically once they do.</p>
+          <div className="mt-6 flex justify-center">{callWaiterButton}</div>
         </div>
       </div>
     );
@@ -405,18 +423,7 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
           <p className="text-[11px] text-gray-400 font-medium">Alnawras Restaurant</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleCallWaiter}
-            disabled={callingWaiter || table?.needsWaiter}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-              table?.needsWaiter
-                ? 'bg-amber-100 text-amber-700 cursor-default'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
-            }`}
-          >
-            <Bell className="size-3.5" />
-            {table?.needsWaiter ? 'Called!' : 'Call Waiter'}
-          </button>
+          {callWaiterButton}
           <button
             onClick={() => setMobileView(mobileView === 'menu' ? 'cart' : 'menu')}
             className="relative bg-orange-500 text-white p-2.5 rounded-xl shadow-lg shadow-orange-200 active:scale-95"
@@ -430,6 +437,13 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
           </button>
         </div>
       </div>
+
+      {/* Lives outside the cart bar, which unmounts in the same update that empties the cart. */}
+      {success && (
+        <div role="status" className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500 text-white text-sm font-black flex-shrink-0 animate-in fade-in">
+          <CheckCircle2 className="size-5" /> Order sent! The kitchen has your order.
+        </div>
+      )}
 
       {mobileView === 'menu' ? (
         <>
@@ -590,23 +604,17 @@ export function SecureOrderingUI({ tableId, addedBy = 'guest', addedByName = 'Gu
       {/* Place order button */}
       {mobileView === 'cart' && cartItems.length > 0 && (
         <div className="px-4 pb-safe pt-3 bg-white border-t flex-shrink-0">
-          {success ? (
-            <div className="flex items-center justify-center gap-2 py-4 text-emerald-600 font-black animate-in zoom-in">
-              <CheckCircle2 className="size-6" /> Order Sent!
-            </div>
-          ) : (
-            <button
-              onClick={handleSubmitOrder}
-              disabled={submitting}
-              className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-orange-200 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
-              ) : (
-                <><ShoppingBag className="size-5" /> Place Order · RM {cartTotal.toFixed(2)}</>
-              )}
-            </button>
-          )}
+          <button
+            onClick={handleSubmitOrder}
+            disabled={submitting}
+            className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-orange-200 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {submitting ? (
+              <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+            ) : (
+              <><ShoppingBag className="size-5" /> Place Order · RM {cartTotal.toFixed(2)}</>
+            )}
+          </button>
         </div>
       )}
 

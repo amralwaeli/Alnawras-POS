@@ -2,11 +2,19 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt } from '../../../lib/currency';
 import { QrCode, CheckCircle, ShoppingCart, User } from 'lucide-react';
+import QRCode from 'qrcode';
 
 export function CustomerMonitorView() {
   const [order, setOrder] = useState<any>(null);
   const [paymentQR, setPaymentQR] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
+  const [qrImage, setQrImage] = useState<string | null>(null);
+
+  // Drawn locally — the bill details used to be sent to a third-party QR service.
+  useEffect(() => {
+    if (!paymentQR) { setQrImage(null); return; }
+    QRCode.toDataURL(paymentQR, { width: 250, margin: 1 }).then(setQrImage, () => setQrImage(null));
+  }, [paymentQR]);
 
   useEffect(() => {
     // Listen for broadcast messages from the cashier window
@@ -72,8 +80,8 @@ export function CustomerMonitorView() {
           {paymentQR ? (
             <div className="space-y-6 animate-in fade-in zoom-in duration-500">
               <div className="bg-violet-50 p-8 rounded-[40px] border-2 border-violet-100 inline-block mx-auto">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(paymentQR)}`} 
+                <img
+                  src={qrImage ?? undefined}
                   alt="Payment QR"
                   className="size-64"
                 />

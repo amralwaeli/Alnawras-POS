@@ -80,7 +80,7 @@ export function ShiftManagementView() {
       <body onload="window.print()">
         <div class="header">
           <h2>SHIFT REPORT</h2>
-          <p>Cashier: ${shift.user_name}</p>
+          <p>Cashier: ${String(shift.user_name ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)}</p>
           <p>Open: ${new Date(shift.opened_at).toLocaleString()}</p>
           <p>Close: ${new Date(shift.closed_at!).toLocaleString()}</p>
         </div>

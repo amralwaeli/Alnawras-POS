@@ -538,7 +538,7 @@ function BiometricsTab({ employee, onRefresh }: { employee: EmployeeWithUser; on
             </button>
           ) : null}
           <a
-            href="/fingerprint-checkin"
+            href="#/fingerprint-checkin"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors"

@@ -12,12 +12,17 @@ import { usePOS } from '../../context/POSContext';
 import { PickupController } from '../../controllers/PickupController';
 import { uploadMerchantQr } from '../../services/PickupService';
 import { validateUpload, IMAGE_TYPES, MB } from '../../../lib/upload';
-import { Order } from '../../models/types';
+import { Order, ROLE_PERMISSIONS } from '../../models/types';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../../components/ui/alert-dialog';
+import { Textarea } from '../../components/ui/textarea';
 import { fmt } from '../../../lib/currency';
 import { toast } from 'sonner';
 import {
   Package, RefreshCw, CheckCircle2, XCircle, Clock, Bike, Truck, Store,
-  Image as ImageIcon, QrCode, ChefHat, BadgeCheck, ArrowLeft,
+  Image as ImageIcon, QrCode, ChefHat, BadgeCheck, ArrowLeft, Ban, Wallet,
 } from 'lucide-react';
 
 const methodIcon: Record<string, any> = { grab: Bike, lalamove: Truck, self: Store };
@@ -43,12 +48,15 @@ export function PickupBoardView() {
   const isAdmin = currentUser?.role === 'admin';
   // POS-only roles have no sidebar, so give them a way back.
   const noSidebar = ['kitchen', 'cashier', 'waiter', 'swaiter'].includes(currentUser?.role ?? '');
+  const canPay = !!currentUser && !!ROLE_PERMISSIONS[currentUser.role]?.canProcessPayments;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [qrUploading, setQrUploading] = useState(false);
+  const [confirm, setConfirm] = useState<{ kind: 'reject' | 'cancel'; order: Order } | null>(null);
+  const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +73,17 @@ export function PickupBoardView() {
     setBusy(null);
     if (res.success) { toast.success(ok); load(); }
     else toast.error(res.error || 'Action failed');
+  };
+
+  const askConfirm = (kind: 'reject' | 'cancel', order: Order) => { setReason(''); setConfirm({ kind, order }); };
+
+  const confirmAction = () => {
+    if (!confirm) return;
+    const { kind, order } = confirm;
+    const r = reason.trim() || undefined;
+    setConfirm(null);
+    if (kind === 'cancel') run(order.id, () => PickupController.cancelOrder(order.id, actor, r), 'Order cancelled');
+    else run(order.id, () => PickupController.rejectPayment(order.id, actor, r), 'Payment rejected');
   };
 
   const uploadQr = async (file: File) => {
@@ -122,6 +141,7 @@ export function PickupBoardView() {
             const MIcon = methodIcon[o.pickupMethod ?? 'self'] ?? Store;
             const pending = o.pickupPayType === 'online' && o.paymentStatus === 'pending_verification';
             const canAdvance = o.pickupPayType === 'cash' || o.paymentStatus === 'paid';
+            const paid = o.paymentStatus === 'paid';
             return (
               <div key={o.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
                 <div className="flex items-start justify-between">
@@ -161,7 +181,7 @@ export function PickupBoardView() {
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       <button disabled={busy === o.id} onClick={() => run(o.id, () => PickupController.approvePayment(o.id, actor), 'Payment approved')} className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-50"><BadgeCheck className="size-4" /> Approve</button>
-                      <button disabled={busy === o.id} onClick={() => run(o.id, () => PickupController.rejectPayment(o.id, actor), 'Payment rejected')} className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-50"><XCircle className="size-4" /> Reject</button>
+                      <button disabled={busy === o.id} onClick={() => askConfirm('reject', o)} className="flex items-center justify-center gap-1.5 min-h-11 py-2 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-50"><XCircle className="size-4" /> Reject</button>
                     </div>
                   </div>
                 )}
@@ -172,12 +192,23 @@ export function PickupBoardView() {
                     {o.pickupStatus === 'preparing' && (
                       <button disabled={busy === o.id} onClick={() => run(o.id, () => PickupController.setPickupStatus(o.id, 'ready', actor), 'Marked Ready')} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-50"><ChefHat className="size-4" /> Mark Ready</button>
                     )}
-                    {o.pickupStatus === 'ready' && (
+                    {o.pickupStatus === 'ready' && paid && (
                       <button disabled={busy === o.id} onClick={() => run(o.id, () => PickupController.markPicked(o.id, actor), 'Marked Picked')} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold disabled:opacity-50"><CheckCircle2 className="size-4" /> Mark Picked</button>
                     )}
-                    {o.pickupPayType === 'cash' && o.paymentStatus !== 'paid' && (
-                      <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1"><Clock className="size-3" /> Collect cash at the counter (Tables screen).</p>
+                    {/* Unpaid (cash) orders complete through the Tables payment flow, never by Mark Picked. */}
+                    {o.pickupStatus === 'ready' && !paid && canPay && (
+                      <button onClick={() => navigate('/tables')} className="w-full flex items-center justify-center gap-2 min-h-11 py-2.5 rounded-xl bg-orange-600 text-white text-sm font-bold"><Wallet className="size-4" /> Collect cash</button>
                     )}
+                    {!paid && (
+                      <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1"><Clock className="size-3" /> Not paid yet. The cashier collects payment at the counter.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Rejected payment: let staff close the order out instead of leaving a live kitchen ticket */}
+                {o.paymentStatus === 'rejected' && (
+                  <div className="border-t pt-3">
+                    <button disabled={busy === o.id} onClick={() => askConfirm('cancel', o)} className="w-full flex items-center justify-center gap-2 min-h-11 py-2.5 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 disabled:opacity-50"><Ban className="size-4" /> Cancel order</button>
                   </div>
                 )}
               </div>
@@ -185,6 +216,29 @@ export function PickupBoardView() {
           })}
         </div>
       )}
+
+      <AlertDialog open={!!confirm} onOpenChange={open => { if (!open) setConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirm?.kind === 'cancel' ? 'Cancel this pickup order?' : 'Reject this payment?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm?.kind === 'cancel'
+                ? `${confirm.order.customerName || 'The customer'}'s order #${confirm.order.billNumber ?? '—'} will be cancelled and removed from the kitchen screen.`
+                : `${confirm?.order.customerName || 'The customer'}'s payment receipt will be marked as rejected. You can cancel the order afterwards.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <label htmlFor="pickup-confirm-reason" className="text-sm font-medium text-gray-700">Reason (optional)</label>
+            <Textarea id="pickup-confirm-reason" value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Receipt amount does not match" maxLength={300} />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-11">Back</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAction} className="min-h-11 bg-red-600 text-white hover:bg-red-700">
+              {confirm?.kind === 'cancel' ? 'Cancel order' : 'Reject payment'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Receipt viewer */}
       {receipt && (

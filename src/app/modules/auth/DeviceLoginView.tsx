@@ -94,7 +94,7 @@ export function DeviceLoginView() {
             <Lock className="size-3" />
             {native
               ? 'Stays signed in until an administrator signs this device out.'
-              : 'Stays signed in until you sign out.'}
+              : 'Signed in for this tab only — closing it signs you out.'}
           </p>
         </form>
       </div>

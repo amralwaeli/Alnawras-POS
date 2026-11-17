@@ -2,7 +2,7 @@ import { Order, Result, SelectedModifier } from '../models/types';
 import { mapOrder } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { PrintService } from '../services/PrintService';
-import { OfflineSyncEngine } from '../services/OfflineSyncEngine';
+import { OfflineSyncEngine, isNetworkError } from '../services/OfflineSyncEngine';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -60,13 +60,16 @@ export class OrderController {
         return { success: false, error: 'Table selection is required for dine-in orders.' };
       }
 
+      // A bill started offline exists only in this device's queue: further rounds
+      // for that table go on the same bill, and wait in the queue behind it.
+      const queuedOrders = OfflineSyncEngine.queuedNewOrders();
+      if (!orderId && params.table) orderId = queuedOrders.find(o => o.table_id === params.table!.id)?.id;
+      const billIsQueued = !!orderId && queuedOrders.some(o => o.id === orderId);
+      let newOrderRow: any = null;
+
       // ── Create the order if one does not already exist ─────────────────────
       if (!orderId) {
         orderId = `order-${crypto.randomUUID()}`;
-        // takeaway & pickup get a bill number on creation (no table to key off).
-        const billNum = params.orderType !== 'dine-in'
-          ? await this.nextBillNumber(branchId, params.orderType)
-          : null;
 
         const orderRow: any = {
           id: orderId,
@@ -78,7 +81,7 @@ export class OrderController {
           order_type: params.orderType,
           branch_id: branchId,
           waiters: params.waiterId ? [params.waiterId] : [],
-          bill_number: billNum,
+          bill_number: null,
           subtotal: 0,
           tax: 0,
           total: 0,
@@ -96,8 +99,19 @@ export class OrderController {
           orderRow.payment_receipt_url = params.pickup.receiptUrl || null;
         }
 
-        const { error: orderError } = await supabase.from('orders').insert(orderRow);
-        if (orderError) throw orderError;
+        try {
+          if (!navigator.onLine) throw new TypeError('Offline');
+          // takeaway & pickup get a bill number on creation (no table to key off).
+          if (params.orderType !== 'dine-in') {
+            orderRow.bill_number = await this.nextBillNumber(branchId, params.orderType);
+          }
+          const { error: orderError } = await supabase.from('orders').insert(orderRow);
+          if (orderError) throw orderError;
+        } catch (createErr) {
+          if (!isNetworkError(createErr)) throw createErr;
+          // No network: the queue creates this bill (and its bill number) on replay.
+          newOrderRow = orderRow;
+        }
         // The table is marked occupied AFTER items are inserted (below), so a
         // table never shows busy until an order is actually sent.
       }
@@ -109,15 +123,18 @@ export class OrderController {
       // what stops a customer on the public QR/pickup page posting an item at an
       // arbitrary price. `rows` (client-priced) is kept ONLY as the offline
       // fallback (own-staff, reconciled on sync) and offline printing source.
-      const rpcItems = params.items.map(item => ({
+      // The device picks each line's id (client_id) so an offline replay never adds a line twice.
+      const lineIds = params.items.map(() => `item-${crypto.randomUUID()}`);
+      const rpcItems = params.items.map((item, i) => ({
         product_id: item.productId,
         quantity: item.quantity,
         notes: item.notes || null,
         option_ids: (item.modifiers ?? []).map(m => m.optionId).filter(Boolean),
+        client_id: lineIds[i],
       }));
 
-      const rows = params.items.map(item => ({
-        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      const rows = params.items.map((item, i) => ({
+        id: lineIds[i],
         order_id: orderId,
         product_id: item.productId,
         product_name: item.productName,
@@ -137,6 +154,8 @@ export class OrderController {
       let finalOrder: any = null;
       let printItems: any[] = rows;
       try {
+        // A bill not on the server yet cannot take items directly: straight to the queue.
+        if (newOrderRow || billIsQueued) throw new TypeError('Bill is queued offline');
         const { data: priced, error: rpcErr } = await supabase.rpc('submit_order_items', {
           p_order_id: orderId,
           p_branch_id: branchId,
@@ -163,7 +182,7 @@ export class OrderController {
         // Only queue offline when the device is genuinely offline. An ONLINE
         // failure (e.g. the RPC rejected an unavailable product) is a real error
         // to surface — not something to silently queue as if it succeeded.
-        if (navigator.onLine) {
+        if (!isNetworkError(dbErr)) {
           console.error('[OrderController] submit_order_items failed', dbErr);
           if (createdNewOrder) {
             // Drop the empty order row we created a moment ago so a failed submit
@@ -174,8 +193,15 @@ export class OrderController {
         }
         console.warn('[OrderController] Offline detected, queuing order locally', dbErr);
         // Replayed through the same server function later (server prices, branch check).
-        OfflineSyncEngine.addToQueue({ orderId, branchId, addedBy: params.addedBy, addedByName: params.addedByName, items: rpcItems });
-        finalOrder = { id: orderId, tableNumber: params.table?.number || 0, items: rows };
+        OfflineSyncEngine.addToQueue({
+          orderId, branchId, addedBy: params.addedBy, addedByName: params.addedByName, items: rpcItems,
+          newOrder: newOrderRow ?? undefined,
+        });
+        // camelCase copies too, for screens that list the returned items.
+        finalOrder = {
+          id: orderId, tableNumber: params.table?.number || 0,
+          items: rows.map(r => ({ ...r, productId: r.product_id, productName: r.product_name })),
+        };
         printItems = rows;
       }
 

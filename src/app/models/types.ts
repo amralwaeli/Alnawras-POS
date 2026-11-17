@@ -119,6 +119,8 @@ export interface Product {
   sku?: string;
   taxRate: number;
   reorderPoint: number;
+  /** Stock goes down on each sale and the item can't be sold past 0 (migration 0035). */
+  trackStock: boolean;
   branchId: string;
   station: 'kitchen' | 'juice' | 'shawarma' | 'none';
   kitchenStatus: 'available' | 'out-of-stock' | 'finished';

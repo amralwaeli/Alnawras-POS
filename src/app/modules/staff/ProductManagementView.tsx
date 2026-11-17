@@ -5,6 +5,7 @@ import { loadStations, Station } from '../../models/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Checkbox } from '../../components/ui/checkbox';
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
@@ -41,6 +42,7 @@ export function ProductManagementView() {
     sku: '',
     taxRate: '8.25',
     reorderPoint: '',
+    trackStock: false,
     station: 'kitchen' as string,
     image: '',
   });
@@ -69,6 +71,7 @@ export function ProductManagementView() {
       sku: '',
       taxRate: '8.25',
       reorderPoint: '',
+      trackStock: false,
       station: 'kitchen',
       image: '',
     });
@@ -163,6 +166,7 @@ export function ProductManagementView() {
       sku: productFormData.sku || undefined,
       taxRate: parseFloat(productFormData.taxRate),
       reorderPoint: parseInt(productFormData.reorderPoint) || 0,
+      trackStock: productFormData.trackStock,
       branchId,
       station: productFormData.station,
       image: imageUrl,
@@ -172,7 +176,9 @@ export function ProductManagementView() {
 
     try {
       if (editingProduct) {
-        const result = await updateProduct(editingProduct.id, productData);
+        // Unchanged stock is left out: sales since the dialog opened have already lowered it.
+        const { stock, ...rest } = productData;
+        const result = await updateProduct(editingProduct.id, stock === editingProduct.stock ? rest : productData);
         if (result.success) {
           toast.success('Product updated successfully');
           setIsProductDialogOpen(false);
@@ -255,6 +261,7 @@ export function ProductManagementView() {
       sku: product.sku || '',
       taxRate: product.taxRate.toString(),
       reorderPoint: product.reorderPoint.toString(),
+      trackStock: product.trackStock,
       station: product.station || 'kitchen',
       image: product.image || '',
     });
@@ -768,6 +775,17 @@ export function ProductManagementView() {
                   value={productFormData.reorderPoint}
                   onChange={(e) => setProductFormData(prev => ({ ...prev, reorderPoint: e.target.value }))}
                 />
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="product-track-stock"
+                checked={productFormData.trackStock}
+                onCheckedChange={(v) => setProductFormData(prev => ({ ...prev, trackStock: v === true }))}
+              />
+              <div>
+                <Label htmlFor="product-track-stock">Track stock</Label>
+                <p className="text-xs text-gray-500 mt-1">Each sale takes it off the stock above; at 0 it shows as sold out. Voiding a line puts it back.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">

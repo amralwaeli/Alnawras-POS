@@ -76,6 +76,7 @@ export const mapProduct = (row: any): Product => ({
   sku: row.sku ?? undefined,
   taxRate: Number(row.tax_rate ?? 0),
   reorderPoint: row.reorder_point ?? 0,
+  trackStock: row.track_stock ?? false,
   branchId: row.branch_id,
   station: row.station ?? 'kitchen',
   kitchenStatus: row.kitchen_status ?? 'available',

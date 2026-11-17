@@ -65,6 +65,7 @@ export class ProductController {
           sku: productData.sku,
           tax_rate: productData.taxRate,
           reorder_point: productData.reorderPoint,
+          track_stock: productData.trackStock ?? false,
           branch_id: productData.branchId,
           station: productData.station || 'kitchen',
           availability_status: productData.availabilityStatus || 'available',
@@ -112,6 +113,7 @@ export class ProductController {
       if (updates.sku !== undefined)                 payload.sku = updates.sku;
       if (updates.taxRate !== undefined)             payload.tax_rate = updates.taxRate;
       if (updates.reorderPoint !== undefined)        payload.reorder_point = updates.reorderPoint;
+      if (updates.trackStock !== undefined)          payload.track_stock = updates.trackStock;
       if (updates.station !== undefined)             payload.station = updates.station;
       if (updates.availabilityStatus !== undefined) {
         payload.availability_status = updates.availabilityStatus;

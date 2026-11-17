@@ -122,7 +122,7 @@ export function QROrderingView() {
       const prods: Product[] = (productsRes.data || []).map((p: any) => ({
         id: p.id, name: p.name, category: p.category ?? '', categoryId: p.category_id,
         price: Number(p.price), stock: p.stock ?? 0, image: p.image,
-        sku: p.sku, taxRate: Number(p.tax_rate ?? 0), reorderPoint: p.reorder_point ?? 0,
+        sku: p.sku, taxRate: Number(p.tax_rate ?? 0), reorderPoint: p.reorder_point ?? 0, trackStock: p.track_stock ?? false,
         branchId: p.branch_id, station: p.station ?? 'kitchen',
         kitchenStatus: p.kitchen_status ?? 'available',
         availabilityStatus: p.availability_status ?? 'available',

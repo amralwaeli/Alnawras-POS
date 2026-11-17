@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
+import { useSavedDocuments, SavedDocumentsList, SavedDoc } from '../../hooks/useSavedDocuments';
 import { useNavigate } from 'react-router';
 import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
 import { QuotationTemplate, QuotationData, QuotationItem } from './QuotationTemplate';
@@ -10,7 +12,8 @@ import { toast } from 'sonner';
 export function QuotationsView() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [quotationNo, setQuotationNo] = useState(`INV${Math.floor(1000 + Math.random() * 9000)}`);
+  // Assigned by the server when the quotation is first printed (INV-0001…).
+  const [quotationNo, setQuotationNo] = useState('');
   const [date, setDate] = useState(new Date().toLocaleDateString('en-GB'));
   const [notes, setNotes] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -51,6 +54,9 @@ export function QuotationsView() {
 
   const handlePrint = async () => {
     if (generating) return;
+    const number = await docs.save(content);
+    if (!number) return;
+    flushSync(() => setQuotationNo(number)); // the printout must show the number
     // Desktop/web (admin site) keeps the print dialog that already works well.
     if (!preferGeneratedPdf()) { window.print(); return; }
     // APK / mobile: rasterise the template (renders Arabic correctly) and hand
@@ -58,7 +64,7 @@ export function QuotationsView() {
     if (!printRef.current) { window.print(); return; }
     setGenerating(true);
     try {
-      await exportElementAsPdf(printRef.current, `Quotation-${quotationNo || 'draft'}.pdf`);
+      await exportElementAsPdf(printRef.current, `Quotation-${number}.pdf`);
     } catch (err) {
       console.error('[QuotationPDF]', err);
       toast.error('Could not generate the PDF. Please try again.');
@@ -82,9 +88,28 @@ export function QuotationsView() {
   const subTotal = items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0);
   const total = subTotal - discount;
 
+  const docs = useSavedDocuments('quotation');
+  // What gets saved (everything printed except the number). Same shape on load, so a reprint isn't saved twice.
+  const contentOf = (name: string, phone: string, d: string, list: QuotationItem[], disc: number, n: string) => {
+    const kept = list.filter(i => i.name.trim() !== '');
+    const sub = kept.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+    return { quotationTo: { name, phone }, date: d, items: kept, subTotal: sub, discount: disc, total: sub - disc, notes: n };
+  };
+  const content = contentOf(customerName, customerPhone, date, items, discount, notes);
+  const unchanged = docs.isSaved(content);
+
+  const openSaved = (d: SavedDoc) => {
+    const c = d.data ?? {}; const to = c.quotationTo ?? {};
+    const list: QuotationItem[] = Array.isArray(c.items) && c.items.length ? c.items : [{ id: '1', name: '', qty: 1, unitPrice: 0 }];
+    setCustomerName(to.name ?? ''); setCustomerPhone(to.phone ?? ''); setDate(c.date ?? '');
+    setItems(list); setDiscount(Number(c.discount) || 0); setNotes(c.notes ?? '');
+    setQuotationNo(d.number);
+    docs.markSaved(contentOf(to.name ?? '', to.phone ?? '', c.date ?? '', list, Number(c.discount) || 0, c.notes ?? ''), d.number);
+  };
+
   const quotationData: QuotationData = {
     quotationTo: { name: customerName, phone: customerPhone },
-    quotationNo,
+    quotationNo: unchanged ? quotationNo : '',
     date,
     items: items.filter(i => i.name.trim() !== ''),
     subTotal,
@@ -165,8 +190,9 @@ export function QuotationsView() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quotation No.</label>
                   <input
                     type="text"
-                    value={quotationNo}
-                    onChange={e => setQuotationNo(e.target.value)}
+                    value={unchanged ? quotationNo : ''}
+                    readOnly
+                    placeholder="Next number — given when printed"
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm"
                   />
                 </div>
@@ -322,6 +348,9 @@ export function QuotationsView() {
                 </div>
               </div>
             </div>
+          </div>
+          <div className="lg:col-span-2">
+            <SavedDocumentsList title="Saved quotations" docs={docs.recent} onOpen={openSaved} />
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { Employee, AttendanceLog, PayrollSummary } from '../models/types';
 import { mapEmployee, mapFingerprint, mapAttendanceLog, mapPayroll } from '../models/mappers';
 import { localDateStr, monthDateRange } from '../../lib/date';
+import { checkInRule, checkOutRule, stillOpen } from './attendanceRules';
 
 // ─────────────────────────────────────────────
 // Utility: generate IDs
@@ -44,17 +45,6 @@ async function sha256(message: string): Promise<string> {
 // ─────────────────────────────────────────────
 // Time utilities
 // ─────────────────────────────────────────────
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function minutesToTime(mins: number): string {
-  const h = Math.floor(mins / 60) % 24;
-  const m = mins % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-}
-
 function nowTimeString(): string {
   const n = new Date();
   return `${n.getHours().toString().padStart(2, '0')}:${n.getMinutes().toString().padStart(2, '0')}`;
@@ -337,38 +327,45 @@ export class HRController {
   }> {
     try {
       const now = new Date();
-      const today = localDateStr(now); // local business date, consistent with the clock math below
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      const shiftStartMins = timeToMinutes(employee.shiftStart);
-      const shiftEndMins = timeToMinutes(employee.shiftEnd);
-      const allowedInMins = shiftStartMins - 30; // 30-minute rule
-      const allowedOutMins = shiftEndMins + 30; // 30-minute rule
+      const { shiftStart, shiftEnd } = employee;
 
-      // Fetch existing log for today
-      const { data: existingLog } = await supabase
+      // The newest log still open (covers an overnight shift that began yesterday).
+      const since = new Date(now); since.setDate(since.getDate() - 2);
+      const { data: openLog } = await supabase
         .from('attendance_logs')
         .select('*')
         .eq('employee_id', employee.employeeId)
-        .eq('log_date', today)
+        .is('check_out_time', null)
+        .gte('log_date', localDateStr(since))
+        .order('check_in_time', { ascending: false })
+        .limit(1)
         .maybeSingle();
+      // Judge an open log by the shift it was opened for (the employee's shift may have changed since).
+      const logShift = (l: any) => [l.scheduled_start || shiftStart, l.scheduled_end || shiftEnd] as const;
+      const existingLog = openLog && stillOpen(now, new Date(openLog.check_in_time), ...logShift(openLog)) ? openLog : null;
 
       if (!existingLog) {
         // ── AUTOMATED CHECK IN ──
-        if (nowMins < allowedInMins) {
-          return { success: false, error: `Too early. You can scan starting at ${minutesToTime(allowedInMins)}` };
-        }
-        
-        const lateMinutes = Math.max(0, nowMins - shiftStartMins);
+        const rule = checkInRule(now, shiftStart, shiftEnd);
+        if ('error' in rule) return { success: false, error: rule.error };
+        const logDate = localDateStr(rule.logDate); // the day the shift starts
+        const { data: done } = await supabase.from('attendance_logs').select('check_out_time')
+          .eq('employee_id', employee.employeeId).eq('log_date', logDate).maybeSingle();
+        if (done) return { success: false, error: done.check_out_time
+          ? 'Already clocked out for this shift'
+          : 'This shift was never clocked out. Ask a manager to correct it in Attendance.' };
+
+        const lateMinutes = rule.lateMinutes;
         const status = lateMinutes > 0 ? 'late' : 'on-time';
         const id = uid('att');
-        
+
         const { data: newLog, error } = await supabase
           .from('attendance_logs')
           .insert({
             id,
             employee_id: employee.employeeId,
             full_name: employee.fullName,
-            log_date: today,
+            log_date: logDate,
             check_in_time: now.toISOString(),
             scheduled_start: employee.shiftStart,
             scheduled_end: employee.shiftEnd,
@@ -390,26 +387,9 @@ export class HRController {
         };
       } else {
         // ── AUTOMATED CHECK OUT ──
-        if (existingLog.check_out_time) {
-          return { success: false, error: 'Already clocked out for today' };
-        }
-
-        const checkInTime = new Date(existingLog.check_in_time);
-        const minsSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
-        
-        // Prevent accidental double-scan (ignore scans within 5 minutes of check-in)
-        if (minsSinceCheckIn < 5) {
-          return { success: false, error: 'Recently clocked in. Please wait a few minutes before clocking out.' };
-        }
-
-        const workedMins = Math.round(minsSinceCheckIn);
-        const earlyLeaveMinutes = Math.max(0, shiftEndMins - nowMins);
-        const overtimeMinutes = Math.max(0, nowMins - shiftEndMins);
-        
-        // ── AUTOMATED CHECK OUT WINDOW ENFORCEMENT ──
-        if (nowMins > allowedOutMins) {
-          return { success: false, error: `Too late. Clock-out was only allowed until ${minutesToTime(allowedOutMins)}` };
-        }
+        const rule = checkOutRule(now, new Date(existingLog.check_in_time), ...logShift(existingLog));
+        if ('error' in rule) return { success: false, error: rule.error };
+        const { workedMinutes: workedMins, earlyLeaveMinutes, overtimeMinutes } = rule;
 
         const { data: updatedLog, error } = await supabase
           .from('attendance_logs')

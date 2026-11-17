@@ -10,6 +10,7 @@ import { orderTotal, fmt } from '../../../lib/currency';
 import { useMemo, useState, useEffect } from 'react';
 import { WorkforceController } from '../../controllers/WorkforceController';
 import { fetchAll } from '../../../lib/fetchAll';
+import { ReportsController } from '../../controllers/ReportsController';
 import { toast } from 'sonner';
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
@@ -353,11 +354,24 @@ export function AdminDashboardView() {
     [orders, todayStart]
   );
 
+  // Today's money = bills PAID today, from the database (the live list also
+  // holds open bills, whose running totals are not revenue yet). Re-read
+  // whenever another bill gets paid.
+  const paidToday = todayOrders.filter(o => o.status === 'completed').length;
+  const [sales, setSales] = useState({ revenue: 0, paid: 0 });
+  useEffect(() => {
+    if (!currentUser?.branchId) return;
+    const to = new Date(todayStart); to.setDate(to.getDate() + 1);
+    ReportsController.getSalesSummary(currentUser.branchId, todayStart, to).then(r => {
+      if (r.success) setSales({ revenue: r.data!.revenue, paid: r.data!.orders });
+    });
+  }, [currentUser?.branchId, todayStart, paidToday]);
+
   const stats = useMemo(() => {
-    const revenue = todayOrders.reduce((acc, o) => acc + orderTotal(o), 0);
+    const revenue = sales.revenue;
     const count = todayOrders.length;
-    const avg = count > 0 ? revenue / count : 0;
-    const completed = todayOrders.filter(o => o.status === 'completed').length;
+    const completed = sales.paid;
+    const avg = completed > 0 ? revenue / completed : 0;
 
     // Peak Hours calculation
     const hourMap = new Array(24).fill(0);
@@ -368,7 +382,7 @@ export function AdminDashboardView() {
     const peakHour = hourMap.indexOf(Math.max(...hourMap));
 
     return { revenue, count, avg, completed, peakHour, hourMap };
-  }, [todayOrders]);
+  }, [todayOrders, sales]);
 
   // Low stock calculation
   useEffect(() => {
@@ -464,7 +478,6 @@ export function AdminDashboardView() {
           sub={`${stats.completed} paid orders`}
           icon={TrendingUp}
           accent="#10b981"
-          trend="+12%"
         />
         <KpiCard
           label="Total Orders"
@@ -472,7 +485,6 @@ export function AdminDashboardView() {
           sub="Dine-in & Takeaway"
           icon={ShoppingBag}
           accent="#3b82f6"
-          trend="+5%"
         />
         <KpiCard
           label="Average Bill"

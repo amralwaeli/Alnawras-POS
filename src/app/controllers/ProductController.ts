@@ -55,7 +55,7 @@ export class ProductController {
       const { data, error } = await supabase
         .from('products')
         .insert({
-          id: `prod-${Date.now()}`,
+          id: `prod-${crypto.randomUUID()}`,
           name: productData.name,
           category_id: productData.categoryId,
           category: productData.category,
@@ -263,7 +263,7 @@ export class CategoryController {
 
   static async addCategory(data: any, user: User): Promise<Result<Category>> {
     const { data: cat, error } = await supabase.from('categories').insert({
-      id: `cat-${Date.now()}`,
+      id: `cat-${crypto.randomUUID()}`,
       name: data.name,
       description: data.description || null,
       color: data.color || '#3B82F6',

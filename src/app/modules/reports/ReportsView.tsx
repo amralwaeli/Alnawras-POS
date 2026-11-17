@@ -5,37 +5,14 @@ import { CURRENCY, orderTotal, fmt } from '../../../lib/currency';
 import { downloadCsv } from '../../../lib/csv';
 import { ReportsController, ProductSaleRow } from '../../controllers/ReportsController';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { periodRange, usePeriod, PeriodPicker } from './period';
+import { ReportsController as RC, SalesSummary, CompletedOrderRow } from '../../controllers/ReportsController';
 
-type Period = 'today' | 'week' | 'month' | 'custom';
 type SortKey = 'unitsSold' | 'revenue';
 
-function periodRange(period: Period, customFrom: string, customTo: string): { from: Date; to: Date } {
-  const now = new Date();
-  if (period === 'today') {
-    const from = new Date(now); from.setHours(0, 0, 0, 0);
-    const to = new Date(from); to.setDate(to.getDate() + 1);
-    return { from, to };
-  }
-  if (period === 'week') {
-    const from = new Date(now); from.setDate(from.getDate() - 7); from.setHours(0, 0, 0, 0);
-    const to = new Date(now); to.setDate(to.getDate() + 1); to.setHours(0, 0, 0, 0);
-    return { from, to };
-  }
-  if (period === 'month') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return { from, to };
-  }
-  // custom
-  const from = customFrom ? new Date(customFrom + 'T00:00:00') : new Date(now.getFullYear(), now.getMonth(), 1);
-  const to = customTo ? new Date(customTo + 'T23:59:59.999') : now;
-  return { from, to };
-}
-
 function ProductPerformanceTab({ branchId }: { branchId: string }) {
-  const [period, setPeriod] = useState<Period>('today');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const p = usePeriod('today');
+  const { period, customFrom, customTo } = p;
   const [rows, setRows] = useState<ProductSaleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,19 +60,7 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2">
-          {(['today', 'week', 'month', 'custom'] as Period[]).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold capitalize transition-colors ${
-                period === p ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {p === 'today' ? 'Today' : p === 'week' ? 'Last 7 Days' : p === 'month' ? 'This Month' : 'Custom'}
-            </button>
-          ))}
-        </div>
+        <PeriodPicker p={p} />
         <button
           onClick={exportCsv}
           disabled={rows.length === 0}
@@ -105,15 +70,6 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
         </button>
       </div>
 
-      {period === 'custom' && (
-        <div className="flex items-center gap-2">
-          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-          <span className="text-gray-400 text-sm">to</span>
-          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-        </div>
-      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100">
@@ -172,30 +128,100 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
   );
 }
 
-export function ReportsView() {
-  const { orders, currentUser } = usePOS();
-  if (!currentUser) return null;
+function OverviewTab({ branchId }: { branchId: string }) {
+  const p = usePeriod('today');
+  const [summary, setSummary] = useState<SalesSummary | null>(null);
+  const [orders, setOrders] = useState<CompletedOrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const completed     = orders.filter(o => o.status === 'completed');
-  const totalRevenue  = completed.reduce((s, o) => s + orderTotal(o), 0);
-  const totalTax      = completed.reduce((s, o) => s + Number(o.tax ?? 0), 0);
-  const totalItems    = orders.reduce(
-    (s, o) => s + (o.items ?? []).reduce((ss: number, i: any) => ss + Number(i.quantity ?? 1), 0),
-    0
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const { from, to } = p.range;
+    Promise.all([RC.getSalesSummary(branchId, from, to), RC.getCompletedOrders(branchId, from, to)]).then(([s, o]) => {
+      if (cancelled) return;
+      if (s.success) { setSummary(s.data!); setError(''); } else setError(s.error || 'Could not load the report');
+      if (o.success) setOrders(o.data!);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [branchId, p.range]);
+
+  const kpis = [
+    { label: 'Revenue',       value: fmt(summary?.revenue ?? 0), icon: DollarSign,   bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
+    { label: 'Bills Paid',    value: summary?.orders ?? 0,       icon: ShoppingCart, bg: 'bg-blue-50',    ic: 'bg-blue-100 text-blue-600',       vc: 'text-blue-700' },
+    { label: 'Tax Collected', value: fmt(summary?.tax ?? 0),     icon: TrendingUp,   bg: 'bg-purple-50',  ic: 'bg-purple-100 text-purple-600',   vc: 'text-purple-700' },
+    { label: 'Items Sold',    value: summary?.items ?? 0,        icon: Package,      bg: 'bg-amber-50',   ic: 'bg-amber-100 text-amber-600',     vc: 'text-amber-700' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PeriodPicker p={p} />
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${loading ? 'opacity-50' : ''}`}>
+        {kpis.map(s => (
+          <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-black/5`}>
+            <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}><s.icon className="size-5" /></div>
+            <p className="text-sm text-gray-500 mb-0.5">{s.label}</p>
+            <p className={`text-2xl font-bold ${s.vc}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+      {summary && Object.keys(summary.byMethod).length > 0 && (
+        <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+          {Object.entries(summary.byMethod).map(([m, a]) => (
+            <span key={m} className="bg-white border border-gray-100 rounded-xl px-3 py-1.5"><b className="uppercase">{m}</b> {fmt(Number(a))}</span>
+          ))}
+          {summary.discount > 0 && <span className="bg-white border border-gray-100 rounded-xl px-3 py-1.5">Discounts {fmt(summary.discount)}</span>}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Paid Bills</h2>
+          {orders.length >= 300 && <p className="text-xs text-gray-500 mt-0.5">Showing the latest 300 — the totals above include all.</p>}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                {['Bill', 'Table / Type', 'Payment', 'Total', 'Paid at'].map(h => (
+                  <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {orders.map(o => (
+                <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-mono text-gray-600">#{o.billNumber ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600">{o.paymentMethod ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-sm font-bold text-gray-900">{fmt(o.total)}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500">{o.completedAt.toLocaleString()}</td>
+                </tr>
+              ))}
+              {!loading && orders.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-500 text-sm">No bills paid in this period</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
+}
 
-  const statusCfg: Record<string, string> = {
-    completed: 'bg-emerald-50 text-emerald-700',
-    open:      'bg-blue-50 text-blue-700',
-    cancelled: 'bg-gray-100 text-gray-500',
-  };
+export function ReportsView() {
+  const { currentUser } = usePOS();
+  if (!currentUser) return null;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="p-6 space-y-6 max-w-5xl">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Sales analytics and performance metrics</p>
+          <p className="text-gray-500 text-sm mt-0.5">Sales by the date bills were paid</p>
         </div>
 
         <Tabs defaultValue="overview">
@@ -204,55 +230,8 @@ export function ReportsView() {
             <TabsTrigger value="products">Product Performance</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6 mt-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Revenue',  value: fmt(totalRevenue), icon: DollarSign, bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
-                { label: 'Total Orders',   value: orders.length,      icon: ShoppingCart, bg: 'bg-blue-50', ic: 'bg-blue-100 text-blue-600', vc: 'text-blue-700' },
-                { label: 'Tax Collected',  value: fmt(totalTax),      icon: TrendingUp, bg: 'bg-purple-50', ic: 'bg-purple-100 text-purple-600', vc: 'text-purple-700' },
-                { label: 'Items Sold',     value: totalItems,          icon: Package, bg: 'bg-amber-50', ic: 'bg-amber-100 text-amber-600', vc: 'text-amber-700' },
-              ].map(s => (
-                <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-black/5`}>
-                  <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}><s.icon className="size-5" /></div>
-                  <p className="text-sm text-gray-500 mb-0.5">{s.label}</p>
-                  <p className={`text-2xl font-bold ${s.vc}`}>{s.value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900">Order History</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 text-left">
-                      {['Order ID', 'Table', 'Items', 'Total', 'Status', 'Date'].map(h => (
-                        <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {orders.map(o => (
-                      <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3.5 font-mono text-xs text-gray-400">{o.id.slice(0, 8)}…</td>
-                        <td className="px-5 py-3.5 text-sm font-medium text-gray-900">Table {o.tableNumber}</td>
-                        <td className="px-5 py-3.5 text-sm text-gray-600">{(o.items ?? []).length}</td>
-                        <td className="px-5 py-3.5 text-sm font-bold text-gray-900">{fmt(orderTotal(o))}</td>
-                        <td className="px-5 py-3.5">
-                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${statusCfg[o.status] ?? 'bg-gray-100 text-gray-500'}`}>{o.status}</span>
-                        </td>
-                        <td className="px-5 py-3.5 text-sm text-gray-400">{new Date(o.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                    {orders.length === 0 && (
-                      <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">No orders found</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <TabsContent value="overview" className="mt-4">
+            <OverviewTab branchId={currentUser.branchId} />
           </TabsContent>
 
           <TabsContent value="products" className="mt-4">

@@ -62,7 +62,7 @@ export class OrderController {
 
       // ── Create the order if one does not already exist ─────────────────────
       if (!orderId) {
-        orderId = `order-${Date.now()}`;
+        orderId = `order-${crypto.randomUUID()}`;
         // takeaway & pickup get a bill number on creation (no table to key off).
         const billNum = params.orderType !== 'dine-in'
           ? await this.nextBillNumber(branchId, params.orderType)
@@ -236,57 +236,17 @@ export class OrderController {
     itemId: string,
     orderId: string,
     reason: string | undefined,
-    actor: { id: string; name: string }
+    actor: { id: string; name: string },
+    branchId: string,
   ): Promise<Result<void>> {
-    try {
-      const { data: orderRow, error: orderFetchErr } = await supabase
-        .from('orders')
-        .select('status')
-        .eq('id', orderId)
-        .single();
-      if (orderFetchErr || !orderRow) return { success: false, error: 'Order not found' };
-      if (orderRow.status !== 'open') {
-        return { success: false, error: 'Cannot void an item on a bill that has already been paid' };
-      }
-
-      // Only void an item that has NOT already been settled by a split payment.
-      // With split-by-item an order stays 'open' while individual items are
-      // paid=true; voiding one of those would leave the guest's payment
-      // unreconciled. The `.eq('paid', false)` guard + row-count check refuses
-      // that case so a paid item must be refunded through a payment flow, not
-      // silently cancelled off the bill.
-      const { data: voided, error: itemErr } = await supabase
-        .from('order_items')
-        .update({
-          status: 'cancelled',
-          cancelled_by: actor.id,
-          cancelled_by_name: actor.name,
-          cancel_reason: reason || null,
-          cancelled_at: new Date().toISOString(),
-        })
-        .eq('id', itemId)
-        .eq('order_id', orderId)
-        .eq('paid', false)
-        .select('id');
-      if (itemErr) throw itemErr;
-      if (!voided || voided.length === 0) {
-        return { success: false, error: 'This item was already paid for and cannot be voided — refund it separately.' };
-      }
-
-      const { data: remaining } = await supabase
-        .from('order_items')
-        .select('subtotal')
-        .eq('order_id', orderId)
-        .neq('status', 'cancelled');
-      const subtotal = (remaining ?? []).reduce((s, r: any) => s + Number(r.subtotal), 0);
-      const tax = 0;
-      await supabase.from('orders').update({ subtotal, tax, total: subtotal + tax }).eq('id', orderId);
-
-      return { success: true, data: undefined };
-    } catch (err: any) {
-      console.error('[OrderController.voidItem]', err);
-      return { success: false, error: err?.message || 'Failed to void item.' };
-    }
+    // Server checks (migration 0033): bill still open, item not paid or already
+    // voided; marks it cancelled with who/why and recomputes the bill.
+    const { error } = await supabase.rpc('void_order_item', {
+      p_item_id: itemId, p_order_id: orderId, p_branch_id: branchId,
+      p_reason: reason ?? null, p_actor_id: actor.id, p_actor_name: actor.name,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: undefined };
   }
 
   /** Next zero-padded bill number for a branch, per order type. Uses the atomic

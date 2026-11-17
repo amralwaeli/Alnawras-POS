@@ -3,10 +3,11 @@ import { usePOS } from '../../context/POSContext';
 import { ShiftController, Shift } from '../../controllers/ShiftController';
 import { fmt } from '../../../lib/currency';
 import { toast } from 'sonner';
+import { ReportsController } from '../../controllers/ReportsController';
 import { Clock, Banknote, CheckCircle, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 
 export function ShiftManagementView() {
-  const { currentUser, orders } = usePOS();
+  const { currentUser } = usePOS();
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
   const [cashInput, setCashInput] = useState('');
@@ -47,12 +48,15 @@ export function ShiftManagementView() {
     const cash = parseFloat(cashInput);
     if (isNaN(cash)) return toast.error('Enter valid closing cash');
     
-    // Calculate total sales for this shift
-    const shiftSales = orders
-      .filter(o => o.status === 'completed' && new Date(o.createdAt) > new Date(currentShift!.opened_at))
-      .reduce((s, o) => s + (o.total || 0), 0);
-
+    // Sales paid during this shift, from the database (the screen's own list only
+    // held today's orders). Expected cash counts CASH payments only — card and QR
+    // money never enters the drawer.
     setLoading(true);
+    const summary = await ReportsController.getSalesSummary(currentUser!.branchId, new Date(currentShift!.opened_at), new Date());
+    if (!summary.success) { setLoading(false); return toast.error(`Could not total the shift: ${summary.error}`); }
+    const shiftSales = summary.data!.revenue;
+    const cashSales = summary.data!.byMethod.cash ?? 0;
+
     const res = await ShiftController.endShift(currentShift!.id, cash, shiftSales);
     setLoading(false);
 
@@ -61,13 +65,13 @@ export function ShiftManagementView() {
       setCurrentShift(null);
       setCashInput('');
       toast.success('Shift ended successfully');
-      generateShiftReport(endedShift);
+      generateShiftReport(endedShift, cashSales);
     } else {
       toast.error(res.error);
     }
   };
 
-  const generateShiftReport = (shift: Shift) => {
+  const generateShiftReport = (shift: Shift, cashSales: number) => {
     const win = window.open('', '', 'width=400,height=600');
     if (!win) return;
     win.document.write(`
@@ -86,11 +90,12 @@ export function ShiftManagementView() {
         </div>
         <div class="row"><span>Opening Cash:</span><span>${fmt(shift.opening_cash)}</span></div>
         <div class="row"><span>Total Sales:</span><span>${fmt(shift.total_sales || 0)}</span></div>
-        <div class="row"><span>Expected Cash:</span><span>${fmt(shift.opening_cash + (shift.total_sales || 0))}</span></div>
+        <div class="row"><span>Cash Sales:</span><span>${fmt(cashSales)}</span></div>
+        <div class="row"><span>Expected Cash:</span><span>${fmt(shift.opening_cash + cashSales)}</span></div>
         <div class="row"><span>Actual Cash:</span><span>${fmt(shift.closing_cash || 0)}</span></div>
         <div class="total row">
           <span>Difference:</span>
-          <span>${fmt((shift.closing_cash || 0) - (shift.opening_cash + (shift.total_sales || 0)))}</span>
+          <span>${fmt((shift.closing_cash || 0) - (shift.opening_cash + cashSales))}</span>
         </div>
       </body></html>
     `);

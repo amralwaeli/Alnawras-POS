@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { TrendingUp, TrendingDown, DollarSign, Download, Plus, X } from 'lucide-react';
-import { orderTotal, fmt } from '../../../lib/currency';
+import { fmt } from '../../../lib/currency';
 import { supabase } from '../../../lib/supabase';
 import { downloadCsv } from '../../../lib/csv';
 import { toast } from 'sonner';
+import { usePeriod, PeriodPicker } from '../reports/period';
+import { ReportsController } from '../../controllers/ReportsController';
 
 const expenseCategories = ['utilities', 'supplies', 'rent', 'salary', 'maintenance', 'other'];
 const catColors: Record<string, string> = {
@@ -20,7 +22,20 @@ const defaultForm = () => ({
 });
 
 export function AccountingView() {
-  const { expenses, orders, currentUser, setExpenses } = usePOS();
+  const { expenses, currentUser, setExpenses } = usePOS();
+  // Revenue and expenses for the SAME chosen period (revenue used to be today's,
+  // expenses all-time). Revenue comes from the database by date paid (0033).
+  const p = usePeriod('month');
+  const [revenue, setRevenue] = useState(0);
+  useEffect(() => {
+    if (!currentUser?.branchId) return;
+    let cancelled = false;
+    ReportsController.getSalesSummary(currentUser.branchId, p.range.from, p.range.to).then(r => {
+      if (cancelled) return;
+      if (r.success) setRevenue(r.data!.revenue); else toast.error(`Could not load revenue: ${r.error}`);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.branchId, p.range]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm());
   const [saving, setSaving] = useState(false);
@@ -52,8 +67,9 @@ export function AccountingView() {
   if (!currentUser) return null;
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalRevenue  = orders.filter(o => o.status === 'completed').reduce((s, o) => s + orderTotal(o), 0);
+  const periodExpenses = expenses.filter(e => new Date(e.date) >= p.range.from && new Date(e.date) < p.range.to);
+  const totalExpenses = periodExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalRevenue  = revenue;
   const netIncome     = totalRevenue - totalExpenses;
 
   // ── Save new expense ──────────────────────────────────────────────────────
@@ -62,7 +78,7 @@ export function AccountingView() {
     const amount = parseFloat(form.amount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     setSaving(true);
-    const id = `exp-${Date.now()}`;
+    const id = `exp-${crypto.randomUUID()}`;
     const { error } = await supabase.from('expenses').insert([{
       id,
       branch_id:        currentUser.branchId,
@@ -91,40 +107,28 @@ export function AccountingView() {
     setSaving(false);
   };
 
-  // ── Export CSV ────────────────────────────────────────────────────────────
-  const exportCSV = (period: 'Daily' | 'Weekly' | 'Monthly') => {
-    const now   = new Date();
-    let start   = new Date();
-    if (period === 'Daily')        { start.setHours(0, 0, 0, 0); }
-    else if (period === 'Weekly')  { start.setDate(now.getDate() - 7); start.setHours(0, 0, 0, 0); }
-    else                           { start = new Date(now.getFullYear(), now.getMonth(), 1); }
-
+  // ── Export CSV: the period chosen at the top, bills fetched from the database ──
+  const [exporting, setExporting] = useState(false);
+  const exportCSV = async () => {
+    setExporting(true);
+    const { from, to } = p.range;
+    const res = await ReportsController.getCompletedOrders(currentUser.branchId, from, to, 5000);
+    setExporting(false);
+    if (!res.success) { toast.error(`Export failed: ${res.error}`); return; }
     const rows: string[][] = [['Date', 'Type', 'Description', 'Category', 'Amount (RM)']];
-
-    orders
-      .filter(o => o.status === 'completed' && new Date(o.createdAt) >= start)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .forEach(o => rows.push([
-        new Date(o.createdAt).toLocaleDateString('en-GB'),
-        'Revenue',
-        `Order - ${o.orderType === 'takeaway' ? 'Takeaway' : o.orderType === 'pickup' ? 'Pickup' : `Table ${o.tableNumber}`}`,
-        'sales',
-        orderTotal(o).toFixed(2),
-      ]));
-
-    expenses
-      .filter(e => new Date(e.date) >= start)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .forEach(e => rows.push([
-        new Date(e.date).toLocaleDateString('en-GB'),
-        'Expense',
-        e.description,
-        e.category,
-        `-${e.amount.toFixed(2)}`,
-      ]));
-
-    downloadCsv(`alnawras-${period.toLowerCase()}-${now.toISOString().split('T')[0]}.csv`, rows);
-    toast.success(`${period} report downloaded`);
+    [...res.data!].reverse().forEach(o => rows.push([
+      o.completedAt.toLocaleDateString('en-GB'),
+      'Revenue',
+      `Bill #${o.billNumber ?? '-'} - ${o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType}`,
+      'sales',
+      o.total.toFixed(2),
+    ]));
+    [...periodExpenses]
+      .sort((x, y) => new Date(x.date).getTime() - new Date(y.date).getTime())
+      .forEach(e => rows.push([new Date(e.date).toLocaleDateString('en-GB'), 'Expense', e.description, e.category, `-${e.amount.toFixed(2)}`]));
+    const day = (d: Date) => d.toISOString().split('T')[0];
+    downloadCsv(`alnawras-${day(from)}-to-${day(new Date(to.getTime() - 1))}.csv`, rows);
+    toast.success(res.data!.length >= 5000 ? 'Report downloaded (first 5000 bills)' : 'Report downloaded');
   };
 
   return (
@@ -134,6 +138,7 @@ export function AccountingView() {
           <h1 className="text-2xl font-bold text-gray-900">Accounting</h1>
           <p className="text-gray-500 text-sm mt-0.5">Financial overview and expense tracking</p>
         </div>
+        <PeriodPicker p={p} />
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -167,7 +172,7 @@ export function AccountingView() {
               </button>
             </div>
             <div className="divide-y divide-gray-50">
-              {expenses.slice(0, 10).map(e => (
+              {periodExpenses.slice(0, 10).map(e => (
                 <div key={e.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{e.description}</p>
@@ -181,8 +186,8 @@ export function AccountingView() {
                   <p className="text-sm font-bold text-red-600 shrink-0 ml-3">-{fmt(e.amount)}</p>
                 </div>
               ))}
-              {expenses.length === 0 && (
-                <div className="py-12 text-center text-gray-400 text-sm">No expenses recorded yet</div>
+              {periodExpenses.length === 0 && (
+                <div className="py-12 text-center text-gray-400 text-sm">No expenses in this period</div>
               )}
             </div>
           </div>
@@ -194,7 +199,7 @@ export function AccountingView() {
             </div>
             <div className="p-5 space-y-4">
               {expenseCategories.map(cat => {
-                const total = expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+                const total = periodExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
                 const pct   = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
                 return (
                   <div key={cat}>
@@ -218,24 +223,15 @@ export function AccountingView() {
         {/* Export */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-900 mb-1">Export Reports</h2>
-          <p className="text-xs text-gray-400 mb-4">Downloads a CSV file with revenue and expense data</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {(['Daily', 'Weekly', 'Monthly'] as const).map(period => (
-              <button
-                key={period}
-                onClick={() => exportCSV(period)}
-                className="flex items-center gap-3 p-4 border-2 border-gray-100 rounded-xl hover:border-amber-400 hover:bg-amber-50 transition-all text-left group"
-              >
-                <Download className="size-4 text-gray-400 group-hover:text-amber-600 shrink-0 transition-colors" />
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{period} Report</p>
-                  <p className="text-xs text-gray-400">
-                    {period === 'Daily' ? "Today's data" : period === 'Weekly' ? 'Last 7 days' : 'Current month'}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
+          <p className="text-xs text-gray-500 mb-4">Paid bills and expenses for the period chosen at the top</p>
+          <button
+            onClick={() => void exportCSV()}
+            disabled={exporting}
+            className="flex items-center gap-3 min-h-11 p-4 border-2 border-gray-100 rounded-xl hover:border-amber-400 hover:bg-amber-50 transition-all text-left group disabled:opacity-50"
+          >
+            <Download className="size-4 text-gray-500 group-hover:text-amber-600 shrink-0 transition-colors" />
+            <span className="text-sm font-semibold text-gray-800">{exporting ? 'Preparing…' : 'Download CSV for the selected period'}</span>
+          </button>
         </div>
       </div>
 

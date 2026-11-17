@@ -71,7 +71,8 @@ export function QROrderingView() {
     setVoiding(true);
     const res = await OrderController.voidItem(
       voidTarget.id, orderId, voidReason.trim() || undefined,
-      { id: currentUser.id, name: currentUser.name }
+      { id: currentUser.id, name: currentUser.name },
+      currentUser.branchId,
     );
     setVoiding(false);
     if (res.success) {

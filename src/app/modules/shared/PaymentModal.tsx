@@ -402,11 +402,14 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // cashier switches to split-by-item so the (ignored-by-the-RPC) discount
   // can't silently show in the summary while not affecting what guests pay.
   useEffect(() => {
-    if (paymentMode === 'split-items' && (presetDiscount > 0 || appliedPresetId)) {
+    if (paymentMode === 'split-items' && (presetDiscount > 0 || appliedPresetId || loyaltyPointsToRedeem > 0)) {
       setPresetDiscount(0);
       setAppliedPresetId(null);
+      // Points can't be redeemed in split mode either (they'd be taken with no discount).
+      setLoyaltyDiscount(0);
+      setLoyaltyPointsToRedeem(0);
     }
-  }, [paymentMode, presetDiscount, appliedPresetId]);
+  }, [paymentMode, presetDiscount, appliedPresetId, loyaltyPointsToRedeem]);
 
   const splitTotal = splits.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   
@@ -465,20 +468,19 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     ${paymentMode === mode ? `${active} shadow-sm` : 'border-gray-200 hover:border-gray-300 text-gray-700'}`;
 
   // Shared tail for any payment path that just completed the WHOLE order:
-  // apply loyalty earn/redeem, notify the customer-facing monitor, hand back
-  // to the parent, and prompt to print. Used by the normal whole-order
-  // payment and by the final split-by-item payment that settles the last
-  // unpaid items on the bill.
-  const finalizeCompletedOrder = async (billNo: string, summary: string) => {
-    if (linkedCustomer && loyaltySettings.enabled) {
-      if (loyaltyPointsToRedeem > 0) {
-        await LoyaltyController.redeemPoints({
-          customerId: linkedCustomer.id,
-          orderId: order.id,
-          points: loyaltyPointsToRedeem,
-          branchId: currentUser.branchId,
-        });
+  // notify the customer-facing monitor, hand back to the parent, and prompt to
+  // print. `server` is pay_order's result (whole-bill path): the server already
+  // did loyalty and its totals are the real ones. Without it (the last split of
+  // a split bill) we only earn points — redemption is not offered in split mode.
+  const finalizeCompletedOrder = async (
+    billNo: string, summary: string,
+    server?: { subtotal: number; discount: number; tax: number; total: number; pointsEarned: number },
+  ) => {
+    if (server) {
+      if (server.pointsEarned > 0 && linkedCustomer) {
+        toast.success(`+${server.pointsEarned} ${loyaltySettings.pointsLabel} earned for ${linkedCustomer.name}`);
       }
+    } else if (linkedCustomer && loyaltySettings.enabled) {
       const pointsEarned = Math.floor(totals.total * loyaltySettings.pointsPerDollar);
       if (pointsEarned > 0) {
         await LoyaltyController.earnPoints({
@@ -494,7 +496,9 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
 
     setLastBillNo(billNo);
     setLastSummary(summary);
-    setLastTotals({ subtotal: totals.subtotal, discount: totals.discount, tax: totals.tax, total: totals.total });
+    setLastTotals(server
+      ? { subtotal: server.subtotal, discount: server.discount, tax: server.tax, total: server.total }
+      : { subtotal: totals.subtotal, discount: totals.discount, tax: totals.tax, total: totals.total });
     setReceiptOrder(order);
 
     // Notify customer monitor of success (one-shot). Remove the channel after
@@ -532,45 +536,30 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
 
     setProcessing(true);
     try {
-      // Atomic per-(branch, order_type) bill number (migration 0021) — replaces
-      // the old MAX(bill_number)+1 read, which raced two concurrent checkouts
-      // into duplicate numbers. Reuse the order's existing number if it has one.
-      let billNo: string;
-      if (order.billNumber) {
-        billNo = String(order.billNumber);
-      } else {
-        const { data: nextNo, error: billErr } = await supabase.rpc('next_bill_number', {
-          p_branch_id: currentUser.branchId,
-          p_order_type: getOrderType(order),
-        });
-        if (billErr) throw billErr;
-        billNo = String(nextNo);
-      }
-      const summary = paymentMode === 'mix'
-        ? splits.map(s => `${s.method.toUpperCase()} ${fmt(parseFloat(s.amount))}`).join(' + ')
-        : paymentMode.toUpperCase();
-
-      const orderUpdate: any = {
-        status: 'completed', completed_at: new Date().toISOString(),
-        payment_method: summary, bill_number: billNo, payment_status: 'paid',
-        // Persist the final money breakdown so reports/receipts reflect the
-        // tax and any discounts actually applied at the till.
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        discount: totals.discount,
-        total: totals.total,
+      // One locked server transaction (migration 0033): refuses a bill that was
+      // already paid, computes the totals itself, redeems/earns loyalty, writes
+      // the payment rows and frees the table.
+      const payments = paymentMode === 'mix'
+        ? splits.filter(sp => parseFloat(sp.amount) > 0).map(sp => ({ method: sp.method, amount: parseFloat(sp.amount) }))
+        : [{ method: paymentMode }];
+      const useLoyalty = !!linkedCustomer && loyaltySettings.enabled;
+      const { data: r, error: payErr } = await supabase.rpc('pay_order', {
+        p_order_id: order.id,
+        p_branch_id: currentUser.branchId,
+        p_payments: payments,
+        p_discount: baseTotals.discount + presetDiscount,
+        p_cashier_id: currentUser.id,
+        p_cashier_name: currentUser.name,
+        p_customer_id: useLoyalty ? linkedCustomer!.id : null,
+        p_redeem_points: useLoyalty ? loyaltyPointsToRedeem : 0,
+      });
+      if (payErr) throw payErr;
+      const billNo = String(r.bill_number);
+      const summary = String(r.payment_summary);
+      const paid = {
+        subtotal: Number(r.subtotal), discount: Number(r.discount), tax: Number(r.tax),
+        total: Number(r.total), pointsEarned: Number(r.points_earned ?? 0),
       };
-      const { error: orderErr } = await supabase.from('orders').update(orderUpdate).eq('id', order.id).eq('branch_id', currentUser.branchId);
-
-      if (orderErr) throw orderErr;
-
-      if (order.tableId) {
-        // Also turn QR self-ordering back off — a waiter must explicitly
-        // re-enable it for the next party seated at this table.
-        await supabase.from('tables')
-          .update({ status: 'available', current_order_id: null, ordering_enabled: false })
-          .eq('id', order.tableId).eq('branch_id', currentUser.branchId);
-      }
 
       // ── Dispatch LAN Receipt Printing ──
       try {
@@ -598,13 +587,13 @@ ${(order.items || []).map((i: any) => {
               return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}${mods}`;
             }).join('\n')}
 --------------------------------
-SUBTOTAL: ${fmt(totals.subtotal).padStart(20)}
-TAX:      ${fmt(totals.tax).padStart(20)}
-DISCOUNT: ${fmt(totals.discount).padStart(20)}
-TOTAL:    ${fmt(totals.total).padStart(20)}
+SUBTOTAL: ${fmt(paid.subtotal).padStart(20)}
+TAX:      ${fmt(paid.tax).padStart(20)}
+DISCOUNT: ${fmt(paid.discount).padStart(20)}
+TOTAL:    ${fmt(paid.total).padStart(20)}
 --------------------------------
 PAYMENT: ${summary}
-${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(Math.max(0, parseFloat(amountReceived) - totals.total)).padStart(21)}` : ''}
+${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(Math.max(0, parseFloat(amountReceived) - paid.total)).padStart(21)}` : ''}
 --------------------------------
    THANK YOU FOR YOUR VISIT!
             `;
@@ -621,8 +610,8 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
         console.warn('[ReceiptPrint] LAN Printing failed', printErr);
       }
 
-      toast.success(`Payment of ${fmt(totals.total)} processed via ${summary}`);
-      await finalizeCompletedOrder(billNo, summary);
+      toast.success(`Payment of ${fmt(paid.total)} processed via ${summary}`);
+      await finalizeCompletedOrder(billNo, summary, paid);
     } catch (err: any) {
       toast.error('Payment failed: ' + (err.message || 'Please try again'));
     } finally {

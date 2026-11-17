@@ -9,7 +9,6 @@ import { ROLE_PERMISSIONS } from '../../models/types';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
 import { TableController } from '../../controllers/TableController';
-import { closeTableGroup } from '../../services/GroupOrderService';
 
 // ─── Move Table modal ───────────────────────────────────────────────────────
 function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (toTableId: string) => void; onClose: () => void }) {
@@ -136,20 +135,8 @@ export function TablesView() {
 
   const handlePaid = async (orderId: string, _billNo: string, _summary: string) => {
     // 1. Update local state
-    const paidOrder = orders.find(o => o.id === orderId);
     setOrders(prev => prev.filter(o => o.id !== orderId));
-    const targetTable = tables.find(t => t.currentOrderId === orderId);
 
-    // Pickup: paying cash at the counter means the customer is collecting, so
-    // mark the order picked and invalidate its single-use link.
-    if (paidOrder && getOrderType(paidOrder) === 'pickup') {
-      try {
-        await PickupController.markPicked(orderId, { id: currentUser?.id, name: currentUser?.name, branchId: currentUser?.branchId });
-      } catch (err) {
-        console.warn('[Pickup] completion on payment failed', err);
-      }
-    }
-    
     setTables(prev => prev.map(t =>
       t.currentOrderId === orderId
         ? { ...t, status: 'available', currentOrderId: undefined }
@@ -157,20 +144,8 @@ export function TablesView() {
     ));
     // Don't unmount PaymentModal here: it still has to show the print-receipt prompt; its onClose clears selectedOrder.
 
-    // 2. Harden security: close the group + all guest sessions and expire the
-    //    legacy QR session for this table immediately after payment. This
-    //    invalidates every customer token and prevents further ordering.
-    if (targetTable) {
-      try {
-        await closeTableGroup(targetTable.id);
-        await supabase
-          .from('qr_sessions')
-          .update({ active: false, last_activity_at: new Date().toISOString() })
-          .eq('table_id', targetTable.id);
-      } catch (err) {
-        console.warn('[Table close] Failed to close group/QR session on payment', err);
-      }
-    }
+    // The server already freed the table, closed the guest party and QR session,
+    // and (pickup) marked the order collected — pay_order / pay_order_items.
   };
 
   if (!currentUser) return null;

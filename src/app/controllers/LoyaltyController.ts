@@ -19,12 +19,14 @@ export class LoyaltyController {
 
   static async findByPhone(phone: string, branchId: string): Promise<{ success: boolean; customer?: Customer; error?: string }> {
     try {
+      // Exact match on digits: phones are stored as digits only (see createCustomer).
       const cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length < 6) return { success: false, error: 'Enter the full phone number' };
       const { data, error } = await supabase
         .from('customers')
         .select('*')
         .eq('branch_id', branchId)
-        .ilike('phone', `%${cleaned}%`)
+        .eq('phone', cleaned)
         .maybeSingle();
       if (error) throw error;
       return { success: true, customer: data ? mapCustomer(data) : undefined };
@@ -44,7 +46,7 @@ export class LoyaltyController {
         .from('customers')
         .insert([{
           name: data.name,
-          phone: data.phone,
+          phone: data.phone.replace(/\D/g, ''),   // digits only, one customer per number (0033)
           email: data.email ?? null,
           points_balance: 0,
           total_spent: 0,

@@ -42,7 +42,7 @@ export class TableController {
       const { data, error } = await supabase
         .from('tables')
         .insert({
-          id: `table-${Date.now()}`,
+          id: `table-${crypto.randomUUID()}`,
           number: tableData.number,
           capacity: tableData.capacity,
           status: 'available',

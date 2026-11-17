@@ -100,8 +100,14 @@ Deno.serve(async (req) => {
     }
     const authUid = created.user.id;
 
-    // Roll the account back if any later step fails, so a half-made tenant can't linger.
-    const rollback = async () => { try { await admin.auth.admin.deleteUser(authUid); } catch (_) { /* ignore */ } };
+    // Undo everything created so far if a later step fails, so a half-made tenant can't linger.
+    const made: { org?: string; branch?: string } = {};
+    const rollback = async () => {
+      try { await admin.from('branch_logins').delete().eq('auth_uid', authUid); } catch (_) { /* ignore */ }
+      if (made.branch) { try { await admin.from('branches').delete().eq('id', made.branch); } catch (_) { /* ignore */ } }
+      if (made.org) { try { await admin.from('organizations').delete().eq('id', made.org); } catch (_) { /* ignore */ } }
+      try { await admin.auth.admin.deleteUser(authUid); } catch (_) { /* ignore */ }
+    };
 
     // 3) Organization + branch.
     const orgId = uid("org");
@@ -110,6 +116,7 @@ Deno.serve(async (req) => {
       id: orgId, name: tenantName, owner_email: email, status: "active",
     });
     if (oErr) { await rollback(); return json({ success: false, error: oErr.message }, 400); }
+    made.org = orgId;
 
     const { error: bErr } = await admin.from("branches").insert({
       id: branchId, org_id: orgId, name: branchName,
@@ -117,6 +124,7 @@ Deno.serve(async (req) => {
       status: "active", enabled_features: {},
     });
     if (bErr) { await rollback(); return json({ success: false, error: bErr.message }, 400); }
+    made.branch = branchId;
 
     // 4) Bind the account to the branch (website login -> that branch's admin).
     const { error: lErr } = await admin.from("branch_logins").insert({
@@ -127,11 +135,13 @@ Deno.serve(async (req) => {
     // 5) Single-use set-password token + link.
     const token = randToken();
     const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3600 * 1000).toISOString();
-    await admin.from("tenant_invites").insert({ token, auth_uid: authUid, email, branch_id: branchId, expires_at: expiresAt });
+    const { error: iErr } = await admin.from("tenant_invites").insert({ token, auth_uid: authUid, email, branch_id: branchId, expires_at: expiresAt });
+    if (iErr) { await rollback(); return json({ success: false, error: iErr.message }, 400); }
     const setUrl = `${SITE}/#/set-password?token=${token}`;
 
-    // 6) Email the invite (best-effort via Gmail). The temp password is included
-    //    so onboarding still works even if the email is delayed / not received.
+    // 6) Email the invite (best-effort via Gmail). Only the single-use, expiring link
+    //    goes by e-mail; the temporary password is shown to the super-admin in the
+    //    panel as a fallback, never sent in clear text.
     let emailSent = false;
     const gmailPass = Deno.env.get("GMAIL_APP_PASSWORD");
     if (gmailPass) {
@@ -142,8 +152,6 @@ Deno.serve(async (req) => {
             <h2 style="color:#f97316;margin:0 0 8px">Welcome to Alnawras POS</h2>
             <p>An account has been created for <b>${safeTenant}</b>.</p>
             <p><a href="${setUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:bold">Set your password</a></p>
-            <p style="font-size:13px;color:#555">Or sign in with your email and this temporary password, then change it:<br>
-              <b>${escapeHtml(tempPass)}</b></p>
             <p style="color:#888;font-size:12px;margin-top:24px">This set-password link expires in ${INVITE_TTL_HOURS} hours.</p>
           </div>`;
         const client = new SMTPClient({
@@ -153,7 +161,7 @@ Deno.serve(async (req) => {
           from: `${FROM_NAME} <${FROM_EMAIL}>`,
           to: email,
           subject: "Your Alnawras POS account",
-          content: `Welcome to Alnawras POS. Set your password: ${setUrl}\nOr sign in with your email and temporary password: ${tempPass} (then change it). Link expires in ${INVITE_TTL_HOURS} hours.`,
+          content: `Welcome to Alnawras POS. Set your password: ${setUrl}\nThe link expires in ${INVITE_TTL_HOURS} hours and can be used once.`,
           html,
         });
         await client.close();

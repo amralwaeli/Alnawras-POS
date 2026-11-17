@@ -35,7 +35,7 @@ export function SetPasswordView() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (password.length < 10) { setError('Password must be at least 10 characters'); return; }
     if (password !== confirm) { setError('Passwords do not match'); return; }
     setLoading(true); setError('');
 

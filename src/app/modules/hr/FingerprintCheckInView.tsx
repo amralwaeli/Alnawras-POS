@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useBranch } from '../../context/BranchContext';
 import { HRController } from '../../controllers/HRController';
 import { FingerprintScanner } from '../../services/FingerprintScanner';
 import { Employee, AttendanceLog } from '../../models/types';
@@ -34,6 +35,7 @@ const fmtShort = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute
 // Idle screen — animated fingerprint + clock
 // ─────────────────────────────────────────────
 function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Date; scannerReady: boolean }) {
+  const { businessName } = useBranch();
   return (
     <div className="flex flex-col items-center justify-center h-full gap-8 select-none">
       {/* Brand */}
@@ -42,7 +44,7 @@ function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Da
           <UtensilsCrossed className="size-5 text-white" />
         </div>
         <div>
-          <p className="font-bold text-white text-lg leading-tight">Alnawras</p>
+          <p className="font-bold text-white text-lg leading-tight">{businessName}</p>
           <p className="text-[11px] text-gray-500 uppercase tracking-wider">Fingerprint Attendance</p>
         </div>
       </div>
@@ -240,6 +242,7 @@ function RecentLog({ logs }: { logs: { name: string; action: 'check-in' | 'check
 // MAIN KIOSK VIEW
 // ─────────────────────────────────────────────
 export function FingerprintCheckInView() {
+  const { businessName } = useBranch();
   const [phase, setPhase] = useState<KioskPhase>('idle');
   const [now, setNow] = useState(new Date());
   const [scannerReady, setScannerReady] = useState(false);
@@ -380,7 +383,7 @@ export function FingerprintCheckInView() {
             <UtensilsCrossed className="size-4 text-white" />
           </div>
           <div>
-            <p className="font-bold text-white text-sm leading-tight">Alnawras</p>
+            <p className="font-bold text-white text-sm leading-tight">{businessName}</p>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fingerprint Attendance Kiosk</p>
           </div>
         </div>

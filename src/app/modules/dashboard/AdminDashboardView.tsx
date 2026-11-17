@@ -1,4 +1,5 @@
 import { usePOS } from '../../context/POSContext';
+import { useBranch } from '../../context/BranchContext';
 import { Link } from 'react-router';
 import {
   ShoppingCart, AlertTriangle, ArrowRight, Activity,
@@ -336,6 +337,7 @@ function WaiterLeaderboard({ orders, users }: { orders: any[]; users: any[] }) {
 
 export function AdminDashboardView() {
   const { orders, products, users, supabase, currentUser } = usePOS();
+  const { businessName } = useBranch();
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -436,7 +438,7 @@ export function AdminDashboardView() {
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Admin Dashboard</h1>
           <p className="text-gray-500 font-medium flex items-center gap-2 mt-1">
-            <Building2 className="size-4" /> Alnawras Restaurant · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            <Building2 className="size-4" /> {businessName} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-3">

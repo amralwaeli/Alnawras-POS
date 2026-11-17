@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Send, Clock, CheckCircle2, ShoppingCart, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { useBranch } from '../../context/BranchContext';
 import { supabase } from '../../../lib/supabase';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const OWNER_WHATSAPP = '601111544800';
 
 const UNITS = ['kg', 'g', 'L', 'mL', 'pieces', 'boxes', 'bags', 'bottles', 'cans', 'packs', 'dozen'];
 
@@ -62,9 +62,10 @@ function buildWhatsAppMessage(order: {
   return msg;
 }
 
-function sendWhatsApp(message: string) {
-  const encoded = encodeURIComponent(message);
-  window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encoded}`, '_blank');
+function sendWhatsApp(message: string, number: string) {
+  // The owner's number is a per-branch setting (Tax & Discounts), not hard-coded.
+  if (!number) { toast.error('Set the owner WhatsApp number in Business Settings first.'); return; }
+  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
 // ── Empty row ─────────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ function emptyItem(): OrderItem { return { name: '', quantity: '1', unit: 'kg' }
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
+  const { settings } = useBranch();
   const [items, setItems]       = useState<OrderItem[]>([emptyItem()]);
   const [notes, setNotes]       = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +130,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
         branchId: currentUser.branchId,
       });
 
-      sendWhatsApp(msg);
+      sendWhatsApp(msg, settings.kitchenWhatsapp);
 
       toast.success('Order submitted! WhatsApp opened to send message to owner.');
       setItems([emptyItem()]);
@@ -306,7 +308,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
                           notes: order.notes,
                           branchId: order.branch_id,
                         });
-                        sendWhatsApp(msg);
+                        sendWhatsApp(msg, settings.kitchenWhatsapp);
                       }}
                       className="mt-3 flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-bold transition-colors"
                     >

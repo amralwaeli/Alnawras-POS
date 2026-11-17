@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Percent, Tag, Plus, Trash2, Save, Loader2, Receipt } from 'lucide-react';
+import { Percent, Tag, Plus, Trash2, Save, Loader2, Receipt, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
 import { useBranch } from '../../context/BranchContext';
@@ -63,6 +63,37 @@ export function BusinessSettingsView() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tax &amp; Discounts</h1>
           <p className="text-gray-500 text-sm mt-0.5">Set the tax and quick-discount buttons applied at payment.</p>
+        </div>
+
+        {/* ── Restaurant (name / currency / WhatsApp / invoice payee) ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+            <Store className="size-4 text-gray-500" />
+            <h2 className="font-semibold text-gray-900">Restaurant</h2>
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="bs-name" className="block text-xs font-medium text-gray-500 mb-1">Name on screens and receipts</label>
+              <input id="bs-name" value={s.businessName} onChange={e => setS(p => ({ ...p, businessName: e.target.value }))}
+                placeholder="Leave empty to use the branch name"
+                className="w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div>
+              <label htmlFor="bs-cur" className="block text-xs font-medium text-gray-500 mb-1">Currency symbol</label>
+              <input id="bs-cur" value={s.currency} maxLength={5} onChange={e => setS(p => ({ ...p, currency: e.target.value }))}
+                placeholder="RM" className="w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div>
+              <label htmlFor="bs-wa" className="block text-xs font-medium text-gray-500 mb-1">Owner WhatsApp (kitchen ingredient requests)</label>
+              <input id="bs-wa" inputMode="tel" value={s.kitchenWhatsapp} onChange={e => setS(p => ({ ...p, kitchenWhatsapp: e.target.value }))}
+                placeholder="With country code, e.g. 60123456789" className="w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="bs-pay" className="block text-xs font-medium text-gray-500 mb-1">"Pay To" on invoices and quotations (one line each)</label>
+              <textarea id="bs-pay" rows={3} value={s.payTo} onChange={e => setS(p => ({ ...p, payTo: e.target.value }))}
+                placeholder={'Bank name\nAccount name\nAccount number'} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+          </div>
         </div>
 
         {/* ── Tax ── */}

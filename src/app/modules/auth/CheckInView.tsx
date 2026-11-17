@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { usePOS } from '../../context/POSContext';
+import { useBranch } from '../../context/BranchContext';
 import { AttendanceController } from '../../controllers/AttendanceController';
 import { Clock, MapPin, CheckCircle2, AlertCircle, UtensilsCrossed } from 'lucide-react';
 
 export function CheckInView() {
   const { users, attendance, setAttendance } = usePOS();
+  const { businessName } = useBranch();
   const [empNum, setEmpNum] = useState('');
   const [now, setNow] = useState(new Date());
   const [error, setError] = useState('');
@@ -51,7 +53,7 @@ export function CheckInView() {
             <UtensilsCrossed className="size-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-white">Alnawras</p>
+            <p className="font-bold text-white">{businessName}</p>
             <p className="text-xs text-gray-400 uppercase tracking-wider">Staff Portal</p>
           </div>
         </div>

@@ -193,6 +193,9 @@ export class HRController {
         .eq('employee_id', employeeId)
         .eq('finger_index', fingerIndex);
 
+      // Fingerprints carry their branch (0034): employee numbers repeat across restaurants.
+      const { data: emp } = await supabase.from('employees').select('branch_id').eq('employee_id', employeeId).maybeSingle();
+      if (!emp?.branch_id) throw new Error('Employee not found');
       const templateHash = await sha256(templateRaw);
       const encryptedTemplate = encryptTemplate(templateRaw);
       const id = uid('fp');
@@ -208,6 +211,7 @@ export class HRController {
           quality_score: qualityScore,
           is_active: true,
           enrolled_by: enrolledBy,
+          branch_id: emp.branch_id,
         });
       if (error) throw error;
       return { success: true };
@@ -530,7 +534,7 @@ export class HRController {
           net_salary: netSalary,
           status: 'draft',
           branch_id: employee.branchId,
-        }, { onConflict: 'employee_id,month,year' })
+        }, { onConflict: 'branch_id,employee_id,month,year' })   // per branch (0034)
         .select()
         .single();
 

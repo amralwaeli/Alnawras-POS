@@ -34,7 +34,7 @@ const seed = (b: string, n: number) => `
   INSERT INTO expenses(id, branch_id, description, amount, created_by, created_by_name) VALUES ('x${b}', '${b}', 'd', 1, 'u', 'U');
   INSERT INTO customers(name, phone, branch_id) VALUES ('C', '1', '${b}');
   INSERT INTO employees(id, employee_id, full_name, role, branch_id, employee_number) VALUES ('e${b}', 'EMP-${b}', 'E', 'waiter', '${b}', 'EMP-${b}');
-  INSERT INTO employee_fingerprints(id, employee_id, template_data, template_hash, finger_index) VALUES ('f${b}', 'EMP-${b}', 'x', 'h', 1);
+  INSERT INTO employee_fingerprints(id, employee_id, template_data, template_hash, finger_index, branch_id) VALUES ('f${b}', 'EMP-${b}', 'x', 'h', 1, '${b}');
   INSERT INTO modifier_groups(id, name, branch_id) VALUES ('g${b}', 'G', '${b}');
   INSERT INTO modifier_options(id, group_id, name) VALUES ('mo${b}', 'g${b}', 'O');
   INSERT INTO product_modifier_groups(product_id, group_id) VALUES ('p${b}', 'g${b}');

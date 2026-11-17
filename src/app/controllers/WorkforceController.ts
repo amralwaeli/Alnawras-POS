@@ -24,13 +24,16 @@ const defaultDepartment = (role: string): string => {
 };
 
 // ─── Next employee number ─────────────────────────────────────────────────────
+/** Next EMP-### for a branch: highest existing number + 1. (Counting rows
+ *  collided as soon as anyone was deleted: 3 staff with EMP-001..004 → EMP-004 again.) */
+export function nextEmployeeNumberFrom(existing: (string | null | undefined)[]): string {
+  const max = existing.reduce((m, n) => Math.max(m, Number(/^EMP-(\d+)$/.exec(n ?? '')?.[1] ?? 0)), 0);
+  return `EMP-${String(max + 1).padStart(3, '0')}`;
+}
+
 async function nextEmployeeNumber(branchId: string): Promise<string> {
-  const { count } = await supabase
-    .from('employees')
-    .select('*', { count: 'exact', head: true })
-    .eq('branch_id', branchId);
-  const seq = ((count ?? 0) + 1).toString().padStart(3, '0');
-  return `EMP-${seq}`;
+  const { data } = await supabase.from('employees').select('employee_number').eq('branch_id', branchId);
+  return nextEmployeeNumberFrom((data ?? []).map((r: any) => r.employee_number));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { Product, Category, ModifierGroup, SelectedModifier } from '../../models/types';
 import { computeTax } from '../../../lib/money';
+import { fmt } from '../../../lib/currency';
+import { useBranchProfile } from '../../hooks/useBranchProfile';
 import { PickupController } from '../../controllers/PickupController';
 import { ModifierController } from '../../controllers/ModifierController';
 import { BranchController } from '../../controllers/BranchController';
@@ -25,7 +27,7 @@ import {
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 
-const RM = (n: number) => `RM ${n.toFixed(2)}`;
+const RM = (n: number) => fmt(n);
 
 export function PickupOrderingView() {
   const { token } = useParams<{ token: string }>();
@@ -81,6 +83,7 @@ type PayType = 'cash' | 'online';
 const NOTICE = 'Please DO NOT book Grab Express or Lalamove until the restaurant marks your order as READY. You will receive an email notification once the order is ready for collection.';
 
 function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId: string; taxSettings: PickupToken['tax'] }) {
+  const businessName = useBranchProfile(branchId);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -239,7 +242,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
         <div className="flex items-center gap-2">
           <div className="bg-orange-500 rounded-xl p-2"><UtensilsCrossed className="size-5 text-white" /></div>
           <div>
-            <h1 className="font-black text-gray-900 text-base leading-tight">Alnawras Restaurant</h1>
+            <h1 className="font-black text-gray-900 text-base leading-tight">{businessName}</h1>
             <p className="text-[11px] text-orange-500 font-bold uppercase tracking-wider">Pickup Order</p>
           </div>
         </div>

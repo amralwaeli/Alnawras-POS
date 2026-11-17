@@ -1,5 +1,6 @@
-/** Malaysian Ringgit — change here to update the whole app */
-export const CURRENCY = 'RM';
+/** Shown before every amount. Per branch (branch_settings.currency), set on load. */
+export let CURRENCY = 'RM';
+export function setCurrency(c: string | null | undefined) { if (c && c.trim()) CURRENCY = c.trim(); }
 
 /** Compute the real order total from items (DB total may be 0 if items were
  *  inserted directly without updating the orders row). */

@@ -128,7 +128,7 @@ function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedempti
   const [searching, setSearching] = useState(false);
   const [addMode, setAddMode] = useState(false);
   const [newName, setNewName] = useState('');
-  const { settings: branchSettings } = useBranch();
+  const { settings: branchSettings, businessName } = useBranch();
   const settings = branchSettings.loyalty;
 
   const search = async () => {
@@ -323,7 +323,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [amountReceived, setAmountReceived] = useState('');
   // Tenant-admin-configured tax + quick-discount presets for this branch.
-  const { settings: branchSettings } = useBranch();
+  const { settings: branchSettings, businessName } = useBranch();
   const [presetDiscount, setPresetDiscount] = useState(0);
   const [appliedPresetId, setAppliedPresetId] = useState<string | null>(null);
 
@@ -570,7 +570,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
           
           for (const printer of cashierPrinters) {
             const receiptText = `
-ALNAWRAS RESTAURANT
+${businessName.toUpperCase()}
 --------------------------------
 Bill #: ${billNo}
 Date: ${new Date().toLocaleString()}

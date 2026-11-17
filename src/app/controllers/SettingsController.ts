@@ -39,6 +39,10 @@ export class SettingsController {
         tax_inclusive: s.taxInclusive,
         discount_presets: s.discountPresets,
         loyalty: s.loyalty,
+        business_name: s.businessName.trim() || null,
+        currency: s.currency.trim() || 'RM',
+        kitchen_whatsapp: s.kitchenWhatsapp.replace(/\D/g, '') || null,
+        pay_to: s.payTo.trim() || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'branch_id' });
       if (error) throw error;

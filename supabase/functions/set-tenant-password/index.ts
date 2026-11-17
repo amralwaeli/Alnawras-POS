@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const token = String(body?.token ?? "");
     const password = String(body?.password ?? "");
     if (!token) return json({ success: false, error: "Missing token" }, 400);
-    if (password.length < 6) return json({ success: false, error: "Password must be at least 6 characters" }, 400);
+    if (password.length < 10) return json({ success: false, error: "Password must be at least 10 characters" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 

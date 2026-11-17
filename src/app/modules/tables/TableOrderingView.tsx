@@ -8,6 +8,7 @@ import { OrderController } from '../../controllers/OrderController';
 import { ModifierController } from '../../controllers/ModifierController';
 import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
+import { fmt } from '../../../lib/currency';
 import {
   ArrowLeft,
   Search,
@@ -31,7 +32,7 @@ interface CartItem {
 }
 
 function formatCurrency(value: number) {
-  return `RM ${value.toFixed(2)}`;
+  return fmt(value);
 }
 
 export function TableOrderingView() {

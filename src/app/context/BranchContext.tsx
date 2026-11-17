@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { User, Branch, BranchFeatures, BranchFeatureKey, ALL_FEATURES_ON, BranchSettings, DEFAULT_BRANCH_SETTINGS } from '../models/types';
 import { BranchController, BranchAccess } from '../controllers/BranchController';
 import { SettingsController } from '../controllers/SettingsController';
+import { setCurrency } from '../../lib/currency';
+import { setBranding } from '../../lib/branding';
 
 interface BranchContextType {
   branch: Branch | null;
@@ -15,6 +17,8 @@ interface BranchContextType {
   settings: BranchSettings;
   /** Re-fetch settings after the admin edits them. */
   reloadSettings: () => void;
+  /** The restaurant's display name (settings, else the branch name). */
+  businessName: string;
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
@@ -59,6 +63,12 @@ export function BranchProvider({ children, currentUser }: { children: ReactNode;
   // module visible, so this never hides features from a single-tenant install
   // that hasn't onboarded onto the branches registry yet.
   const features = access.branch?.features ?? ALL_FEATURES_ON;
+  const businessName = settings.businessName || access.branch?.name || 'Restaurant';
+  // Non-React code (receipt text, invoice template, fmt) reads these.
+  useEffect(() => {
+    setCurrency(settings.currency);
+    setBranding({ businessName, payTo: settings.payTo });
+  }, [settings.currency, settings.payTo, businessName]);
 
   const value: BranchContextType = {
     branch: access.branch,
@@ -69,6 +79,7 @@ export function BranchProvider({ children, currentUser }: { children: ReactNode;
     hasFeature: (key) => features[key] !== false,
     settings,
     reloadSettings,
+    businessName,
   };
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;

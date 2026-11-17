@@ -275,6 +275,14 @@ export interface BranchSettings {
   discountPresets: DiscountPreset[];
   /** Loyalty program config (was per-device localStorage; now per branch). */
   loyalty: LoyaltySettings;
+  /** Restaurant name shown on screens and receipts (empty = the branch name). */
+  businessName: string;
+  /** Currency symbol shown before amounts, e.g. RM. */
+  currency: string;
+  /** Owner's WhatsApp number for kitchen ingredient requests (digits, with country code). */
+  kitchenWhatsapp: string;
+  /** Bank / payee lines printed under "Pay To" on invoices and quotations. */
+  payTo: string;
 }
 
 export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
@@ -283,6 +291,10 @@ export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   taxLabel: 'Tax',
   taxInclusive: false,
   discountPresets: [],
+  businessName: '',
+  currency: 'RM',
+  kitchenWhatsapp: '',
+  payTo: '',
   // Inlined (not the DEFAULT_LOYALTY_SETTINGS const, which is declared later in
   // this module — referencing it here would hit the temporal dead zone).
   loyalty: {

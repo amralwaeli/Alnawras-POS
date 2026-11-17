@@ -21,6 +21,7 @@ import {
   CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, ShieldAlert,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
+import { useBranchProfile } from '../../hooks/useBranchProfile';
 
 // ─── Full ordering UI (receives tableId as prop, never from URL) ──────────────
 
@@ -58,6 +59,7 @@ const POLL_MS = 8000;
 
 export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
   const [table, setTable]                 = useState<GuestTable | null>(null);
+  const businessName = useBranchProfile(table?.branchId);
   const [existingItems, setExistingItems] = useState<ExistingItem[]>([]);
   const [products, setProducts]           = useState<Product[]>([]);
   const [categories, setCategories]       = useState<Category[]>([]);
@@ -304,7 +306,7 @@ export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
       <div className="bg-white px-4 pt-safe pb-3 shadow-sm flex items-center justify-between gap-3 flex-shrink-0">
         <div>
           <h1 className="font-black text-gray-900 text-lg leading-tight">Table {table?.number}</h1>
-          <p className="text-[11px] text-gray-400 font-medium">Alnawras Restaurant</p>
+          <p className="text-[11px] text-gray-500 font-medium">{businessName}</p>
         </div>
         <div className="flex items-center gap-2">
           {callWaiterButton}

@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { PAY_TO } from '../../../lib/branding';
 
 export interface InvoiceItem {
   id: string;
@@ -85,7 +86,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
       <div style={{ width: 130, height: 90, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
         <img
           src={LOGO_URL}
-          alt="Alnawras Logo"
+          alt="Logo"
           style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block', backgroundColor: '#fff' }}
         />
       </div>
@@ -153,9 +154,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
       <div style={{ width: '55%' }}>
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontWeight: 700, margin: '0 0 4px' }}>Pay To</p>
-          <p style={{ margin: '0 0 2px' }}>CIMB BANK</p>
-          <p style={{ margin: '0 0 2px' }}>ALNAWRAS SDN BHD</p>
-          <p style={{ margin: 0 }}>8605525557</p>
+          {PAY_TO.split('\n').filter(Boolean).map((line, i) => (
+            <p key={i} style={{ margin: '0 0 2px' }}>{line}</p>
+          ))}
         </div>
         <div>
           <p style={{ fontWeight: 700, margin: '0 0 4px' }}>Notes / Terms</p>

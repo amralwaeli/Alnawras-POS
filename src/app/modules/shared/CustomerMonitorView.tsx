@@ -4,10 +4,12 @@ import { CURRENCY, fmt } from '../../../lib/currency';
 import { QrCode, CheckCircle, ShoppingCart, User } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePOS } from '../../context/POSContext';
+import { useBranch } from '../../context/BranchContext';
 import { DeviceService } from '../../services/DeviceService';
 
 export function CustomerMonitorView() {
   const { currentUser } = usePOS();
+  const { businessName } = useBranch();
   const [order, setOrder] = useState<any>(null);
   const [paymentQR, setPaymentQR] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function CustomerMonitorView() {
         <div className="bg-orange-500/10 p-8 rounded-[60px] mb-8">
           <ShoppingCart className="size-32 text-orange-500 opacity-20" />
         </div>
-        <h1 className="text-5xl font-black italic tracking-tighter uppercase mb-4">Welcome to Alnawras</h1>
+        <h1 className="text-5xl font-black italic tracking-tighter uppercase mb-4">Welcome to {businessName}</h1>
         <p className="text-xl text-gray-500 max-w-md">Please check your items on this screen before payment.</p>
       </div>
     );

@@ -15,7 +15,7 @@ import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
-  const { hasFeature } = useBranch();
+  const { hasFeature, businessName } = useBranch();
   const { deviceUnlocked, signOutDevice } = useDeviceAuth();
   const location = useLocation();
   const [collapsed, setCollapsed]     = useState(() => window.innerWidth < 1024);
@@ -84,7 +84,7 @@ export function Layout() {
     { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const, feature: 'accounting' },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true, feature: 'loyalty' },
-    { path: '/business-settings',  label: 'Tax & Discounts', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/business-settings',  label: 'Business Settings', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
     { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
     { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const, adminOnly: true, feature: 'groupOrdering' },
@@ -169,7 +169,7 @@ export function Layout() {
             <UtensilsCrossed className="size-5 text-white" />
           </div>
           <div className={`flex-1 min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
-            <p className="font-bold text-base leading-tight truncate">Alnawras</p>
+            <p className="font-bold text-base leading-tight truncate">{businessName}</p>
             <p className="text-[11px] text-gray-400 uppercase tracking-wider">Point of Sale</p>
           </div>
           {/* Desktop: collapse toggle */}
@@ -332,7 +332,7 @@ export function Layout() {
             <div className="size-6 rounded-lg bg-amber-500 flex items-center justify-center">
               <UtensilsCrossed className="size-3.5 text-white" />
             </div>
-            <span className="font-bold text-sm text-gray-900">Alnawras POS</span>
+            <span className="font-bold text-sm text-gray-900">{businessName}</span>
           </div>
           <div className="flex-1" />
           <div className={`size-7 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold`}>

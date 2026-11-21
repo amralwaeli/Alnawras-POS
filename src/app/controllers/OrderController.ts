@@ -3,6 +3,7 @@ import { mapOrder } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { PrintService } from '../services/PrintService';
 import { OfflineSyncEngine, isNetworkError } from '../services/OfflineSyncEngine';
+import { toast } from 'sonner';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -230,11 +231,12 @@ export class OrderController {
               const stationItems = itemsByStation[station];
               if (stationItems && stationItems.length > 0) {
                 const ticket = PrintService.formatKitchenTicket(finalOrder, stationItems, station);
-                await PrintService.sendToPrinter({
+                // Not awaited: a switched-off printer must not hold up sending the order.
+                void PrintService.sendToPrinter({
                   printerIp: printer.ipAddress,
                   printerPort: printer.port || 9100,
                   content: ticket
-                });
+                }).then(res => { if (!res.success) toast.error(`Kitchen printer ${printer.name || printer.ipAddress}: ${res.error}`); });
               }
             }
           }

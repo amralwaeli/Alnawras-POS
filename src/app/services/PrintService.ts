@@ -6,6 +6,21 @@
  * on Android and Desktop devices.
  */
 
+import { registerPlugin } from '@capacitor/core';
+import { isNativeApp } from '../../lib/platform';
+
+/** Native socket printing in the Android app (LanPrinterPlugin.java). */
+const LanPrinter = registerPlugin<{ print(o: { host: string; port: number; data: string }): Promise<void> }>('LanPrinter');
+
+function toBase64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+
+/** Strips control characters from printed data (a crafted name can't cut paper or open the drawer). */
+export const cleanPrintText = (v: any) => String(v ?? '').replace(/[\x00-\x1F\x7F]/g, ' ').trimEnd();
+
 export interface PrintJob {
   printerIp: string;
   printerPort: number;
@@ -21,12 +36,20 @@ export class PrintService {
   static async sendToPrinter(job: PrintJob): Promise<{ success: boolean; error?: string }> {
     console.log(`[PrintService] Sending job to ${job.printerIp}:${job.printerPort}`);
     
-    try {
-      // 1. Check if we are running in an Android WebView with a Bridge
-      if ((window as any).AndroidPrintBridge) {
-        (window as any).AndroidPrintBridge.print(JSON.stringify(job));
+    // 1. The Android app sends the ticket straight to the printer's IP (port 9100).
+    if (isNativeApp()) {
+      try {
+        await LanPrinter.print({ host: job.printerIp, port: job.printerPort || 9100, data: toBase64(new TextEncoder().encode(job.content)) });
         return { success: true };
+      } catch (err: any) {
+        // An app installed before this feature has no LanPrinter: fall through to the relay.
+        if (err?.code !== 'UNIMPLEMENTED' && !/not implemented/i.test(String(err?.message))) {
+          return { success: false, error: err?.message || 'Printer not reachable' };
+        }
       }
+    }
+
+    try {
 
       // 2. Fallback: Use the AlnawrasPOS Print Proxy running on the Cashier device
       // We use the local network IP of your Cashier device here.
@@ -83,7 +106,7 @@ export class PrintService {
     // modifier labels) so a crafted string cannot inject ESC/POS control sequences
     // (paper cut, cash-drawer kick, garbled output). The formatter adds its own
     // control codes above; only interpolated data is sanitised here.
-    const clean = (v: any) => String(v ?? '').replace(/[\x00-\x1F\x7F]/g, ' ').trimEnd();
+    const clean = cleanPrintText;
 
     newItems.forEach(item => {
       const name = clean(item.productName || item.product_name || 'Item');

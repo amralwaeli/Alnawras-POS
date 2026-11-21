@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
+import { PrintService } from '../../services/PrintService';
 import { loadStations, saveStations } from '../../models/types';
 import type { Printer as PrinterType, Station } from '../../models/types';
 
@@ -550,6 +551,18 @@ export function PrinterManagementView() {
                   </div>
 
                   <div className="flex gap-2 pt-1">
+                    {printer.type === 'network' && (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        const res = await PrintService.sendToPrinter({
+                          printerIp: printer.ipAddress ?? '', printerPort: printer.port || 9100,
+                          content: `\x1B\x40\x1B\x61\x01TEST PRINT\n${printer.name}\n${new Date().toLocaleString()}\n\n\n\x1B\x69`,
+                        });
+                        if (res.success) toast.success(`Sent a test page to ${printer.name}`);
+                        else toast.error(res.error || 'Printer not reachable');
+                      }}>
+                        <Printer className="size-3.5 mr-1" /> Test
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => { setEditingPrinter(printer); setPrinterDialogOpen(true); }} className="flex-1">
                       <Edit className="size-3.5 mr-1" /> Edit
                     </Button>

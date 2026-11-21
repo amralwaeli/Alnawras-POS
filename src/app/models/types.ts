@@ -888,13 +888,18 @@ export interface Station {
 export const DEFAULT_STATIONS: Station[] = [
   { id: 'kitchen', name: 'Kitchen',  color: '#f97316', isBuiltIn: true },
   { id: 'juice',   name: 'Juice Bar', color: '#22c55e', isBuiltIn: true },
+  { id: 'shawarma', name: 'Shawarma', color: '#eab308', isBuiltIn: true },
+  // Receipts print on printers assigned to this one (PaymentModal).
+  { id: 'cashier', name: 'Receipts (Cashier)', color: '#3b82f6', isBuiltIn: true },
 ];
 
 export function loadStations(): Station[] {
   try {
     const raw = localStorage.getItem('alnawras_stations');
     if (!raw) return [...DEFAULT_STATIONS];
-    return JSON.parse(raw);
+    const saved: Station[] = JSON.parse(raw);
+    // Built-ins added later (shawarma, receipts) appear on devices that saved stations before.
+    return [...saved, ...DEFAULT_STATIONS.filter(d => !saved.some(s => s.id === d.id))];
   } catch {
     return [...DEFAULT_STATIONS];
   }

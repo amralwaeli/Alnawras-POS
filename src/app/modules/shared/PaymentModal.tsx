@@ -7,17 +7,18 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   X, Clock, CheckCircle, CreditCard, Banknote, QrCode,
   SplitSquareHorizontal, Plus, Minus, Search, UserCheck, Star, Gift,
-  ShieldAlert, Users, Check
+  ShieldAlert, Users, Check, HandCoins
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
+import { DebtController, DebtAccount } from '../../controllers/DebtController';
 import type { Customer, DiscountPreset } from '../../models/types';
 import { ROLE_PERMISSIONS } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
-import { PrintService } from '../../services/PrintService';
+import { PrintService, cleanPrintText } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 import QRCode from 'qrcode';
@@ -25,8 +26,9 @@ import { friendlyError } from '../../../lib/errors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
-type PaymentMode  = SimpleMethod | 'mix' | 'split-items';
-interface SplitEntry { method: SimpleMethod; amount: string; }
+type MixMethod    = SimpleMethod | 'account';   // a customer debt account (migration 0036)
+type PaymentMode  = SimpleMethod | 'account' | 'mix' | 'split-items';
+interface SplitEntry { method: MixMethod; amount: string; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export function calcOrderTotals(order: any) {
@@ -323,6 +325,12 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
   const [amountReceived, setAmountReceived] = useState('');
+  // "On account": the customer pays later (Customer Debts).
+  const [debtAccounts, setDebtAccounts] = useState<DebtAccount[] | null>(null);
+  const [debtAccountId, setDebtAccountId] = useState<string | null>(null);
+  const [debtSearch, setDebtSearch] = useState('');
+  const [newDebtName, setNewDebtName] = useState('');
+  const [newDebtPhone, setNewDebtPhone] = useState('');
   // Tenant-admin-configured tax + quick-discount presets for this branch.
   const { settings: branchSettings, businessName } = useBranch();
   const [presetDiscount, setPresetDiscount] = useState(0);
@@ -355,7 +363,26 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setPaidItemIds(new Set());
     setPresetDiscount(0);
     setAppliedPresetId(null);
+    setDebtAccountId(null);
+    setDebtSearch('');
+    setDebtAccounts(null);
   }, [order?.id, isOpen]);
+
+  const usesAccount = paymentMode === 'account' || (paymentMode === 'mix' && splits.some(s => s.method === 'account'));
+  const loadDebtAccounts = () => DebtController.list(currentUser.branchId).then(res => {
+    if (res.success) setDebtAccounts(res.data.filter(a => a.isActive));
+    else toast.error(friendlyError(res.error, 'Could not load customer accounts'));
+  });
+  useEffect(() => { if (isOpen && usesAccount && debtAccounts === null) loadDebtAccounts(); }, [isOpen, usesAccount]);
+
+  const createDebtAccount = async () => {
+    if (!newDebtName.trim()) { toast.error('Enter the customer name'); return; }
+    const res = await DebtController.save(currentUser.branchId, { name: newDebtName, phone: newDebtPhone, terms: 'flexible' });
+    if (!res.success) { toast.error(friendlyError(res.error, 'Could not create the account')); return; }
+    setNewDebtName(''); setNewDebtPhone('');
+    await loadDebtAccounts();
+    setDebtAccountId(res.data.id);
+  };
 
   // Items still owed on this bill — already-paid (via a prior split) or
   // voided items drop out as soon as they're settled.
@@ -460,7 +487,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const addSplitRow = () => {
     if (splits.length >= 3) return;
     const used = splits.map(s => s.method);
-    const next = (['cash', 'card', 'qr'] as SimpleMethod[]).find(m => !used.includes(m));
+    const next = (['cash', 'card', 'qr', 'account'] as MixMethod[]).find(m => !used.includes(m));
     if (next) setSplits(prev => [...prev, { method: next, amount: '' }]);
   };
 
@@ -524,6 +551,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     // path must not run (it would re-charge already-settled items).
     if (lockedToSplit) { toast.error('This bill is partially paid — continue by item'); return; }
     if (paymentMode === 'mix' && !splitExact) { toast.error(`Split must total exactly ${fmt(totals.total)}`); return; }
+    if (usesAccount && !debtAccountId) { toast.error('Choose the customer account'); return; }
 
     // Validate cash received. A blank field means the customer paid the exact
     // amount (no change), so only block when a value is entered that is too low.
@@ -541,8 +569,11 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
       // already paid, computes the totals itself, redeems/earns loyalty, writes
       // the payment rows and frees the table.
       const payments = paymentMode === 'mix'
-        ? splits.filter(sp => parseFloat(sp.amount) > 0).map(sp => ({ method: sp.method, amount: parseFloat(sp.amount) }))
-        : [{ method: paymentMode }];
+        ? splits.filter(sp => parseFloat(sp.amount) > 0).map(sp => ({
+            method: sp.method, amount: parseFloat(sp.amount),
+            ...(sp.method === 'account' ? { account_id: debtAccountId } : {}),
+          }))
+        : [{ method: paymentMode, ...(paymentMode === 'account' ? { account_id: debtAccountId } : {}) }];
       const useLoyalty = !!linkedCustomer && loyaltySettings.enabled;
       const { data: r, error: payErr } = await supabase.rpc('pay_order', {
         p_order_id: order.id,
@@ -579,11 +610,11 @@ Table: ${order.tableNumber || 'Takeaway'}
 Cashier: ${currentUser?.name || 'N/A'}
 --------------------------------
 ${(order.items || []).map((i: any) => {
-              const name = String(i.productName || i.product_name || 'Item');
+              const name = cleanPrintText(i.productName || i.product_name || 'Item');
               const qty = Number(i.quantity ?? i.qty ?? 1);
               const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
               const mods = Array.isArray(i.modifiers) && i.modifiers.length
-                ? `\n  ${i.modifiers.map((m: any) => m.optionName || m.option_name || '').join(', ')}`
+                ? `\n  ${i.modifiers.map((m: any) => cleanPrintText(m.optionName || m.option_name || '')).join(', ')}`
                 : '';
               return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}${mods}`;
             }).join('\n')}
@@ -599,12 +630,15 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
    THANK YOU FOR YOUR VISIT!
             `;
 
-            await PrintService.sendToPrinter({
+            // Not awaited: a switched-off printer must not hold up the till.
+            void PrintService.sendToPrinter({
               printerIp: printer.ipAddress,
               printerPort: printer.port || 9100,
-              content: receiptText
+              content: `\x1B\x40${receiptText}\n\n\n\x1B\x69`, // init, receipt, cut paper
+            }).then(res => {
+              if (res.success) setLanPrinted(true);
+              else toast.error(`Receipt printer ${printer.name || printer.ipAddress}: ${res.error}`);
             });
-            setLanPrinted(true);
           }
         }
       } catch (printErr) {
@@ -795,10 +829,11 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                   <p className="text-sm font-semibold text-gray-700">Payment Method</p>
                   {lockedToSplit && <p className="text-[11px] font-semibold text-pink-600">Partially paid — continue by item</p>}
                 </div>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   <button onClick={() => setPaymentMode('cash')} disabled={lockedToSplit} className={`${methodBtn('cash', 'border-emerald-500 bg-emerald-50 text-emerald-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><Banknote className="size-4" />Cash</button>
                   <button onClick={() => setPaymentMode('card')} disabled={lockedToSplit} className={`${methodBtn('card', 'border-blue-500 bg-blue-50 text-blue-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><CreditCard className="size-4" />Card</button>
                   <button onClick={() => setPaymentMode('qr')} disabled={lockedToSplit} className={`${methodBtn('qr', 'border-violet-500 bg-violet-50 text-violet-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><QrCode className="size-4" />QR</button>
+                  <button onClick={() => setPaymentMode('account')} disabled={lockedToSplit} className={`${methodBtn('account', 'border-amber-500 bg-amber-50 text-amber-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><HandCoins className="size-4" />Account</button>
                   <button onClick={() => setPaymentMode('mix')} disabled={lockedToSplit} className={`${methodBtn('mix', 'border-orange-500 bg-orange-50 text-orange-700')} disabled:opacity-30 disabled:cursor-not-allowed`}><SplitSquareHorizontal className="size-4" />Mix</button>
                   <button onClick={() => setPaymentMode('split-items')} className={methodBtn('split-items', 'border-pink-500 bg-pink-50 text-pink-700')}><Users className="size-4" />Split</button>
                 </div>
@@ -831,11 +866,11 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                     </div>
                     {splits.map((entry, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <select value={entry.method} onChange={e => updateSplit(idx, 'method', e.target.value as SimpleMethod)}
+                        <select value={entry.method} onChange={e => updateSplit(idx, 'method', e.target.value as MixMethod)}
                           className="flex-none w-24 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none" disabled={processing}>
-                          {(['cash','card','qr'] as SimpleMethod[]).map(m => (
+                          {(['cash','card','qr','account'] as MixMethod[]).map(m => (
                             <option key={m} value={m} disabled={splits.some((s,i) => i !== idx && s.method === m)}>
-                              {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : '📱 QR'}
+                              {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : m === 'qr' ? '📱 QR' : '🧾 Account'}
                             </option>
                           ))}
                         </select>
@@ -857,6 +892,38 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                         <Plus className="size-3.5" /> Add Payment Method
                       </button>
                     )}
+                  </div>
+                )}
+
+                {usesAccount && (
+                  <div className="space-y-2 bg-amber-50 rounded-xl p-3 border border-amber-100">
+                    <p className="text-xs font-medium text-amber-800">Put on the account of — the customer pays later</p>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
+                      <input value={debtSearch} onChange={e => setDebtSearch(e.target.value)} placeholder="Search name or phone"
+                        className="w-full pl-8 pr-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
+                    </div>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {debtAccounts === null && <p className="text-xs text-gray-500 py-2">Loading…</p>}
+                      {debtAccounts?.filter(a => `${a.name} ${a.phone ?? ''}`.toLowerCase().includes(debtSearch.toLowerCase())).map(a => (
+                        <button key={a.id} type="button" onClick={() => setDebtAccountId(a.id)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm ${debtAccountId === a.id ? 'border-amber-500 bg-white shadow-sm' : 'border-transparent hover:bg-white/70'}`}>
+                          <span className="truncate"><span className="font-semibold">{a.name}</span>{a.phone ? <span className="text-gray-500"> · {a.phone}</span> : null}</span>
+                          <span className={`shrink-0 text-xs ${a.overdue ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                            owes {fmt(a.balance)}{a.creditLimit != null ? ` / ${fmt(a.creditLimit)}` : ''}{a.overdue ? ' · overdue' : ''}
+                          </span>
+                        </button>
+                      ))}
+                      {debtAccounts?.length === 0 && <p className="text-xs text-gray-500 py-2">No customer accounts yet — add one below.</p>}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <input value={newDebtName} onChange={e => setNewDebtName(e.target.value)} placeholder="New customer name"
+                        className="flex-1 min-w-0 px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
+                      <input value={newDebtPhone} onChange={e => setNewDebtPhone(e.target.value)} placeholder="Phone"
+                        className="w-28 px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
+                      <button type="button" onClick={createDebtAccount}
+                        className="px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600">Add</button>
+                    </div>
                   </div>
                 )}
 
@@ -937,7 +1004,7 @@ ${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(pars
                   disabled={
                     paymentMode === 'split-items'
                       ? (splitProcessing || splitSelected.size === 0)
-                      : (processing || (paymentMode === 'mix' && !splitExact))
+                      : (processing || (paymentMode === 'mix' && !splitExact) || (usesAccount && !debtAccountId))
                   }
                   className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2 disabled:opacity-50"
                 >

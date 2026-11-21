@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ReportsController } from '../../controllers/ReportsController';
 import { Clock, Banknote, CheckCircle, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 import { friendlyError } from '../../../lib/errors';
+import { supabase } from '../../../lib/supabase';
 
 export function ShiftManagementView() {
   const { currentUser } = usePOS();
@@ -57,6 +58,11 @@ export function ShiftManagementView() {
     if (!summary.success) { setLoading(false); return toast.error(`Could not total the shift: ${summary.error}`); }
     const shiftSales = summary.data!.revenue;
     const cashSales = summary.data!.byMethod.cash ?? 0;
+    // Cash a customer paid towards their debt is in the drawer but is not a sale.
+    const { data: debtRows, error: debtErr } = await supabase.from('debt_entries').select('amount')
+      .eq('kind', 'payment').eq('method', 'cash').gte('created_at', currentShift!.opened_at);
+    if (debtErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr)}`); }
+    const debtCash = (debtRows ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
 
     const res = await ShiftController.endShift(currentShift!.id, cash, shiftSales);
     setLoading(false);
@@ -66,13 +72,14 @@ export function ShiftManagementView() {
       setCurrentShift(null);
       setCashInput('');
       toast.success('Shift ended successfully');
-      generateShiftReport(endedShift, cashSales);
+      generateShiftReport(endedShift, cashSales, debtCash);
     } else {
       toast.error(friendlyError(res.error));
     }
   };
 
-  const generateShiftReport = (shift: Shift, cashSales: number) => {
+  const generateShiftReport = (shift: Shift, cashSales: number, debtCash: number) => {
+    const expected = shift.opening_cash + cashSales + debtCash;
     const win = window.open('', '', 'width=400,height=600');
     if (!win) return;
     win.document.write(`
@@ -92,11 +99,12 @@ export function ShiftManagementView() {
         <div class="row"><span>Opening Cash:</span><span>${fmt(shift.opening_cash)}</span></div>
         <div class="row"><span>Total Sales:</span><span>${fmt(shift.total_sales || 0)}</span></div>
         <div class="row"><span>Cash Sales:</span><span>${fmt(cashSales)}</span></div>
-        <div class="row"><span>Expected Cash:</span><span>${fmt(shift.opening_cash + cashSales)}</span></div>
+        <div class="row"><span>Debt Collected (cash):</span><span>${fmt(debtCash)}</span></div>
+        <div class="row"><span>Expected Cash:</span><span>${fmt(expected)}</span></div>
         <div class="row"><span>Actual Cash:</span><span>${fmt(shift.closing_cash || 0)}</span></div>
         <div class="total row">
           <span>Difference:</span>
-          <span>${fmt((shift.closing_cash || 0) - (shift.opening_cash + cashSales))}</span>
+          <span>${fmt((shift.closing_cash || 0) - expected)}</span>
         </div>
       </body></html>
     `);

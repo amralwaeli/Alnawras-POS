@@ -66,6 +66,7 @@ const PickupBoardView         = lazy(() => import('./modules/pickup/PickupBoardV
 const SetPasswordView        = lazy(() => import('./modules/auth').then(m => ({ default: m.SetPasswordView })));
 const CustomerMenuView       = lazy(() => import('./modules/menu').then(m => ({ default: m.CustomerMenuView })));
 const LoyaltyManagementView  = lazy(() => import('./modules/loyalty').then(m => ({ default: m.LoyaltyManagementView })));
+const DebtAccountsView       = lazy(() => import('./modules/debts').then(m => ({ default: m.DebtAccountsView })));
 const BusinessSettingsView   = lazy(() => import('./modules/settings').then(m => ({ default: m.BusinessSettingsView })));
 const CustomerMonitorView    = lazy(() => import('./modules/shared/CustomerMonitorView').then(m => ({ default: m.CustomerMonitorView })));
 
@@ -158,7 +159,7 @@ export const router = createHashRouter([
       { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },
       { path: 'modifier-groups',     element: <Lazy><ProtectedRoute adminOnly><ModifierManagementView /></ProtectedRoute></Lazy> },
       { path: 'category-management', element: <Navigate to="/manage-menu" replace /> },
-      { path: 'printers',            element: <Lazy><ProtectedRoute adminOnly><PrinterManagementView /></ProtectedRoute></Lazy> },
+      { path: 'printers',            element: <Lazy><ProtectedRoute permission="canProcessPayments"><PrinterManagementView /></ProtectedRoute></Lazy> },
 
       // ── Kitchen ──
       { path: 'kitchen',             element: <Lazy><ProtectedRoute permission="canManageInventory"><KitchenView /></ProtectedRoute></Lazy> },
@@ -205,6 +206,9 @@ export const router = createHashRouter([
 
       // ── Loyalty ──
       { path: 'loyalty',             element: <Lazy><ProtectedRoute adminOnly feature="loyalty"><LoyaltyManagementView /></ProtectedRoute></Lazy> },
+
+      // ── Customer debts (pay-later accounts) ──
+      { path: 'debts',               element: <Lazy><ProtectedRoute permission="canProcessPayments"><DebtAccountsView /></ProtectedRoute></Lazy> },
 
       // ── Tax & Discounts (tenant admin) ──
       { path: 'business-settings',   element: <Lazy><ProtectedRoute adminOnly><BusinessSettingsView /></ProtectedRoute></Lazy> },

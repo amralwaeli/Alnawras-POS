@@ -1,7 +1,7 @@
 # Security model
 
 How AlnawrasPOS keeps each restaurant's data separate, and what to keep in mind
-when changing the database. Current as of November 2026 (migrations up to 0035).
+when changing the database. Current as of November 2026 (migrations up to 0036).
 
 ## Who is who
 
@@ -21,6 +21,8 @@ when changing the database. Current as of November 2026 (migrations up to 0035).
 - Prices, totals, tax, discounts, loyalty and bill numbers are computed by server functions (`submit_order_items`, `pay_order`, `pay_order_items`, `void_order_item`), which also check the caller's branch (`0031`, `0033`).
 - PINs are stored only as bcrypt hashes, can't be read or written through the API, are unique per branch, and wrong tries are limited per terminal and per branch (`0030`).
 - Saved invoices and quotations (`documents`, `0035`) are readable by the branch's own devices and written only through `save_document`, which numbers them per branch.
+- Customer debts (`0036`): accounts are per branch; the ledger (`debt_entries`) is read-only to devices and written only by `pay_order` (method `account`, credit limit checked), `record_debt_payment` and `adjust_debt`.
+- The Android app's printer bridge (`LanPrinterPlugin`) only connects to private LAN IP addresses.
 - Storage: menu photos and the payment QR can only be uploaded by a branch device into its own name; the receipts bucket can't be listed.
 - New sign-ups are switched off in Supabase Auth.
 - The website sends a Content-Security-Policy (in `index.html`) and refuses to run inside another site's frame.

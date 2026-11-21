@@ -5,7 +5,7 @@ import {
   DollarSign, ChefHat, LayoutDashboard, QrCode, Tag, UtensilsCrossed,
   Settings, Fingerprint, ReceiptText, FileText, Printer, Star, Percent,
   ChevronsLeft, ChevronsRight, Menu, X, Building2, CalendarOff,
-  ChevronDown, ChevronRight as ChevronRightIcon, Package as PackageIcon, Layers,
+  ChevronDown, ChevronRight as ChevronRightIcon, Package as PackageIcon, Layers, HandCoins,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { useBranch } from '../context/BranchContext';
@@ -39,6 +39,16 @@ export function Layout() {
             <span className="font-semibold">{currentUser.name}</span>
             <span className="text-gray-400 capitalize"> · {currentUser.role}</span>
           </p>
+          {currentUser.role === 'cashier' && (
+            <nav className="flex items-center gap-1 overflow-x-auto">
+              {[['/tables', 'Tables'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']].map(([to, label]) => (
+                <NavLink key={to} to={to}
+                  className={({ isActive }) => `min-h-11 px-3 flex items-center rounded-lg text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white text-gray-900' : 'hover:bg-white/10'}`}>
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+          )}
           <button
             onClick={logout}
             className="min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold"
@@ -46,7 +56,7 @@ export function Layout() {
             Switch user
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div>
+        <div className="flex-1 min-h-0 overflow-y-auto"><Outlet /></div>
       </div>
     );
   }
@@ -82,8 +92,9 @@ export function Layout() {
     { path: '/modifier-groups',    label: 'Modifier Groups', icon: Layers,       permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true, feature: 'accounting' },
     { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const, feature: 'accounting' },
-    { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canProcessPayments' as const },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true, feature: 'loyalty' },
+    { path: '/debts',              label: 'Customer Debts', icon: HandCoins,     permission: 'canProcessPayments' as const },
     { path: '/business-settings',  label: 'Business Settings', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true },
     { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
     { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },

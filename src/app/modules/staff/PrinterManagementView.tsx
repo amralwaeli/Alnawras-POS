@@ -10,30 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
 import { PrintService } from '../../services/PrintService';
+import { PrinterController, cachedPrinters } from '../../controllers/PrinterController';
+import { friendlyError } from '../../../lib/errors';
 import { loadStations, saveStations } from '../../models/types';
 import type { Printer as PrinterType, Station } from '../../models/types';
-
-// ── Storage helpers ───────────────────────────────────────────────────────────
-
-const PRINTERS_KEY = 'alnawras_printers';
-
-function loadPrinters(branchId: string): PrinterType[] {
-  try {
-    const raw = localStorage.getItem(PRINTERS_KEY);
-    if (!raw) return [];
-    const all: PrinterType[] = JSON.parse(raw);
-    return all.filter(p => p.branchId === branchId);
-  } catch { return []; }
-}
-
-function savePrinters(branchId: string, printers: PrinterType[]) {
-  try {
-    const raw = localStorage.getItem(PRINTERS_KEY);
-    const all: PrinterType[] = raw ? JSON.parse(raw) : [];
-    const otherBranch = all.filter(p => p.branchId !== branchId);
-    localStorage.setItem(PRINTERS_KEY, JSON.stringify([...otherBranch, ...printers]));
-  } catch { /* ignore */ }
-}
 
 // ── Badge helper ──────────────────────────────────────────────────────────────
 
@@ -169,6 +149,7 @@ const emptyPrinterForm = {
   ipAddress: '',
   port: '9100',
   usbPath: '',
+  paperWidth: '80',
   stations: [] as string[],
   isActive: true,
 };
@@ -196,6 +177,7 @@ function PrinterDialog({
         ipAddress: printer.ipAddress ?? '',
         port: printer.port?.toString() ?? '9100',
         usbPath: printer.usbPath ?? '',
+        paperWidth: String(printer.paperWidth ?? 80),
         stations: printer.stations,
         isActive: printer.isActive,
       } : { ...emptyPrinterForm });
@@ -222,6 +204,7 @@ function PrinterDialog({
       ipAddress: form.type === 'network' ? form.ipAddress.trim() : undefined,
       port: form.type === 'network' ? parseInt(form.port) || 9100 : undefined,
       usbPath: form.type === 'usb' ? form.usbPath.trim() : undefined,
+      paperWidth: form.paperWidth === '58' ? 58 : 80,
       stations: form.stations,
       isActive: form.isActive,
     });
@@ -283,6 +266,17 @@ function PrinterDialog({
           )}
 
           <div>
+            <Label>Paper width</Label>
+            <Select value={form.paperWidth} onValueChange={(v: string) => setForm(p => ({ ...p, paperWidth: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="80">80 mm (most kitchen and receipt printers)</SelectItem>
+                <SelectItem value="58">58 mm (small printers)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label>Assigned Stations</Label>
             <p className="text-xs text-gray-500 mb-2">Orders from these stations will be sent to this printer</p>
             {stations.length === 0 ? (
@@ -333,7 +327,7 @@ export function PrinterManagementView() {
   const branchId = currentUser?.branchId ?? 'branch-1';
 
   const [stations, setStations] = useState<Station[]>(() => loadStations());
-  const [printers, setPrinters] = useState<PrinterType[]>(() => loadPrinters(branchId));
+  const [printers, setPrinters] = useState<PrinterType[]>(() => cachedPrinters(branchId));
 
   const [stationDialogOpen, setStationDialogOpen] = useState(false);
   const [editingStation, setEditingStation]        = useState<Station | null>(null);
@@ -342,7 +336,8 @@ export function PrinterManagementView() {
   const [editingPrinter, setEditingPrinter]        = useState<PrinterType | null>(null);
 
   useEffect(() => { saveStations(stations); }, [stations]);
-  useEffect(() => { savePrinters(branchId, printers); }, [printers, branchId]);
+  // Shared by every device of the branch (database); this device's copy until it loads.
+  useEffect(() => { PrinterController.load(branchId).then(setPrinters); }, [branchId]);
 
   // ── Station handlers ──────────────────────────────────────────────────────
 
@@ -358,38 +353,41 @@ export function PrinterManagementView() {
   const handleDeleteStation = (id: string) => {
     setStations(prev => prev.filter(s => s.id !== id));
     // Remove this station from any printer that had it assigned
-    setPrinters(prev => prev.map(p => ({
-      ...p,
-      stations: p.stations.filter(s => s !== id),
-    })));
+    printers.filter(p => p.stations.includes(id))
+      .forEach(p => persist({ ...p, stations: p.stations.filter(s => s !== id) }));
     toast.success('Station removed');
   };
 
   // ── Printer handlers ──────────────────────────────────────────────────────
 
+  /** Saves one printer for the whole branch, then shows it. */
+  const persist = async (p: PrinterType, okMessage?: string) => {
+    const res = await PrinterController.save(p);
+    if (!res.success) { toast.error(friendlyError(res.error, 'Could not save the printer')); return; }
+    setPrinters(prev => prev.some(x => x.id === res.data.id) ? prev.map(x => x.id === res.data.id ? res.data : x) : [...prev, res.data]);
+    if (okMessage) toast.success(okMessage);
+  };
+
   const handleSavePrinter = (data: Omit<PrinterType, 'id' | 'branchId' | 'createdAt'> & { id?: string }) => {
-    if (data.id) {
-      setPrinters(prev => prev.map(p => p.id === data.id ? { ...p, ...data, id: p.id } : p));
-      toast.success('Printer updated');
-    } else {
-      setPrinters(prev => [...prev, {
-        ...data,
-        id: crypto.randomUUID(),
-        branchId,
-        createdAt: new Date().toISOString(),
-      } as PrinterType]);
-      toast.success('Printer added');
-    }
+    const existing = data.id ? printers.find(p => p.id === data.id) : undefined;
+    persist(existing
+      ? { ...existing, ...data, id: existing.id }
+      : { ...data, id: crypto.randomUUID(), branchId, createdAt: new Date().toISOString() } as PrinterType,
+      existing ? 'Printer updated' : 'Printer added');
     setEditingPrinter(null);
   };
 
-  const handleDeletePrinter = (id: string) => {
+  const handleDeletePrinter = async (id: string) => {
+    const res = await PrinterController.remove(branchId, id);
+    if (!res.success) { toast.error(friendlyError(res.error, 'Could not remove the printer')); return; }
     setPrinters(prev => prev.filter(p => p.id !== id));
     toast.success('Printer removed');
   };
 
-  const toggleActive = (id: string) =>
-    setPrinters(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
+  const toggleActive = (id: string) => {
+    const p = printers.find(x => x.id === id);
+    if (p) persist({ ...p, isActive: !p.isActive });
+  };
 
   const stationById = (id: string) => stations.find(s => s.id === id);
 
@@ -553,10 +551,7 @@ export function PrinterManagementView() {
                   <div className="flex gap-2 pt-1">
                     {printer.type === 'network' && (
                       <Button size="sm" variant="outline" onClick={async () => {
-                        const res = await PrintService.sendToPrinter({
-                          printerIp: printer.ipAddress ?? '', printerPort: printer.port || 9100,
-                          content: `\x1B\x40\x1B\x61\x01TEST PRINT\n${printer.name}\n${new Date().toLocaleString()}\n\n\n\x1B\x69`,
-                        });
+                        const res = await PrintService.sendToPrinter(PrintService.testPage(printer));
                         if (res.success) toast.success(`Sent a test page to ${printer.name}`);
                         else toast.error(res.error || 'Printer not reachable');
                       }}>

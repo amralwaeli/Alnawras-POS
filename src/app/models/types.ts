@@ -916,6 +916,8 @@ export interface Printer {
   ipAddress?: string;
   port?: number;
   usbPath?: string;
+  /** Paper roll width in mm (58 or 80); sets the printed image width. */
+  paperWidth?: 58 | 80;
   stations: PrinterStation[];
   isActive: boolean;
   branchId: string;

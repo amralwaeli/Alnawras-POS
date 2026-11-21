@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { PrintService } from '../services/PrintService';
 import { OfflineSyncEngine, isNetworkError } from '../services/OfflineSyncEngine';
 import { toast } from 'sonner';
+import { cachedPrinters } from './PrinterController';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -211,9 +212,8 @@ export class OrderController {
       // ── AUTOMATED STATION-BASED PRINTING ──
       // Split items by station and send to respective printers.
       try {
-        const printersRaw = localStorage.getItem('alnawras_printers');
-        if (printersRaw) {
-          const printers = JSON.parse(printersRaw);
+        const printers: any[] = cachedPrinters(branchId);
+        if (printers.length) {
           const activePrinters = printers.filter((p: any) => p.isActive && p.type === 'network');
 
           // Group new items by their station.
@@ -235,7 +235,7 @@ export class OrderController {
                 void PrintService.sendToPrinter({
                   printerIp: printer.ipAddress,
                   printerPort: printer.port || 9100,
-                  content: ticket
+                  bytes: PrintService.render(ticket, printer.paperWidth)
                 }).then(res => { if (!res.success) toast.error(`Kitchen printer ${printer.name || printer.ipAddress}: ${res.error}`); });
               }
             }

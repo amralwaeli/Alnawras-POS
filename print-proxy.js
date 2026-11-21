@@ -39,7 +39,7 @@ const PRINTER_PORTS = (process.env.PRINTER_PORTS || '9100')
 const ALLOWED_ORIGINS = (process.env.PRINT_PROXY_ORIGINS ||
   'https://amralwaeli.github.io,capacitor://localhost,http://localhost,http://localhost:5173')
   .split(',').map((s) => s.trim()).filter(Boolean);
-const MAX_BYTES = 256 * 1024;
+const MAX_BYTES = 2 * 1024 * 1024;   // image tickets (Arabic is printed as an image)
 const HEX_RE = /^[0-9a-fA-F]+$/;
 
 app.use(cors({
@@ -51,7 +51,7 @@ app.use(cors({
     return cb(new Error('Origin not allowed'));
   },
 }));
-app.use(express.json({ limit: '300kb' }));
+app.use(express.json({ limit: '5mb' }));   // tickets are images now (hex of up to 2 MB)
 
 /** True for loopback / RFC1918 / link-local IPv4 — i.e. a LAN-local target. */
 function isPrivateIp(ip) {

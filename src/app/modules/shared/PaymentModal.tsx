@@ -15,10 +15,11 @@ import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { DebtController, DebtAccount } from '../../controllers/DebtController';
+import { cachedPrinters } from '../../controllers/PrinterController';
 import type { Customer, DiscountPreset } from '../../models/types';
 import { ROLE_PERMISSIONS } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
-import { PrintService, cleanPrintText } from '../../services/PrintService';
+import { PrintService, cleanPrintText, type PrintLine } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 import QRCode from 'qrcode';
@@ -595,46 +596,48 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
 
       // ── Dispatch LAN Receipt Printing ──
       try {
-        const printersRaw = localStorage.getItem('alnawras_printers');
-        if (printersRaw) {
-          const printers = JSON.parse(printersRaw);
+        const printers: any[] = cachedPrinters(currentUser.branchId);
+        if (printers.length) {
           const cashierPrinters = printers.filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
-          
-          for (const printer of cashierPrinters) {
-            const receiptText = `
-${businessName.toUpperCase()}
---------------------------------
-Bill #: ${billNo}
-Date: ${new Date().toLocaleString()}
-Table: ${order.tableNumber || 'Takeaway'}
-Cashier: ${currentUser?.name || 'N/A'}
---------------------------------
-${(order.items || []).map((i: any) => {
+
+          const receipt: PrintLine[] = [
+            { text: cleanPrintText(businessName).toUpperCase(), style: 'large', align: 'center' },
+            'rule',
+            { text: 'Bill #', value: billNo },
+            { text: 'Date', value: new Date().toLocaleString() },
+            { text: 'Table', value: cleanPrintText(order.tableNumber || 'Takeaway') },
+            { text: 'Cashier', value: cleanPrintText(currentUser?.name || 'N/A') },
+            'rule',
+            ...(order.items || []).flatMap((i: any): PrintLine[] => {
               const name = cleanPrintText(i.productName || i.product_name || 'Item');
               const qty = Number(i.quantity ?? i.qty ?? 1);
               const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
               const mods = Array.isArray(i.modifiers) && i.modifiers.length
-                ? `\n  ${i.modifiers.map((m: any) => cleanPrintText(m.optionName || m.option_name || '')).join(', ')}`
-                : '';
-              return `${name.padEnd(20)} x${qty} ${fmt(lineTotal).padStart(8)}${mods}`;
-            }).join('\n')}
---------------------------------
-SUBTOTAL: ${fmt(paid.subtotal).padStart(20)}
-TAX:      ${fmt(paid.tax).padStart(20)}
-DISCOUNT: ${fmt(paid.discount).padStart(20)}
-TOTAL:    ${fmt(paid.total).padStart(20)}
---------------------------------
-PAYMENT: ${summary}
-${paymentMode === 'cash' && amountReceived.trim() !== '' ? `RECEIVED: ${fmt(parseFloat(amountReceived)).padStart(19)}\nCHANGE:   ${fmt(Math.max(0, parseFloat(amountReceived) - paid.total)).padStart(21)}` : ''}
---------------------------------
-   THANK YOU FOR YOUR VISIT!
-            `;
+                ? [{ text: `  ${i.modifiers.map((m: any) => cleanPrintText(m.optionName || m.option_name || '')).join(', ')}` }]
+                : [];
+              return [{ text: `${name} x${qty}`, value: fmt(lineTotal) }, ...mods];
+            }),
+            'rule',
+            { text: 'SUBTOTAL', value: fmt(paid.subtotal) },
+            { text: 'TAX', value: fmt(paid.tax) },
+            { text: 'DISCOUNT', value: fmt(paid.discount) },
+            { text: 'TOTAL', value: fmt(paid.total), style: 'large' },
+            'rule',
+            { text: 'PAYMENT', value: summary },
+            ...(paymentMode === 'cash' && amountReceived.trim() !== '' ? [
+              { text: 'RECEIVED', value: fmt(parseFloat(amountReceived)) },
+              { text: 'CHANGE', value: fmt(Math.max(0, parseFloat(amountReceived) - paid.total)) },
+            ] : []),
+            'rule',
+            { text: 'THANK YOU FOR YOUR VISIT!', align: 'center' },
+          ];
 
+          for (const printer of cashierPrinters) {
             // Not awaited: a switched-off printer must not hold up the till.
             void PrintService.sendToPrinter({
               printerIp: printer.ipAddress,
               printerPort: printer.port || 9100,
-              content: `\x1B\x40${receiptText}\n\n\n\x1B\x69`, // init, receipt, cut paper
+              bytes: PrintService.render(receipt, printer.paperWidth),
             }).then(res => {
               if (res.success) setLanPrinted(true);
               else toast.error(`Receipt printer ${printer.name || printer.ipAddress}: ${res.error}`);

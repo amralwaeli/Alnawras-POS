@@ -20,7 +20,7 @@ import java.net.Socket;
 @CapacitorPlugin(name = "LanPrinter")
 public class LanPrinterPlugin extends Plugin {
     private static final int TIMEOUT_MS = 4000;
-    private static final int MAX_BYTES = 256 * 1024;
+    private static final int MAX_BYTES = 2 * 1024 * 1024;
 
     @PluginMethod
     public void print(PluginCall call) {

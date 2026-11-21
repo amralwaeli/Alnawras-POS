@@ -5,6 +5,7 @@ import { BranchController } from '../controllers/BranchController';
 import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { DeviceService } from '../services/DeviceService';
+import { PrinterController } from '../controllers/PrinterController';
 
 /** Staff-facing message when a branch is locked out (contract lapsed or the
  *  super-admin suspended it). Kept generic — staff shouldn't see billing detail. */
@@ -39,6 +40,19 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
     if (!currentUser) { setUsers([]); return; }
     StaffController.getStaff().then(res => { if (res.success && res.data) setUsers(res.data); });
   }, [currentUser?.id]);
+
+  // The branch's shared printer list → this device's copy used for printing (works offline).
+  // Also every 5 minutes and when the app comes back to the screen, so a printer changed on
+  // another device is used here without signing out.
+  useEffect(() => {
+    const branchId = currentUser?.branchId;
+    if (!branchId) return;
+    const refresh = () => { if (document.visibilityState === 'visible') void PrinterController.load(branchId); };
+    refresh();
+    const timer = setInterval(refresh, 5 * 60_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [currentUser?.branchId]);
 
   const login = async (pin: string) => {
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {

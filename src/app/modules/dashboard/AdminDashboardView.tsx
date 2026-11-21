@@ -13,6 +13,7 @@ import { WorkforceController } from '../../controllers/WorkforceController';
 import { fetchAll } from '../../../lib/fetchAll';
 import { ReportsController } from '../../controllers/ReportsController';
 import { toast } from 'sonner';
+import { FreePlanUsage } from './FreePlanUsage';
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
@@ -455,6 +456,8 @@ export function AdminDashboardView() {
           </Link>
         </div>
       </div>
+
+      <FreePlanUsage />
 
       {/* Low Stock Alert */}
       {lowStock.length > 0 && (

@@ -12,6 +12,7 @@
  */
 import { supabase } from '../../lib/supabase';
 import { randomHex, extForType } from '../../lib/upload';
+import { compressImage } from '../../lib/image';
 
 /** Pickup links stay valid for 24h (a customer may order over the course of a day). */
 const TOKEN_TTL_HOURS = 24;
@@ -117,11 +118,17 @@ export async function completePickupToken(orderId: string): Promise<void> {
  * uploads server-side (migration 0012).
  */
 export async function uploadReceipt(token: string, file: File): Promise<string | null> {
-  const path = `${token.slice(0, 16)}-${randomHex(8)}.${extForType(file.type)}`;
-  const { error } = await supabase.storage.from('pickup-receipts').upload(path, file, {
-    cacheControl: '3600',
+  // Phone photos are often 2–5 MB: shrink to a readable 1280 px JPEG (PDFs go as they are).
+  let body: Blob = file;
+  let type = file.type || 'image/jpeg';
+  if (type.startsWith('image/') && type !== 'image/gif') {
+    try { body = await compressImage(file, 1280, 0.75); type = 'image/jpeg'; } catch { /* keep the original */ }
+  }
+  const path = `${token.slice(0, 16)}-${randomHex(8)}.${extForType(type)}`;
+  const { error } = await supabase.storage.from('pickup-receipts').upload(path, body, {
+    cacheControl: '31536000',   // never changes (new name per upload)
     upsert: false,
-    contentType: file.type || 'image/jpeg',
+    contentType: type,
   });
   if (error) {
     console.error('[PickupService] uploadReceipt failed:', error);
@@ -149,7 +156,7 @@ export async function uploadMerchantQr(
   file: File,
 ): Promise<{ url: string } | { error: string; alreadyExists?: boolean }> {
   const { error } = await supabase.storage.from('merchant-qr').upload(`${branchId}.png`, file, {
-    cacheControl: '0',
+    cacheControl: '86400',   // phones keep it a day (it can only be replaced from the dashboard)
     upsert: false,
     contentType: file.type || 'image/png',
   });

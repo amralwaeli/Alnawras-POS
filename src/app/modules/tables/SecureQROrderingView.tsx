@@ -56,7 +56,9 @@ const toExisting = (items: any[]): ExistingItem[] => (items ?? []).map((item: an
 }));
 
 // shortcut: polls instead of realtime (anon can't see realtime rows once RLS is on); 8s is fine for a menu.
-const POLL_MS = 8000;
+// 30 s keeps a guest's phone current without using the free plan's data allowance
+// (8 s used ~2.7 GB/month at 100 tables a day); it also refreshes when the page is reopened.
+const POLL_MS = 30_000;
 
 export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
   const [table, setTable]                 = useState<GuestTable | null>(null);

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useReducer } from 'react';
+import { useOrders } from '../../context/OrdersContext';
 import { supabase } from '../../../lib/supabase';
 import { usePOS } from '../../context/POSContext';
 import { CheckCircle2, Clock4, ChefHat, Bell, Search, Wifi, ShoppingCart } from 'lucide-react';
@@ -19,94 +20,75 @@ const STATUS_STYLE: Record<string, { badge: string; btn: string; label: string }
 };
 
 export function KitchenView() {
-  const { products, currentUser, updateProduct, setProducts } = usePOS();
-  const [tickets, setTickets]     = useState<any[]>([]);
+  const { products, currentUser, updateProduct, setProducts, orders, setOrders } = usePOS();
   const [tab, setTab]             = useState<'orders' | 'products' | 'order-request'>('orders');
   const [newAlert, setNewAlert]   = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
-  const [connected, setConnected] = useState(true);
-  const [loadState, setLoadState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const { ordersLoaded, live } = useOrders();
+  const [online, setOnline] = useState(navigator.onLine);
+  const connected = online && live;
+  // Ticket ages ("12m", red after 15 min) must keep counting in a quiet kitchen.
+  const [, tick] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => { const t = setInterval(tick, 30_000); return () => clearInterval(t); }, []);
 
-  const loadTickets = useCallback(async () => {
-    if (!currentUser) return;
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('status', 'open')
-      .eq('branch_id', currentUser.branchId)
-      .order('created_at', { ascending: true });
-    if (error) { setLoadState('error'); return; }
-    setLoadState('ok');
-    if (orders) {
-      const active = orders
-        .map(o => ({ ...o, items: (o.order_items || []).filter((i: any) => i.status !== 'served' && i.status !== 'cancelled') }))
-        .filter(o => o.items.length > 0);
-      setTickets(active);
-    }
-  }, [currentUser]);
+  // Tickets come from the shared, realtime-patched order list (RealtimeSyncEngine), so the
+  // kitchen screen downloads nothing itself. It used to re-download every open order with
+  // all its items on each change plus every 30 s — the largest data user in the app.
+  const tickets = useMemo(() => orders
+    .filter(o => o.status === 'open')
+    .sort((x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime())
+    .map(o => ({
+      id: o.id, created_at: o.createdAt, order_type: o.orderType, table_number: o.tableNumber,
+      items: (o.items || [])
+        .filter(i => i.status !== 'served' && i.status !== 'cancelled')
+        .map(i => ({ id: i.id, product_name: i.productName, quantity: i.quantity, status: i.status, notes: i.notes, modifiers: i.modifiers })),
+    }))
+    .filter(o => o.items.length > 0), [orders]);
 
   useEffect(() => {
-    if (!currentUser) return;
-    void loadTickets();
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
-    const channel = supabase
-      .channel('kitchen-tickets')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `branch_id=eq.${currentUser.branchId}` }, async (payload) => {
-        // A cancellation is an UPDATE transitioning INTO 'cancelled' — flag it
-        // distinctly (red, sticky) instead of the generic new-item alert, so
-        // the kitchen notices an already-fired item was pulled.
-        const isCancellation = payload.eventType === 'UPDATE'
-          && (payload.new as any)?.status === 'cancelled'
-          && (payload.old as any)?.status !== 'cancelled';
-
-        if (isCancellation) {
-          const cancelledItem = payload.new as any;
-          const { data: orderRow } = await supabase
-            .from('orders').select('table_number, order_type').eq('id', cancelledItem.order_id).maybeSingle();
-          const label = orderRow?.order_type === 'pickup' ? 'Pickup'
-            : orderRow?.order_type === 'takeaway' ? 'Takeaway'
-            : `Table ${orderRow?.table_number ?? '?'}`;
-          toast.error(`Item cancelled — ${cancelledItem.product_name} (${label})`, {
-            duration: 6000, style: { background: '#dc2626', color: '#fff', fontWeight: 700 },
-          });
-          void loadTickets();
-          return;
-        }
-
-        void loadTickets();
-        if (payload.eventType === 'INSERT') {
-          setNewAlert(true);
-          new Audio('/notification.mp3').play().catch(() => {});
-          setTimeout(() => setNewAlert(false), 5000);
-          toast('New order item!', { style: { background: '#f97316', color: '#fff', fontWeight: 700 } });
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-        void loadTickets();
-        toast('New Order Received!', { style: { background: '#f97316', color: '#fff', fontWeight: 700 } });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `branch_id=eq.${currentUser.branchId}` }, () => void loadTickets())
-      .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
-
-    const poll = setInterval(loadTickets, 30_000); // Safety fallback every 30s (was 250ms — caused massive egress)
-    return () => { supabase.removeChannel(channel); clearInterval(poll); };
-  }, [currentUser, loadTickets]);
+  // New-item and cancelled-item alerts: compare each update with the previous one.
+  // The first successful load is what's already there, not new orders.
+  const seen = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (!ordersLoaded) return;
+    const now = new Map<string, string>();
+    for (const o of orders) for (const i of o.items || []) now.set(i.id, i.status);
+    const prev = seen.current;
+    seen.current = now;
+    if (!prev) return;
+    let added = false;
+    for (const o of orders) for (const i of o.items || []) {
+      const before = prev.get(i.id);
+      if (before === undefined && o.status === 'open' && i.status === 'pending') added = true;
+      if (i.status === 'cancelled' && before !== undefined && before !== 'cancelled') {
+        const label = o.orderType === 'pickup' ? 'Pickup' : o.orderType === 'takeaway' ? 'Takeaway' : `Table ${o.tableNumber ?? '?'}`;
+        toast.error(`Item cancelled — ${i.productName} (${label})`, {
+          duration: 6000, style: { background: '#dc2626', color: '#fff', fontWeight: 700 },
+        });
+      }
+    }
+    if (added) {
+      setNewAlert(true);
+      new Audio('/notification.mp3').play().catch(() => {});
+      setTimeout(() => setNewAlert(false), 5000);
+      toast('New order item!', { style: { background: '#f97316', color: '#fff', fontWeight: 700 } });
+    }
+  }, [orders, ordersLoaded]);
 
   const advanceItem = async (itemId: string, currentStatus: string) => {
     const next = STATUS_FLOW[currentStatus];
     if (!next) return;
-    if (next === 'served') {
-      setTickets(prev =>
-        prev.map(t => ({ ...t, items: t.items.filter((i: any) => i.id !== itemId) }))
-            .filter(t => t.items.length > 0)
-      );
-    } else {
-      setTickets(prev =>
-        prev.map(t => ({ ...t, items: t.items.map((i: any) => i.id === itemId ? { ...i, status: next } : i) }))
-      );
-    }
+    const setStatus = (status: string) => setOrders(prev => prev.map(o => ({
+      ...o, items: (o.items || []).map(i => i.id === itemId ? { ...i, status: status as any } : i),
+    })));
+    setStatus(next);   // shows at once; the realtime update confirms it on every device
     const { error } = await supabase.from('order_items').update({ status: next }).eq('id', itemId);
-    if (error) { toast.error('Update failed — reloading'); void loadTickets(); }
+    if (error) { setStatus(currentStatus); toast.error('Update failed — check the connection'); }
     else if (next === 'ready') toast.success('Item ready for pickup!');
   };
 
@@ -178,18 +160,11 @@ export function KitchenView() {
         {tab === 'order-request' ? (
           <IngredientOrdersTab currentUser={currentUser} />
         ) : tab === 'orders' ? (
-          // Never say "Kitchen Clear" unless a load actually succeeded.
-          loadState !== 'ok' && tickets.length === 0 ? (
+          // Never say "Kitchen Clear" unless the orders loaded and updates are arriving.
+          (!ordersLoaded || !connected) && tickets.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 text-center">
-              <p className="text-xl font-bold text-gray-300">
-                {loadState === 'loading' ? 'Loading orders…' : 'Could not load orders'}
-              </p>
-              {loadState === 'error' && (
-                <>
-                  <p className="text-base text-gray-400">Check the internet connection. Orders may be waiting.</p>
-                  <button onClick={() => void loadTickets()} className="min-h-11 px-6 rounded-xl bg-orange-600 text-white font-bold">Try again</button>
-                </>
-              )}
+              <p className="text-xl font-bold text-gray-300">{!online ? 'No internet connection' : !ordersLoaded ? 'Loading orders…' : 'Reconnecting…'}</p>
+              <p className="text-base text-gray-400">Orders may be waiting. They appear as soon as the connection is back.</p>
             </div>
           ) : tickets.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-700">

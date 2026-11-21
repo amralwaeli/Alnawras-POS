@@ -18,7 +18,13 @@ import { useCatalog } from './CatalogContext';
 
 export function RealtimeSyncEngine() {
   const { currentUser } = useAuth();
-  const { setOrders } = useOrders();
+  const { orders, setOrders, setOrdersLoaded, setLive } = useOrders();
+  // The latest bills, readable inside realtime callbacks (state updates apply later).
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
+  // Bills created by a realtime INSERT whose state update hasn't applied yet.
+  const justAdded = useRef<Set<string>>(new Set());
+  const haveOrder = (id: string) => justAdded.current.has(id) || ordersRef.current.some(o => o.id === id);
   const { setTables } = useTables();
   const { setProducts, setCategories } = useCatalog();
 
@@ -28,6 +34,8 @@ export function RealtimeSyncEngine() {
   // False until the channel's first SUBSCRIBED; distinguishes the initial
   // subscribe (initial load covers it) from a reconnect (which must resync).
   const subscribedRef = useRef(false);
+  // Orders being fetched because an item arrived for a bill this device doesn't have yet.
+  const fetching = useRef<Set<string>>(new Set());
 
   const syncAll = useCallback(async () => {
     if (!currentUser) return;
@@ -51,8 +59,26 @@ export function RealtimeSyncEngine() {
       // Seed the "already calling" set so existing flags don't trigger alerts.
       knownCalling.current = new Set(tableRes.data.filter((t: any) => t.needsWaiter).map((t: any) => t.id));
     }
-    if (ordersRes.data)    setOrders(ordersRes.data.map(mapOrder));
-  }, [currentUser, setProducts, setCategories, setTables, setOrders]);
+    if (ordersRes.data)    { setOrders(ordersRes.data.map(mapOrder)); setOrdersLoaded(true); }
+    justAdded.current.clear();
+  }, [currentUser, setProducts, setCategories, setTables, setOrders, setOrdersLoaded]);
+
+  /** One bill with its items — only when this device is missing it (was: reload everything). */
+  const fetchOrder = useCallback(async (orderId: string) => {
+    if (fetching.current.has(orderId)) return;
+    fetching.current.add(orderId);
+    try {
+      const { data } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).maybeSingle();
+      if (!data) return;
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const shown = data.status === 'open' || (data.status === 'completed' && new Date(data.created_at) >= todayStart);
+      const mapped = mapOrder(data);
+      setOrders(prev => !shown ? prev.filter(o => o.id !== mapped.id)
+        : prev.some(o => o.id === mapped.id) ? prev.map(o => o.id === mapped.id ? mapped : o) : [...prev, mapped]);
+    } finally {
+      fetching.current.delete(orderId);
+    }
+  }, [setOrders]);
 
   // ── Realtime subscriptions ────────────────────────────────────────────────
   useEffect(() => {
@@ -141,13 +167,21 @@ export function RealtimeSyncEngine() {
           return;
         }
 
-        const { data } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderRow.id).single();
-        if (!data) return;
-
-        const mapped = mapOrder(data);
+        // The change carries the whole bill row: apply it and keep the items this device
+        // already has (items arrive as their own changes). Nothing is downloaded, except a
+        // bill this device has never seen, updated rather than created (e.g. after a gap).
+        if (payload.eventType === 'UPDATE' && !haveOrder(orderRow.id)) {
+          void fetchOrder(orderRow.id);
+          return;
+        }
+        if (payload.eventType === 'INSERT') {
+          justAdded.current.add(orderRow.id);
+          setTimeout(() => justAdded.current.delete(orderRow.id), 10_000);
+        }
         setOrders(prev => {
-          const exists = prev.some(o => o.id === mapped.id);
-          return exists ? prev.map(o => o.id === mapped.id ? mapped : o) : [...prev, mapped];
+          const existing = prev.find(o => o.id === orderRow.id);
+          const mapped = { ...mapOrder({ ...orderRow, order_items: [] }), items: existing?.items ?? [] };
+          return existing ? prev.map(o => o.id === mapped.id ? mapped : o) : [...prev, mapped];
         });
       })
       // Categories
@@ -160,9 +194,9 @@ export function RealtimeSyncEngine() {
         const item = (payload.new || payload.old) as any;
         if (!item?.order_id) return;
 
+        if (!haveOrder(item.order_id)) { void fetchOrder(item.order_id); return; }
         setOrders(prev => {
-          const hasOrder = prev.some(o => o.id === item.order_id);
-          if (!hasOrder) { void syncAll(); return prev; }
+          if (!prev.some(o => o.id === item.order_id)) return prev;
 
           return prev.map(order => {
             if (order.id !== item.order_id) return order;
@@ -176,14 +210,15 @@ export function RealtimeSyncEngine() {
         // On every (re)subscribe after the first, reconcile full state: Supabase
         // does not replay postgres_changes missed while the socket was dropped,
         // so without this a reconnect leaves the terminal silently out of sync.
+        setLive(status === 'SUBSCRIBED');
         if (status === 'SUBSCRIBED') {
           if (subscribedRef.current) void syncAll();
           subscribedRef.current = true;
         }
       });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [currentUser, setOrders, setTables, setProducts, setCategories, syncAll]);
+    return () => { setLive(false); supabase.removeChannel(channel); };
+  }, [currentUser, setOrders, setTables, setProducts, setCategories, syncAll, fetchOrder, setLive]);
 
   // ── Initial load only — realtime subscriptions handle all subsequent updates ──
   useEffect(() => {
@@ -191,16 +226,23 @@ export function RealtimeSyncEngine() {
     void syncAll();
   }, [currentUser, syncAll]);
 
-  // Reconcile when the network returns or the tab/tablet wakes — the realtime
-  // socket may have missed changes while offline or backgrounded.
+  // Reconcile when the network returns, or when the tablet wakes after more than 2 minutes
+  // away — the realtime socket may have missed changes. A short screen-off keeps the socket,
+  // and a full reload on every wake was one of the largest data users (free plan: 5 GB/month).
   useEffect(() => {
     if (!currentUser) return;
-    const resync = () => { if (document.visibilityState === 'visible') void syncAll(); };
-    window.addEventListener('online', resync);
-    document.addEventListener('visibilitychange', resync);
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt > 2 * 60_000) void syncAll();
+      hiddenAt = 0;
+    };
+    const onOnline = () => void syncAll();
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      window.removeEventListener('online', resync);
-      document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [currentUser, syncAll]);
 

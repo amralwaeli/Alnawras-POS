@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { usePOS } from '../../context/POSContext';
-import { UtensilsCrossed } from 'lucide-react';
 import { friendlyError } from '../../../lib/errors';
 
 interface LoginViewProps {
@@ -75,12 +74,10 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
       {/* Left panel - Branding */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-[#161B22] p-12 border-r border-gray-800 overflow-y-auto">
         <div className="flex items-center gap-4">
-          <div className="size-12 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <UtensilsCrossed className="size-6 text-white" />
-          </div>
+          <img src={`${import.meta.env.BASE_URL}smartpos-icon.svg`} alt="" className="size-12 rounded-2xl shadow-lg shadow-orange-500/20" />
           <div>
-            <p className="font-black text-white text-2xl tracking-tighter uppercase italic leading-none">Alnawras</p>
-            <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">Smart POS System</p>
+            <p className="font-black text-white text-2xl tracking-tight leading-none">Smart<span className="text-orange-500">Pos</span></p>
+            <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">Restaurant POS System</p>
           </div>
         </div>
         
@@ -91,7 +88,7 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
           <p className="text-gray-500 text-xl font-medium">Enter your credentials to access the dashboard.</p>
         </div>
         
-        <p className="text-gray-600 text-xs font-bold uppercase tracking-widest">Alnawras POS</p>
+        <p className="text-gray-600 text-xs font-bold uppercase tracking-widest">SmartPos</p>
       </div>
 
       {/* Right panel - Keypad */}
@@ -99,10 +96,8 @@ export function LoginView({ onLoginSuccess }: LoginViewProps) {
         <div className="w-full max-w-sm m-auto">
           {/* Mobile Logo */}
           <div className="lg:hidden flex flex-col items-center gap-3 mb-6 sm:mb-12">
-            <div className="size-14 rounded-[22px] bg-orange-500 flex items-center justify-center shadow-xl">
-              <UtensilsCrossed className="size-7 text-white" />
-            </div>
-            <p className="font-black text-white text-2xl uppercase italic tracking-tighter">Alnawras POS</p>
+            <img src={`${import.meta.env.BASE_URL}smartpos-icon.svg`} alt="" className="size-14 rounded-[22px] shadow-xl" />
+            <p className="font-black text-white text-2xl tracking-tight">Smart<span className="text-orange-500">Pos</span></p>
           </div>
 
           <div className="text-center lg:text-left mb-6 sm:mb-10">

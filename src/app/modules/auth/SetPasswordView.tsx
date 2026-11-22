@@ -1,6 +1,6 @@
 import { useState, ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
-import { UtensilsCrossed, Lock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Lock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
 /** Public page reached from a tenant invite email (/#/set-password?token=...).
@@ -11,10 +11,8 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh flex items-center justify-center bg-[#0B0E14] p-4 sm:p-6">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-6 sm:mb-10">
-          <div className="size-14 rounded-[22px] bg-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/20 mb-4">
-            <UtensilsCrossed className="size-7 text-white" />
-          </div>
-          <p className="font-black text-white text-2xl uppercase italic tracking-tighter">Alnawras POS</p>
+          <img src={`${import.meta.env.BASE_URL}smartpos-icon.svg`} alt="" className="size-14 rounded-[22px] shadow-xl shadow-orange-500/20 mb-4" />
+          <p className="font-black text-white text-2xl tracking-tight">Smart<span className="text-orange-500">Pos</span></p>
           <p className="text-[10px] text-orange-500 font-bold uppercase tracking-[0.2em] mt-1">Set Your Password</p>
         </div>
         {children}

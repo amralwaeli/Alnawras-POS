@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.alnawras.pos',
-  appName: 'AlnawrasPOS',
+  appName: 'SmartPos',
   webDir: 'docs',
   server: {
     // Correct GitHub Pages URL — matches the repo owner: amralwaeli

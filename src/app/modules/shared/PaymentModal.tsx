@@ -458,7 +458,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
           event: 'update-bill',
           payload: {
             order: { ...order, discount: totals.discount, tax: totals.tax, total: totals.total },
-            paymentQR: paymentMode === 'qr' ? `ALNAWRAS-PAY-${order.id}-${totals.total}` : null
+            paymentQR: paymentMode === 'qr' ? `SMARTPOS-PAY-${order.id}-${totals.total}` : null
           }
         });
       }
@@ -467,7 +467,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   }, [order, isOpen, paymentMode, totals.total, totals.tax, totals.discount]);
 
   // Drawn locally — the order id and total used to be sent to a third-party QR service.
-  const payQrText = order && paymentMode === 'qr' ? `ALNAWRAS-PAY-${order.id}-${totals.total}` : null;
+  const payQrText = order && paymentMode === 'qr' ? `SMARTPOS-PAY-${order.id}-${totals.total}` : null;
   const [payQrImage, setPayQrImage] = useState<string | null>(null);
   useEffect(() => {
     if (!payQrText) { setPayQrImage(null); return; }

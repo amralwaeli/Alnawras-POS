@@ -1,34 +1,9 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportHeight="108"
-    android:viewportWidth="108">
-    <path
-        android:fillType="evenOdd"
-        android:pathData="M32,64C32,64 38.39,52.99 44.13,50.95C51.37,48.37 70.14,49.57 70.14,49.57L108.26,87.69L108,109.01L75.97,107.97L32,64Z"
-        android:strokeColor="#00000000"
-        android:strokeWidth="1">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="78.5885"
-                android:endY="90.9159"
-                android:startX="48.7653"
-                android:startY="61.0927"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M66.94,46.02L66.94,46.02C72.44,50.07 76,56.61 76,64L32,64C32,56.61 35.56,50.11 40.98,46.06L36.18,41.19C35.45,40.45 35.45,39.3 36.18,38.56C36.91,37.81 38.05,37.81 38.78,38.56L44.25,44.05C47.18,42.57 50.48,41.71 54,41.71C57.48,41.71 60.78,42.57 63.68,44.05L69.11,38.56C69.84,37.81 70.98,37.81 71.71,38.56C72.44,39.3 72.44,40.45 71.71,41.19L66.94,46.02ZM62.94,56.92C64.08,56.92 65,56.01 65,54.88C65,53.76 64.08,52.85 62.94,52.85C61.8,52.85 60.88,53.76 60.88,54.88C60.88,56.01 61.8,56.92 62.94,56.92ZM45.06,56.92C46.2,56.92 47.13,56.01 47.13,54.88C47.13,53.76 46.2,52.85 45.06,52.85C43.92,52.85 43,53.76 43,54.88C43,56.01 43.92,56.92 45.06,56.92Z"
-        android:strokeColor="#00000000"
-        android:strokeWidth="1" />
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M37 30H71Q74 30 74 33V78l-5 -3.5l-5 3.5l-5 -3.5l-5 3.5l-5 -3.5l-5 3.5l-5 -3.5l-5 3.5V33Q34 30 37 30Z"/>
+    <path android:fillColor="#EA580C" android:pathData="M40.7 37H51.3A1.7 1.7 0 0 1 53 38.7V38.699999999999996A1.7 1.7 0 0 1 51.3 40.4H40.7A1.7 1.7 0 0 1 39 38.699999999999996V38.7A1.7 1.7 0 0 1 40.7 37ZM40.7 44H48.3A1.7 1.7 0 0 1 50 45.7V45.699999999999996A1.7 1.7 0 0 1 48.3 47.4H40.7A1.7 1.7 0 0 1 39 45.699999999999996V45.7A1.7 1.7 0 0 1 40.7 44ZM40.7 51H63.3A1.7 1.7 0 0 1 65 52.7V52.699999999999996A1.7 1.7 0 0 1 63.3 54.4H40.7A1.7 1.7 0 0 1 39 52.699999999999996V52.7A1.7 1.7 0 0 1 40.7 51Z"/>
+    <path android:fillColor="#FDBA74" android:pathData="M39.6 58H40.4A0.6 0.6 0 0 1 41 58.6V58.6A0.6 0.6 0 0 1 40.4 59.2H39.6A0.6 0.6 0 0 1 39 58.6V58.6A0.6 0.6 0 0 1 39.6 58ZM43.6 58H44.4A0.6 0.6 0 0 1 45 58.6V58.6A0.6 0.6 0 0 1 44.4 59.2H43.6A0.6 0.6 0 0 1 43 58.6V58.6A0.6 0.6 0 0 1 43.6 58ZM47.6 58H48.4A0.6 0.6 0 0 1 49 58.6V58.6A0.6 0.6 0 0 1 48.4 59.2H47.6A0.6 0.6 0 0 1 47 58.6V58.6A0.6 0.6 0 0 1 47.6 58ZM51.6 58H52.4A0.6 0.6 0 0 1 53 58.6V58.6A0.6 0.6 0 0 1 52.4 59.2H51.6A0.6 0.6 0 0 1 51 58.6V58.6A0.6 0.6 0 0 1 51.6 58ZM55.6 58H56.4A0.6 0.6 0 0 1 57 58.6V58.6A0.6 0.6 0 0 1 56.4 59.2H55.6A0.6 0.6 0 0 1 55 58.6V58.6A0.6 0.6 0 0 1 55.6 58ZM59.6 58H60.4A0.6 0.6 0 0 1 61 58.6V58.6A0.6 0.6 0 0 1 60.4 59.2H59.6A0.6 0.6 0 0 1 59 58.6V58.6A0.6 0.6 0 0 1 59.6 58ZM63.6 58H64.4A0.6 0.6 0 0 1 65 58.6V58.6A0.6 0.6 0 0 1 64.4 59.2H63.6A0.6 0.6 0 0 1 63 58.6V58.6A0.6 0.6 0 0 1 63.6 58ZM67.6 58H68.4A0.6 0.6 0 0 1 69 58.6V58.6A0.6 0.6 0 0 1 68.4 59.2H67.6A0.6 0.6 0 0 1 67 58.6V58.6A0.6 0.6 0 0 1 67.6 58Z"/>
+    <path android:fillColor="#C2410C" android:pathData="M41.5 62H66.5A2.5 2.5 0 0 1 69 64.5V64.5A2.5 2.5 0 0 1 66.5 67H41.5A2.5 2.5 0 0 1 39 64.5V64.5A2.5 2.5 0 0 1 41.5 62Z"/>
+    <path android:fillColor="#FB923C" android:pathData="M64 33.5Q65 39 70.5 40Q65 41 64 46.5Q63 41 57.5 40Q63 39 64 33.5Z"/>
 </vector>

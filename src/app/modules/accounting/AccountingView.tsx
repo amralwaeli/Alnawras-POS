@@ -127,7 +127,7 @@ export function AccountingView() {
       .sort((x, y) => new Date(x.date).getTime() - new Date(y.date).getTime())
       .forEach(e => rows.push([new Date(e.date).toLocaleDateString('en-GB'), 'Expense', e.description, e.category, `-${e.amount.toFixed(2)}`]));
     const day = (d: Date) => d.toISOString().split('T')[0];
-    downloadCsv(`alnawras-${day(from)}-to-${day(new Date(to.getTime() - 1))}.csv`, rows);
+    downloadCsv(`smartpos-${day(from)}-to-${day(new Date(to.getTime() - 1))}.csv`, rows);
     toast.success(res.data!.length >= 5000 ? 'Report downloaded (first 5000 bills)' : 'Report downloaded');
   };
 

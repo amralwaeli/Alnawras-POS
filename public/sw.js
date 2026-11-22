@@ -14,7 +14,7 @@
  *
  * Bump CACHE_NAME whenever this file changes to flush the old cache.
  */
-const CACHE_NAME = 'alnawras-pos-v2';
+const CACHE_NAME = 'smartpos-v3';
 
 // Base path the SW is served from, e.g. "/Alnawras-POS/". Derived from the SW's
 // own location so it works under any GitHub Pages project path.

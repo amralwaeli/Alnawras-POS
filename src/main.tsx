@@ -36,6 +36,14 @@
         // Check for a newer service worker on every launch so updates roll out
         // without a reinstall.
         reg.update();
+        // Keep every screen on the device for offline use (see sw.js 'precache').
+        const keepOffline = () => {
+          if (!navigator.onLine) return;
+          const current = (document.querySelector('script[type="module"][src]') as HTMLScriptElement | null)?.src;
+          navigator.serviceWorker.ready.then(r => r.active?.postMessage({ type: 'precache', current }));
+        };
+        keepOffline();
+        window.addEventListener('online', keepOffline);
         let prompted = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           // A new version took over. Do NOT auto-reload — that would wipe an

@@ -14,7 +14,7 @@
  *
  * Bump CACHE_NAME whenever this file changes to flush the old cache.
  */
-const CACHE_NAME = 'smartpos-v3';
+const CACHE_NAME = 'smartpos-v4';
 
 // Base path the SW is served from, e.g. "/Alnawras-POS/". Derived from the SW's
 // own location so it works under any GitHub Pages project path.
@@ -38,6 +38,32 @@ self.addEventListener('activate', (event) => {
       .then(() => self.clients.claim())
   );
 });
+
+// The page asks for this whenever it is online: download every file of the current
+// build (precache.json, written by vite.config.ts) so all screens open offline.
+// Old builds' files are removed only when the asking page IS the current build,
+// so a page still running an older build never loses its own screens.
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'precache') return;
+  event.waitUntil(precacheAll(event.data.current));
+});
+
+async function precacheAll(currentScript) {
+  const res = await fetch(BASE + 'precache.json', { cache: 'no-store' });
+  if (!res.ok) return;
+  const files = (await res.json()).map((f) => BASE + f);
+  const cache = await caches.open(CACHE_NAME);
+  const have = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+  for (const f of files) {
+    if (!have.has(f)) { try { await cache.add(f); } catch { /* retried next time */ } }
+  }
+  const keep = new Set(files);
+  if (!currentScript || !keep.has(new URL(currentScript).pathname)) return;
+  for (const r of await cache.keys()) {
+    const p = new URL(r.url).pathname;
+    if (p.startsWith(BASE + 'assets/') && !keep.has(p)) await cache.delete(r);
+  }
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -64,7 +90,7 @@ self.addEventListener('fetch', (event) => {
 
   // Cache-first for hashed static assets (fast + works offline).
   event.respondWith(
-    caches.match(req).then((cached) =>
+    caches.match(req, { ignoreVary: true }).then((cached) =>
       cached ||
       fetch(req).then((res) => {
         if (res && res.status === 200 && res.type === 'basic') {

@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { PAY_TO } from '../../../lib/branding';
+import { PAY_TO, INVOICE_FROM, LOGO_URL, BUSINESS_NAME } from '../../../lib/branding';
 
 export interface InvoiceItem {
   id: string;
@@ -26,9 +26,6 @@ interface Props {
   data: InvoiceData;
 }
 
-// Absolute URL so the logo works in both the on-screen preview and the
-// print window (window.open) regardless of which role is using the page.
-const LOGO_URL = `${typeof window !== 'undefined' ? window.location.origin : ''}${import.meta.env.BASE_URL}alnawras-logo.png`;
 
 export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) => (
   <div
@@ -77,19 +74,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref)
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: 12 }}>
       <div>
         <p style={{ fontWeight: 700, textDecoration: 'underline', margin: '0 0 4px' }}>From</p>
-        <p style={{ fontWeight: 600, margin: '0 0 2px' }}>AL-NAWRAS RESTAURANT (1496779-P)</p>
-        <p style={{ margin: '0 0 8px' }}>29 Jalan Flora 1/9 Taman Pulai Flora 81300 Skudai Johor</p>
-        <p style={{ margin: '0 0 2px' }}>Phone: 018-7874994/ 018-7837567</p>
-        <p style={{ margin: 0 }}>E-Mail: alnawrasrestaurant23@gmail.com</p>
+        {(INVOICE_FROM.trim() || BUSINESS_NAME).split('\n').filter(Boolean).map((line, i) => (
+          <p key={i} style={{ fontWeight: i === 0 ? 600 : 400, margin: '0 0 2px' }}>{line}</p>
+        ))}
       </div>
-      {/* Pinned logo — always this image, always solid white background */}
-      <div style={{ width: 130, height: 90, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-        <img
-          src={LOGO_URL}
-          alt="Logo"
-          style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block', backgroundColor: '#fff' }}
-        />
-      </div>
+      {/* The restaurant's own logo (Business Settings), on a white background */}
+      {LOGO_URL && (
+        <div style={{ width: 130, height: 90, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+          <img src={LOGO_URL} alt="Logo" style={{ maxWidth: 130, maxHeight: 90, objectFit: 'contain', display: 'block', backgroundColor: '#fff' }} />
+        </div>
+      )}
     </div>
 
     {/* ── Invoice To + Ref ── */}

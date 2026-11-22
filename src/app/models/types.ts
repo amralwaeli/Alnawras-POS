@@ -287,6 +287,10 @@ export interface BranchSettings {
   kitchenWhatsapp: string;
   /** Bank / payee lines printed under "Pay To" on invoices and quotations. */
   payTo: string;
+  /** "From" lines on invoices and quotations: name (+ reg. no.), address, phone, email. */
+  invoiceFrom: string;
+  /** Logo on invoices and quotations (https image address; empty = no logo). */
+  logoUrl: string;
 }
 
 export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
@@ -299,6 +303,8 @@ export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   currency: 'RM',
   kitchenWhatsapp: '',
   payTo: '',
+  invoiceFrom: '',
+  logoUrl: '',
   // Inlined (not the DEFAULT_LOYALTY_SETTINGS const, which is declared later in
   // this module — referencing it here would hit the temporal dead zone).
   loyalty: {

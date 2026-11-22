@@ -45,6 +45,8 @@ export const mapBranchSettings = (row: any): BranchSettings => {
     currency: row.currency || 'RM',
     kitchenWhatsapp: row.kitchen_whatsapp ?? '',
     payTo: row.pay_to ?? '',
+    invoiceFrom: row.invoice_from ?? '',
+    logoUrl: row.logo_url ?? '',
     // Merge over defaults so a row missing the loyalty column (pre-0023) or a
     // newer key still yields a complete settings object.
     loyalty: { ...DEFAULT_LOYALTY_SETTINGS, ...(row.loyalty ?? {}) },

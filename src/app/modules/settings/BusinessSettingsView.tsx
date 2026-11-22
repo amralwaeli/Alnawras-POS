@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Percent, Tag, Plus, Trash2, Save, Loader2, Receipt, Store } from 'lucide-react';
+import { Percent, Tag, Plus, Trash2, Save, Loader2, Receipt, Store, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
 import { useBranch } from '../../context/BranchContext';
 import { SettingsController } from '../../controllers/SettingsController';
 import { BranchSettings, DiscountPreset, DEFAULT_BRANCH_SETTINGS } from '../../models/types';
 import { friendlyError } from '../../../lib/errors';
+import { compressImage } from '../../../lib/image';
+import { uploadProductImage } from '../../services/ProductImageService';
 
 const uid = () => `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -15,6 +17,7 @@ export function BusinessSettingsView() {
   const [s, setS] = useState<BranchSettings>(DEFAULT_BRANCH_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (!currentUser?.branchId) return;
@@ -37,6 +40,18 @@ export function BusinessSettingsView() {
 
   const removePreset = (id: string) =>
     setS(prev => ({ ...prev, discountPresets: prev.discountPresets.filter(p => p.id !== id) }));
+
+  // Logo for invoices/quotations: compressed and stored with the product images (saved with Save).
+  const pickLogo = async (file: File | undefined) => {
+    if (!file || !currentUser) return;
+    setUploadingLogo(true);
+    try {
+      const url = await uploadProductImage(await compressImage(file, 400, 0.9), currentUser.branchId);
+      if (url) set('logoUrl', url);
+      else toast.error('Could not upload the logo');
+    } catch { toast.error('That file is not an image'); }
+    finally { setUploadingLogo(false); }
+  };
 
   const save = async () => {
     // Validate presets
@@ -93,6 +108,30 @@ export function BusinessSettingsView() {
               <label htmlFor="bs-pay" className="block text-xs font-medium text-gray-500 mb-1">"Pay To" on invoices and quotations (one line each)</label>
               <textarea id="bs-pay" rows={3} value={s.payTo} onChange={e => setS(p => ({ ...p, payTo: e.target.value }))}
                 placeholder={'Bank name\nAccount name\nAccount number'} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="bs-from" className="block text-xs font-medium text-gray-500 mb-1">"From" on invoices and quotations (one line each; the first line is bold)</label>
+              <textarea id="bs-from" rows={4} maxLength={1000} value={s.invoiceFrom} onChange={e => setS(p => ({ ...p, invoiceFrom: e.target.value }))}
+                placeholder={'Company name (registration no.)\nAddress\nPhone: …\nE-Mail: …'} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div className="sm:col-span-2">
+              <p className="block text-xs font-medium text-gray-500 mb-1">Logo on invoices and quotations</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="w-32 h-20 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden">
+                  {s.logoUrl
+                    ? <img src={s.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                    : <span className="text-xs text-gray-400">No logo</span>}
+                </div>
+                <label className="min-h-11 inline-flex items-center gap-2 px-4 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">
+                  {uploadingLogo ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                  {s.logoUrl ? 'Change logo' : 'Upload logo'}
+                  <input type="file" accept="image/*" className="sr-only" disabled={uploadingLogo}
+                    onChange={e => { pickLogo(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+                {s.logoUrl && (
+                  <button type="button" onClick={() => set('logoUrl', '')} className="min-h-11 px-3 text-sm text-red-600 hover:text-red-700">Remove</button>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -43,6 +43,8 @@ export class SettingsController {
         currency: s.currency.trim() || 'RM',
         kitchen_whatsapp: s.kitchenWhatsapp.replace(/\D/g, '') || null,
         pay_to: s.payTo.trim() || null,
+        invoice_from: s.invoiceFrom.trim() || null,
+        logo_url: s.logoUrl.trim() || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'branch_id' });
       if (error) throw error;

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { friendlyError } from '../../../lib/errors';
+import { BUSINESS_NAME } from '../../../lib/branding';
 
 interface CartItem {
   id: string;
@@ -620,7 +621,7 @@ export function QROrderingView() {
               <UtensilsCrossed className="size-5 text-white" />
             </div>
             <div>
-              <p className="font-black text-gray-900 leading-none text-sm uppercase tracking-wide">AL-NAWRAS</p>
+              <p className="font-black text-gray-900 leading-none text-sm uppercase tracking-wide truncate max-w-40" dir="auto">{BUSINESS_NAME}</p>
               <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest leading-none mt-0.5">Restaurant</p>
             </div>
           </div>

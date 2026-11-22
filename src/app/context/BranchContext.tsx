@@ -67,8 +67,8 @@ export function BranchProvider({ children, currentUser }: { children: ReactNode;
   // Non-React code (receipt text, invoice template, fmt) reads these.
   useEffect(() => {
     setCurrency(settings.currency);
-    setBranding({ businessName, payTo: settings.payTo });
-  }, [settings.currency, settings.payTo, businessName]);
+    setBranding({ businessName, payTo: settings.payTo, invoiceFrom: settings.invoiceFrom, logoUrl: settings.logoUrl });
+  }, [settings.currency, settings.payTo, settings.invoiceFrom, settings.logoUrl, businessName]);
 
   const value: BranchContextType = {
     branch: access.branch,

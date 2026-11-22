@@ -6,8 +6,13 @@
  */
 export let BUSINESS_NAME = 'Restaurant';
 export let PAY_TO = '';
+/** Invoice / quotation header: "From" lines and logo address (empty = none). */
+export let INVOICE_FROM = '';
+export let LOGO_URL = '';
 
-export function setBranding(b: { businessName?: string | null; payTo?: string | null }) {
+export function setBranding(b: { businessName?: string | null; payTo?: string | null; invoiceFrom?: string | null; logoUrl?: string | null }) {
   if (b.businessName) BUSINESS_NAME = b.businessName;
   if (b.payTo !== undefined) PAY_TO = b.payTo ?? '';
+  if (b.invoiceFrom !== undefined) INVOICE_FROM = b.invoiceFrom ?? '';
+  if (b.logoUrl !== undefined) LOGO_URL = b.logoUrl ?? '';
 }

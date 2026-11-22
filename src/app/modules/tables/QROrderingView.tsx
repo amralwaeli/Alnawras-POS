@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { Product, Category, Table, ModifierGroup, SelectedModifier } from '../../models/types';
 import { ModifierController } from '../../controllers/ModifierController';
@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import {
   Plus, Minus, ShoppingCart, X, Search,
-  CheckCircle2, ShoppingBag, Bell, ChevronDown, UtensilsCrossed, Ban,
+  CheckCircle2, ShoppingBag, Bell, ChevronDown, ChevronLeft, UtensilsCrossed, Ban,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { friendlyError } from '../../../lib/errors';
@@ -46,6 +46,7 @@ export function QROrderingView() {
   // standing at the table on the restaurant's own device — so it only applies
   // when there's no active staff session in this browser tab.
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   const [table, setTable]               = useState<Table | null>(null);
   const [orderId, setOrderId]           = useState<string | null>(null);
@@ -388,7 +389,7 @@ export function QROrderingView() {
               <span className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">N/A</span>
             </div>
           )}
-          <h3 dir="auto" className={`font-bold leading-snug break-words line-clamp-3 ${compact ? 'text-xs' : 'text-sm'} ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
+          <h3 dir="auto" className={`font-bold leading-snug break-words line-clamp-3 text-sm ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
           <div className="mt-auto flex items-center justify-between gap-1">
             <span className={`font-black whitespace-nowrap ${compact ? 'text-sm' : ''} ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
             {isAvailable && <div className={`bg-orange-500 text-white rounded-xl shrink-0 ${compact ? 'p-1.5' : 'p-2'}`}><Plus className={compact ? 'size-3.5' : 'size-4'} strokeWidth={4} /></div>}
@@ -505,6 +506,12 @@ export function QROrderingView() {
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
+          {currentUser ? (
+            <button onClick={() => navigate('/tables')} aria-label="Back to tables"
+              className="flex items-center gap-1 min-h-11 shrink-0 px-3 py-2.5 rounded-xl text-sm font-bold bg-white border text-gray-700 shadow-sm whitespace-nowrap active:scale-95">
+              <ChevronLeft className="size-4" /> Tables
+            </button>
+          ) : (
           <button
             onClick={handleCallWaiter}
             disabled={callingWaiter || !!table?.needsWaiter}
@@ -513,6 +520,7 @@ export function QROrderingView() {
             <Bell className="size-3.5 text-orange-500" />
             <span>{table?.needsWaiter ? 'Called' : 'Waiter'}</span>
           </button>
+          )}
           <div className="text-right border-l pl-2 border-gray-100 shrink-0">
             <p className="text-[9px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-0.5">Table</p>
             <p className="text-xs font-black text-gray-900 leading-none whitespace-nowrap">{table ? `T-${table.number}` : '…'}</p>
@@ -538,7 +546,7 @@ export function QROrderingView() {
           {categories.map(cat => (
             <button
               key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)}
-              className={`shrink-0 min-h-11 px-5 py-3 rounded-[16px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}
+              className={`shrink-0 min-h-11 px-5 py-3 rounded-[16px] font-bold whitespace-nowrap transition-all text-sm shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}
             >{cat.name}</button>
           ))}
         </div>
@@ -656,6 +664,12 @@ export function QROrderingView() {
             />
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            {currentUser ? (
+              <button onClick={() => navigate('/tables')}
+                className="flex items-center gap-2 min-h-11 whitespace-nowrap px-5 py-2.5 rounded-2xl text-sm font-bold bg-white border text-gray-700 shadow-sm hover:bg-gray-50">
+                <ChevronLeft className="size-4" /> Back to Tables
+              </button>
+            ) : (
             <button
               onClick={handleCallWaiter}
               disabled={callingWaiter || !!table?.needsWaiter}
@@ -664,6 +678,7 @@ export function QROrderingView() {
               <Bell className="size-4 text-orange-500" />
               {table?.needsWaiter ? 'Waiter Called' : 'Call Waiter'}
             </button>
+            )}
             <div className="text-right border-l pl-4 border-gray-100">
               <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none mb-1">Table</p>
               <p className="text-2xl font-black text-gray-900 leading-none italic whitespace-nowrap">{table ? `T-${table.number}` : '…'}</p>
@@ -690,7 +705,7 @@ export function QROrderingView() {
           {categories.map(cat => (
             <button
               key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)}
-              className={`shrink-0 px-6 xl:px-10 py-5 [@media(max-height:700px)]:py-3.5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}
+              className={`shrink-0 px-6 xl:px-10 py-5 [@media(max-height:700px)]:py-3.5 rounded-[22px] font-bold whitespace-nowrap transition-all text-sm shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}
             >{cat.name}</button>
           ))}
         </div>

@@ -361,7 +361,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                         <span className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">N/A</span>
                       </div>
                     )}
-                    <h3 dir="auto" className={`text-xs font-bold leading-snug break-words line-clamp-3 ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
+                    <h3 dir="auto" className={`text-sm font-bold leading-snug break-words line-clamp-3 ${isAvailable ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
                     <div className="mt-auto flex items-center justify-between gap-1">
                       <span className={`text-sm font-black whitespace-nowrap ${isAvailable ? 'text-orange-600' : 'text-red-400'}`}>RM {p.price.toFixed(2)}</span>
                       {isAvailable && <div className="bg-orange-500 text-white p-1.5 rounded-lg shrink-0"><Plus className="size-3.5" strokeWidth={4} /></div>}
@@ -376,7 +376,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
         {/* Category tabs */}
         <div className="bg-white border-t px-2 py-2 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
           {sortedCategories.map(cat => (
-            <button key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)} className={`shrink-0 min-h-11 px-5 py-3 rounded-[16px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
+            <button key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)} className={`shrink-0 min-h-11 px-5 py-3 rounded-[16px] font-bold whitespace-nowrap transition-all text-sm shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-0.5' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>
 
@@ -540,7 +540,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
         <div className="bg-white border-t p-3 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
           {sortedCategories.map(cat => (
-            <button key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)} className={`shrink-0 px-6 xl:px-10 py-5 [@media(max-height:700px)]:py-3.5 rounded-[22px] font-black whitespace-nowrap transition-all text-[10px] uppercase tracking-widest shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
+            <button key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)} className={`shrink-0 px-6 xl:px-10 py-5 [@media(max-height:700px)]:py-3.5 rounded-[22px] font-bold whitespace-nowrap transition-all text-sm shadow-sm ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-orange-200 -translate-y-1' : 'bg-gray-100 text-gray-500'}`}>{cat.name}</button>
           ))}
         </div>
       </div>

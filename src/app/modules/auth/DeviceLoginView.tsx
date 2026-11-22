@@ -3,6 +3,7 @@ import { Lock, Loader2 } from 'lucide-react';
 import { useDeviceAuth } from '../../context/DeviceAuthContext';
 import { isNativeApp } from '../../../lib/platform';
 import { friendlyError } from '../../../lib/errors';
+import { getSavedServer, parseSetupCode, switchServer } from '../../../lib/serverConfig';
 
 /**
  * DeviceLoginView — the branch email+password gate.
@@ -19,6 +20,19 @@ export function DeviceLoginView() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const native = isNativeApp();
+  const own = getSavedServer();
+  const [showSetup, setShowSetup] = useState(false);
+  const [setupCode, setSetupCode] = useState('');
+  const [setupError, setSetupError] = useState('');
+
+  // One-time customers: point this device at their own server, then start again on it.
+  const connect = (code: string | null) => {
+    const cfg = code === null ? null : parseSetupCode(code);
+    if (code !== null && !cfg) { setSetupError('That setup code is not valid. Copy it again from the setup message.'); return; }
+    const res = switchServer(cfg);
+    if (!res.ok) { setSetupError(res.error ?? 'Could not change the server.'); return; }
+    window.location.reload();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +109,31 @@ export function DeviceLoginView() {
               : 'Signed in for this tab only — closing it signs you out.'}
           </p>
         </form>
+
+        <div className="mt-4 text-center">
+          {own ? (
+            <p className="text-[11px] text-gray-500">
+              Own server: {own.url.replace('https://', '').split('.')[0]}{' · '}
+              <button type="button" onClick={() => connect(null)} className="underline hover:text-gray-300">use the SmartPos server</button>
+            </p>
+          ) : !showSetup ? (
+            <button type="button" onClick={() => setShowSetup(true)} className="text-[11px] text-gray-500 underline hover:text-gray-300 min-h-10">
+              Bought SmartPos once? Connect to your own server
+            </button>
+          ) : (
+            <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-4 space-y-3 text-left">
+              <label htmlFor="setup-code" className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Setup code</label>
+              <textarea id="setup-code" rows={3} value={setupCode} onChange={e => { setSetupCode(e.target.value); setSetupError(''); }}
+                placeholder="Paste the setup code you were given"
+                className="w-full px-3 py-2 bg-gray-800/40 border border-gray-800 rounded-xl text-white text-xs font-mono break-all focus:outline-none focus:border-orange-500" />
+              {setupError && <p className="text-red-400 text-xs">{setupError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowSetup(false)} className="flex-1 min-h-11 rounded-xl border border-gray-700 text-gray-300 text-sm">Cancel</button>
+                <button type="button" disabled={!setupCode.trim()} onClick={() => connect(setupCode)} className="flex-1 min-h-11 rounded-xl bg-orange-500 text-white text-sm font-bold disabled:opacity-50">Connect</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { isNativeApp } from './platform'
+import { getSavedServer } from './serverConfig'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// A one-time customer's device uses their own project (lib/serverConfig); everyone else the build's.
+const own = typeof window !== 'undefined' ? getSavedServer() : null
+const supabaseUrl = own?.url ?? import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = own?.key ?? import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[Supabase] Missing env vars. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env and rebuild.')

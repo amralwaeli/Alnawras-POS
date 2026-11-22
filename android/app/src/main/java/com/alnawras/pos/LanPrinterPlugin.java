@@ -73,7 +73,7 @@ public class LanPrinterPlugin extends Plugin {
         new Thread(() -> {
             List<String> self = new ArrayList<>();
             TreeSet<Long> hosts = new TreeSet<>();
-            JSArray networks = new JSArray();
+            TreeSet<String> networks = new TreeSet<>();
             try {
                 for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                     if (!ni.isUp() || ni.isLoopback()) continue;
@@ -85,7 +85,7 @@ public class LanPrinterPlugin extends Plugin {
                         long ip = toLong(addr.getHostAddress());
                         long mask = (0xFFFFFFFFL << (32 - prefix)) & 0xFFFFFFFFL;
                         long net = ip & mask, bcast = net | (~mask & 0xFFFFFFFFL);
-                        networks.put(toIp(net) + "/" + prefix);
+                        networks.add(toIp(net) + "/" + prefix);
                         for (long h = net + 1; h < bcast; h++) hosts.add(h);
                     }
                 }
@@ -120,7 +120,7 @@ public class LanPrinterPlugin extends Plugin {
             }
             JSObject res = new JSObject();
             res.put("printers", printers);
-            res.put("networks", networks);
+            res.put("networks", new JSArray(networks));
             call.resolve(res);
         }).start();
     }

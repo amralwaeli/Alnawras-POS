@@ -5,6 +5,12 @@ import { usePOS } from '../../context/POSContext';
 import { CheckCircle2, Clock4, ChefHat, Bell, Search, Wifi, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { IngredientOrdersTab } from './IngredientOrdersTab';
+import { loadStations } from '../../models/types';
+
+// Which station's items this screen shows (per device): the kitchen tablet sees only
+// kitchen items, a drinks-bar screen only drinks. Matches the product's station.
+const STATION_KEY = 'alnawras_kds_station';
+const savedStation = () => { try { return localStorage.getItem(STATION_KEY) || 'kitchen'; } catch { return 'kitchen'; } };
 
 type KitchenStatus = 'available' | 'out-of-stock' | 'finished';
 
@@ -24,6 +30,10 @@ export function KitchenView() {
   const [tab, setTab]             = useState<'orders' | 'products' | 'order-request'>('orders');
   const [newAlert, setNewAlert]   = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
+  const [station, setStation] = useState(savedStation);
+  const stations = useMemo(() => loadStations().filter(s => s.id !== 'cashier'), []);
+  const chooseStation = (id: string) => { setStation(id); try { localStorage.setItem(STATION_KEY, id); } catch { /* ignore */ } };
+  const forHere = (i: { station?: string }) => station === 'all' || (i.station || 'kitchen') === station;
   const { ordersLoaded, live } = useOrders();
   const [online, setOnline] = useState(navigator.onLine);
   const connected = online && live;
@@ -40,10 +50,10 @@ export function KitchenView() {
     .map(o => ({
       id: o.id, created_at: o.createdAt, order_type: o.orderType, table_number: o.tableNumber,
       items: (o.items || [])
-        .filter(i => i.status !== 'served' && i.status !== 'cancelled')
+        .filter(i => i.status !== 'served' && i.status !== 'cancelled' && forHere(i))
         .map(i => ({ id: i.id, product_name: i.productName, quantity: i.quantity, status: i.status, notes: i.notes, modifiers: i.modifiers })),
     }))
-    .filter(o => o.items.length > 0), [orders]);
+    .filter(o => o.items.length > 0), [orders, station]);
 
   useEffect(() => {
     const on = () => setOnline(true), off = () => setOnline(false);
@@ -64,6 +74,7 @@ export function KitchenView() {
     let added = false;
     for (const o of orders) for (const i of o.items || []) {
       const before = prev.get(i.id);
+      if (!forHere(i)) continue;   // drinks don't beep on the kitchen screen
       if (before === undefined && o.status === 'open' && i.status === 'pending') added = true;
       if (i.status === 'cancelled' && before !== undefined && before !== 'cancelled') {
         const label = o.orderType === 'pickup' ? 'Pickup' : o.orderType === 'takeaway' ? 'Takeaway' : `Table ${o.tableNumber ?? '?'}`;
@@ -78,7 +89,7 @@ export function KitchenView() {
       setTimeout(() => setNewAlert(false), 5000);
       toast('New order item!', { style: { background: '#f97316', color: '#fff', fontWeight: 700 } });
     }
-  }, [orders, ordersLoaded]);
+  }, [orders, ordersLoaded, station]);
 
   const advanceItem = async (itemId: string, currentStatus: string) => {
     const next = STATUS_FLOW[currentStatus];
@@ -139,6 +150,14 @@ export function KitchenView() {
               <Bell className="size-4" /> NEW ORDER
             </div>
           )}
+          <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Station
+            <select value={station} onChange={e => chooseStation(e.target.value)} aria-label="Station shown on this screen"
+              className="min-h-11 bg-[#0B0E14] border border-white/[0.1] rounded-xl px-3 text-xs font-bold text-white normal-case tracking-normal">
+              {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="all">All stations</option>
+            </select>
+          </label>
           <div className="flex max-w-full overflow-x-auto no-scrollbar bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06]">
             <button onClick={() => setTab('orders')}
               className={`min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>

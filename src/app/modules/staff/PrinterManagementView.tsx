@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Printer, Wifi, Usb, ChefHat, CheckCircle2, XCircle, Pencil } from 'lucide-react';
+import { Plus, Edit, Trash2, Printer, Wifi, Usb, ChefHat, CheckCircle2, XCircle, Pencil, Search, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
-import { PrintService } from '../../services/PrintService';
+import { PrintService, findPrinters, type FoundPrinter } from '../../services/PrintService';
+import { isNativeApp } from '../../../lib/platform';
 import { PrinterController, cachedPrinters } from '../../controllers/PrinterController';
 import { friendlyError } from '../../../lib/errors';
 import { loadStations, saveStations } from '../../models/types';
@@ -158,12 +159,14 @@ const emptyPrinterForm = {
 function PrinterDialog({
   open,
   printer,
+  prefillIp,
   stations,
   onClose,
   onSave,
 }: {
   open: boolean;
   printer: PrinterType | null;
+  prefillIp?: string;
   stations: Station[];
   onClose: () => void;
   onSave: (p: Omit<PrinterType, 'id' | 'branchId' | 'createdAt'> & { id?: string }) => void;
@@ -181,9 +184,9 @@ function PrinterDialog({
         paperWidth: String(printer.paperWidth ?? 80),
         stations: printer.stations,
         isActive: printer.isActive,
-      } : { ...emptyPrinterForm });
+      } : { ...emptyPrinterForm, ipAddress: prefillIp ?? '' });
     }
-  }, [open, printer]);
+  }, [open, printer, prefillIp]);
 
   const toggleStation = (stationId: string) =>
     setForm(prev => ({
@@ -340,6 +343,21 @@ export function PrinterManagementView() {
   // Shared by every device of the branch (database); this device's copy until it loads.
   useEffect(() => { PrinterController.load(branchId).then(setPrinters); }, [branchId]);
 
+  // Android app: look for printers on the tablet's network as soon as the screen opens.
+  const [found, setFound] = useState<{ printers: FoundPrinter[]; networks: string[] } | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [prefillIp, setPrefillIp] = useState<string | undefined>();
+  const scan = async () => {
+    setScanning(true);
+    try { setFound(await findPrinters()); }
+    catch (err: any) {
+      // An app installed before this feature has no scan: ask for the new APK.
+      toast.error(err?.code === 'UNIMPLEMENTED' ? 'Install the latest app to search for printers' : friendlyError(err, 'Could not search the network'));
+    }
+    finally { setScanning(false); }
+  };
+  useEffect(() => { if (isNativeApp()) scan(); }, []);
+
   // ── Station handlers ──────────────────────────────────────────────────────
 
   const handleSaveStation = (s: Station) => {
@@ -487,17 +505,68 @@ export function PrinterManagementView() {
             <h2 className="text-lg font-semibold">Printers</h2>
             <p className="text-sm text-gray-500">Connect printers and assign them to stations</p>
           </div>
-          <Button size="sm" onClick={() => { setEditingPrinter(null); setPrinterDialogOpen(true); }}>
+          <Button size="sm" onClick={() => { setEditingPrinter(null); setPrefillIp(undefined); setPrinterDialogOpen(true); }}>
             <Plus className="size-4 mr-1" /> Add Printer
           </Button>
         </div>
+
+        {isNativeApp() ? (
+          <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-sm flex items-center gap-2">
+                <Search className="size-4 text-blue-600" /> Printers on this network
+                {found && found.networks.length > 0 && <span className="text-xs font-normal text-gray-500">({found.networks.join(', ')})</span>}
+              </p>
+              <Button size="sm" variant="outline" onClick={scan} disabled={scanning}>
+                {scanning ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Search className="size-3.5 mr-1" />}
+                {scanning ? 'Searching…' : 'Search again'}
+              </Button>
+            </div>
+            {found && !scanning && (
+              found.networks.length === 0 ? (
+                <p className="text-sm text-gray-600 mt-2">This tablet is not connected to a network. Plug in the Ethernet cable or join the Wi-Fi, then search again.</p>
+              ) : found.printers.length === 0 ? (
+                <p className="text-sm text-gray-600 mt-2">No printers found. Check each printer is switched on and plugged into the same network, then search again.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-blue-100">
+                  {found.printers.map(fp => {
+                    const added = printers.find(p => p.type === 'network' && p.ipAddress === fp.ip);
+                    return (
+                      <li key={fp.ip} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                        <span className="font-mono text-sm">{fp.ip}</span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={async () => {
+                            const res = await PrintService.sendToPrinter(PrintService.testPage({ name: fp.ip, ipAddress: fp.ip, port: fp.port }));
+                            if (res.success) toast.success(`Sent a test page to ${fp.ip}`);
+                            else toast.error(res.error || 'Printer not reachable');
+                          }}>
+                            <Printer className="size-3.5 mr-1" /> Test
+                          </Button>
+                          {added ? (
+                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-md px-2 py-1.5 self-center">Added as {added.name}</span>
+                          ) : (
+                            <Button size="sm" onClick={() => { setEditingPrinter(null); setPrefillIp(fp.ip); setPrinterDialogOpen(true); }}>
+                              <Plus className="size-3.5 mr-1" /> Add
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )
+            )}
+          </div>
+        ) : (
+          <p className="mb-4 text-xs text-gray-500">Printers are found automatically in the Android app on the cashier tablet.</p>
+        )}
 
         {printers.length === 0 ? (
           <div className="text-center py-12 border-2 border-dashed rounded-xl">
             <Printer className="size-10 text-gray-300 mx-auto mb-3" />
             <p className="font-medium text-gray-500 mb-1">No printers configured</p>
             <p className="text-sm text-gray-400 mb-4">Add a printer and assign it to a station</p>
-            <Button size="sm" onClick={() => { setEditingPrinter(null); setPrinterDialogOpen(true); }}>
+            <Button size="sm" onClick={() => { setEditingPrinter(null); setPrefillIp(undefined); setPrinterDialogOpen(true); }}>
               <Plus className="size-4 mr-1" /> Add Printer
             </Button>
           </div>
@@ -561,7 +630,7 @@ export function PrinterManagementView() {
                         <Printer className="size-3.5 mr-1" /> Test
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => { setEditingPrinter(printer); setPrinterDialogOpen(true); }} className="flex-1">
+                    <Button size="sm" variant="outline" onClick={() => { setEditingPrinter(printer); setPrefillIp(undefined); setPrinterDialogOpen(true); }} className="flex-1">
                       <Edit className="size-3.5 mr-1" /> Edit
                     </Button>
                     <AlertDialog>
@@ -599,6 +668,7 @@ export function PrinterManagementView() {
       <PrinterDialog
         open={printerDialogOpen}
         printer={editingPrinter}
+        prefillIp={prefillIp}
         stations={stations}
         onClose={() => { setPrinterDialogOpen(false); setEditingPrinter(null); }}
         onSave={handleSavePrinter}

@@ -10,7 +10,15 @@ import { registerPlugin } from '@capacitor/core';
 import { isNativeApp } from '../../lib/platform';
 
 /** Native socket printing in the Android app (LanPrinterPlugin.java). */
-const LanPrinter = registerPlugin<{ print(o: { host: string; port: number; data: string }): Promise<void> }>('LanPrinter');
+export interface FoundPrinter { ip: string; port: number }
+
+const LanPrinter = registerPlugin<{
+  print(o: { host: string; port: number; data: string }): Promise<void>;
+  discover(): Promise<{ printers: FoundPrinter[]; networks: string[] }>;
+}>('LanPrinter');
+
+/** Android app only: printers answering on port 9100 on the tablet's own network. */
+export const findPrinters = () => LanPrinter.discover();
 
 function toBase64(bytes: Uint8Array): string {
   let s = '';

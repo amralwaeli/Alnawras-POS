@@ -2,6 +2,8 @@ package com.alnawras.pos;
 
 import android.util.Base64;
 
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -9,7 +11,18 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Sends raw ESC/POS bytes to a network (Ethernet/Wi-Fi) receipt printer on the
@@ -46,6 +59,80 @@ public class LanPrinterPlugin extends Plugin {
                 call.reject("Printer " + host + " is not reachable. Check it is on and on the same network.");
             }
         }).start();
+    }
+
+    private static final int SCAN_TIMEOUT_MS = 500;
+
+    /**
+     * Finds receipt printers on the tablet's own local network(s): every address of the
+     * tablet's subnet (at most the /24 around it) that accepts a connection on port 9100.
+     * Resolves { printers: [{ ip, port }], networks: ["192.168.1.0/24"] }.
+     */
+    @PluginMethod
+    public void discover(PluginCall call) {
+        new Thread(() -> {
+            List<String> self = new ArrayList<>();
+            TreeSet<Long> hosts = new TreeSet<>();
+            JSArray networks = new JSArray();
+            try {
+                for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                    if (!ni.isUp() || ni.isLoopback()) continue;
+                    for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                        InetAddress addr = ia.getAddress();
+                        if (!(addr instanceof Inet4Address) || !isPrivateLan(addr.getHostAddress())) continue;
+                        self.add(addr.getHostAddress());
+                        int prefix = Math.max(24, Math.min(30, ia.getNetworkPrefixLength()));
+                        long ip = toLong(addr.getHostAddress());
+                        long mask = (0xFFFFFFFFL << (32 - prefix)) & 0xFFFFFFFFL;
+                        long net = ip & mask, bcast = net | (~mask & 0xFFFFFFFFL);
+                        networks.put(toIp(net) + "/" + prefix);
+                        for (long h = net + 1; h < bcast; h++) hosts.add(h);
+                    }
+                }
+            } catch (Exception e) {
+                call.reject("Could not read this tablet's network");
+                return;
+            }
+
+            List<String> found = Collections.synchronizedList(new ArrayList<>());
+            ExecutorService pool = Executors.newFixedThreadPool(64);
+            for (long h : hosts) {
+                String ip = toIp(h);
+                if (self.contains(ip)) continue;
+                pool.execute(() -> {
+                    try (Socket s = new Socket()) {
+                        s.connect(new InetSocketAddress(ip, 9100), SCAN_TIMEOUT_MS);
+                        found.add(ip);
+                    } catch (Exception ignored) { }
+                });
+            }
+            pool.shutdown();
+            try { pool.awaitTermination(30, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+
+            List<String> sorted = new ArrayList<>(found);
+            sorted.sort((a, b) -> Long.compare(toLong(a), toLong(b)));
+            JSArray printers = new JSArray();
+            for (String ip : sorted) {
+                JSObject p = new JSObject();
+                p.put("ip", ip);
+                p.put("port", 9100);
+                printers.put(p);
+            }
+            JSObject res = new JSObject();
+            res.put("printers", printers);
+            res.put("networks", networks);
+            call.resolve(res);
+        }).start();
+    }
+
+    static long toLong(String ip) {
+        long v = 0;
+        for (String part : ip.split("\\.")) v = (v << 8) | Integer.parseInt(part);
+        return v;
+    }
+
+    static String toIp(long v) {
+        return ((v >> 24) & 255) + "." + ((v >> 16) & 255) + "." + ((v >> 8) & 255) + "." + (v & 255);
     }
 
     /** IPv4 literals in 10/8, 172.16/12, 192.168/16 or 169.254/16 only (no host names). */

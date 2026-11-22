@@ -65,31 +65,31 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
         <button
           onClick={exportCsv}
           disabled={rows.length === 0}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          className="min-h-11 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 disabled:opacity-40"
         >
           <Download className="size-3.5" /> Export CSV
         </button>
       </div>
 
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100">
           <p className="text-sm text-gray-500">Products Sold</p>
-          <p className="text-2xl font-bold text-amber-700">{rows.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-700">{rows.length}</p>
         </div>
         <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
           <p className="text-sm text-gray-500">Total Units</p>
-          <p className="text-2xl font-bold text-blue-700">{totalUnits}</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-700">{totalUnits}</p>
         </div>
         <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 col-span-2 sm:col-span-1">
           <p className="text-sm text-gray-500">Total Revenue</p>
-          <p className="text-2xl font-bold text-emerald-700">{fmt(totalRevenue)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-700 break-words">{fmt(totalRevenue)}</p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[520px]">
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</th>
@@ -115,10 +115,10 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
                 <tr><td colSpan={4} className="px-5 py-12 text-center text-gray-400 text-sm">No sales in this period</td></tr>
               ) : sorted.map(r => (
                 <tr key={r.productId} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{r.productName}</td>
+                  <td className="px-5 py-3.5 text-sm font-medium text-gray-900 break-words" dir="auto">{r.productName}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600">{r.unitsSold}</td>
-                  <td className="px-5 py-3.5 text-sm font-bold text-gray-900">{fmt(r.revenue)}</td>
-                  <td className="px-5 py-3.5 text-sm text-gray-500">{fmt(r.unitsSold > 0 ? r.revenue / r.unitsSold : 0)}</td>
+                  <td className="px-5 py-3.5 text-sm font-bold text-gray-900 whitespace-nowrap">{fmt(r.revenue)}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">{fmt(r.unitsSold > 0 ? r.revenue / r.unitsSold : 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -160,12 +160,12 @@ function OverviewTab({ branchId }: { branchId: string }) {
     <div className="space-y-6">
       <PeriodPicker p={p} />
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${loading ? 'opacity-50' : ''}`}>
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${loading ? 'opacity-50' : ''}`}>
         {kpis.map(s => (
-          <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-black/5`}>
+          <div key={s.label} className={`${s.bg} rounded-2xl p-4 sm:p-5 border border-black/5 min-w-0`}>
             <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}><s.icon className="size-5" /></div>
             <p className="text-sm text-gray-500 mb-0.5">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.vc}`}>{s.value}</p>
+            <p className={`text-xl sm:text-2xl font-bold break-words ${s.vc}`}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -184,11 +184,11 @@ function OverviewTab({ branchId }: { branchId: string }) {
           {orders.length >= 300 && <p className="text-xs text-gray-500 mt-0.5">Showing the latest 300 — the totals above include all.</p>}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="bg-gray-50 text-left">
                 {['Bill', 'Table / Type', 'Payment', 'Total', 'Paid at'].map(h => (
-                  <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -198,8 +198,8 @@ function OverviewTab({ branchId }: { branchId: string }) {
                   <td className="px-5 py-3.5 text-sm font-mono text-gray-600">#{o.billNumber ?? '—'}</td>
                   <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600">{o.paymentMethod ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-sm font-bold text-gray-900">{fmt(o.total)}</td>
-                  <td className="px-5 py-3.5 text-sm text-gray-500">{o.completedAt.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-sm font-bold text-gray-900 whitespace-nowrap">{fmt(o.total)}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">{o.completedAt.toLocaleString()}</td>
                 </tr>
               ))}
               {!loading && orders.length === 0 && (
@@ -219,7 +219,7 @@ export function ReportsView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-500 text-sm mt-0.5">Sales by the date bills were paid</p>

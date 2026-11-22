@@ -118,14 +118,14 @@ export function KitchenView() {
   return (
     <div className="h-full flex flex-col bg-[#0B0E14] text-white overflow-hidden">
 
-      <header className="shrink-0 h-20 bg-[#161B22] border-b border-white/[0.06] px-8 flex items-center justify-between shadow-2xl z-10">
-        <div className="flex items-center gap-4">
-          <div className="size-12 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/25">
+      <header className="shrink-0 min-h-20 bg-[#161B22] border-b border-white/[0.06] px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xl z-10">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="size-10 sm:size-12 shrink-0 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/25">
             <ChefHat className="size-7 text-white" />
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tighter uppercase italic">Kitchen Display</h1>
-            <div className="flex items-center gap-2 mt-0.5">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic truncate">Kitchen Display</h1>
+            <div className="flex flex-wrap items-center gap-x-2 mt-0.5">
               <p className="text-orange-500 text-[10px] font-bold uppercase tracking-[0.2em]">Live Monitoring</p>
               <span className={`flex items-center gap-1 text-[10px] font-bold ${connected ? 'text-emerald-400' : 'text-red-400'}`}>
                 <Wifi className="size-3" />{connected ? 'Connected' : 'Reconnecting…'}
@@ -133,30 +133,30 @@ export function KitchenView() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 max-w-full">
           {newAlert && (
-            <div className="flex items-center gap-2 bg-orange-500 text-white px-6 py-2.5 rounded-full font-black text-sm animate-bounce shadow-lg shadow-orange-500/30">
+            <div className="flex items-center gap-2 bg-orange-500 text-white px-4 sm:px-6 py-2.5 rounded-full font-black text-sm whitespace-nowrap animate-bounce shadow-lg shadow-orange-500/30">
               <Bell className="size-4" /> NEW ORDER
             </div>
           )}
-          <div className="flex bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06]">
+          <div className="flex max-w-full overflow-x-auto no-scrollbar bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06]">
             <button onClick={() => setTab('orders')}
-              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              className={`min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
               Tickets ({tickets.length})
             </button>
             <button onClick={() => setTab('products')}
-              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'products' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              className={`min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'products' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
               Inventory
             </button>
             <button onClick={() => setTab('order-request')}
-              className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'order-request' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              className={`flex items-center gap-1.5 min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'order-request' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
               <ShoppingCart className="size-3.5" /> Order
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-8 kitchen-scroll">
+      <main className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 lg:p-8 kitchen-scroll">
         {tab === 'order-request' ? (
           <IngredientOrdersTab currentUser={currentUser} />
         ) : tab === 'orders' ? (
@@ -175,7 +175,7 @@ export function KitchenView() {
               <p className="text-gray-600 text-sm mt-2 opacity-40">All orders complete</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {tickets.map(ticket => {
                 const age = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 60000);
                 const isUrgent = age >= 15;
@@ -186,31 +186,31 @@ export function KitchenView() {
                   <div key={ticket.id} className={`flex flex-col rounded-[32px] border-b-8 overflow-hidden shadow-2xl transition-all duration-300 ${
                     isUrgent ? 'bg-red-950/20 border-red-600' : offPrem ? 'bg-[#161B22] border-purple-500' : 'bg-[#161B22] border-orange-500'
                   }`}>
-                    <div className="p-5 flex items-center justify-between border-b border-white/5 bg-white/[0.03]">
-                      <div className="flex items-center gap-3">
-                        <div className={`size-10 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${
+                    <div className="p-4 sm:p-5 flex items-center justify-between gap-2 border-b border-white/5 bg-white/[0.03]">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`size-10 shrink-0 rounded-xl flex items-center justify-center font-black text-lg shadow-inner ${
                           offPrem ? 'bg-purple-500' : isUrgent ? 'bg-red-600' : 'bg-orange-500'
                         }`}>{isPickup ? '📦' : isTakeaway ? '🛍️' : ticket.table_number}</div>
-                        <span className="font-black text-xl tracking-tighter italic uppercase">
+                        <span className="font-black text-xl tracking-tighter italic uppercase truncate">
                           {isPickup ? 'Pickup' : isTakeaway ? 'Takeaway' : `Table ${ticket.table_number}`}
                         </span>
                       </div>
-                      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         isUrgent ? 'bg-red-600 text-white animate-pulse' : age >= 10 ? 'bg-amber-600 text-white' : 'bg-gray-800 text-gray-400'
                       }`}><Clock4 className="size-3" />{age}m</div>
                     </div>
-                    <div className="flex-1 p-5 space-y-3">
+                    <div className="flex-1 p-4 sm:p-5 space-y-3">
                       {ticket.items.map((item: any) => {
                         const style = STATUS_STYLE[item.status] || STATUS_STYLE.pending;
                         return (
                           <div key={item.id} className="bg-[#0B0E14] border border-white/[0.06] rounded-2xl p-4 flex flex-col gap-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <p className="text-base font-bold leading-tight">{item.product_name}</p>
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-base font-bold leading-tight break-words" dir="auto">{item.product_name}</p>
                                 {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
                                   <div className="mt-1 flex flex-wrap gap-1">
                                     {item.modifiers.map((m: any, idx: number) => (
-                                      <span key={idx} className="text-[10px] font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-900/40 rounded-md px-1.5 py-0.5">
+                                      <span key={idx} dir="auto" className="text-[10px] font-bold text-cyan-300 break-words bg-cyan-500/10 border border-cyan-900/40 rounded-md px-1.5 py-0.5">
                                         {m.optionName || m.option_name}
                                       </span>
                                     ))}
@@ -218,10 +218,10 @@ export function KitchenView() {
                                 )}
                                 <span className={`inline-block mt-2 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${style.badge}`}>{item.status}</span>
                               </div>
-                              <span className="text-2xl font-black text-orange-500 ml-2 leading-none">×{item.quantity}</span>
+                              <span className="text-2xl font-black text-orange-500 ml-2 leading-none shrink-0 whitespace-nowrap">×{item.quantity}</span>
                             </div>
                             {item.notes && (
-                              <p className="text-[10px] text-amber-400 font-bold bg-amber-500/10 p-2 rounded-lg italic border border-amber-900/30">"{item.notes}"</p>
+                              <p dir="auto" className="text-[10px] text-amber-400 font-bold bg-amber-500/10 p-2 rounded-lg italic border border-amber-900/30 break-words">"{item.notes}"</p>
                             )}
                             {item.status !== 'served' && (
                               <button onClick={() => advanceItem(item.id, item.status)}
@@ -239,8 +239,8 @@ export function KitchenView() {
             </div>
           )
         ) : (
-          <div className="max-w-4xl mx-auto bg-[#161B22] rounded-[40px] border border-white/[0.06] overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-white/[0.06] bg-white/[0.02]">
+          <div className="max-w-4xl mx-auto bg-[#161B22] rounded-3xl sm:rounded-[40px] border border-white/[0.06] overflow-hidden shadow-2xl">
+            <div className="p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-gray-500" />
                 <input type="text" placeholder="Search products…" value={inventorySearch}
@@ -248,32 +248,32 @@ export function KitchenView() {
                   className="w-full pl-12 pr-4 py-4 bg-[#0B0E14] border-2 border-white/[0.08] rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-500 transition-all" />
               </div>
             </div>
-            <div className="grid grid-cols-2 divide-x divide-white/[0.06] bg-white/[0.02] p-8 border-b border-white/[0.06]">
+            <div className="grid grid-cols-2 divide-x divide-white/[0.06] bg-white/[0.02] p-5 sm:p-8 border-b border-white/[0.06]">
               <div className="text-center">
-                <p className="text-5xl font-black italic tracking-tighter text-emerald-400">{counts.available}</p>
+                <p className="text-4xl sm:text-5xl font-black italic tracking-tighter text-emerald-400">{counts.available}</p>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">Available</p>
               </div>
               <div className="text-center">
-                <p className="text-5xl font-black italic tracking-tighter text-red-400">{counts.unavailable}</p>
+                <p className="text-4xl sm:text-5xl font-black italic tracking-tighter text-red-400">{counts.unavailable}</p>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">Unavailable</p>
               </div>
             </div>
-            <div className="divide-y divide-white/[0.04] max-h-[60vh] overflow-y-auto kitchen-scroll">
+            <div className="divide-y divide-white/[0.04] max-h-[60dvh] overflow-y-auto kitchen-scroll">
               {filteredProducts.length === 0 ? (
                 <div className="text-center py-16 text-gray-600"><p className="text-lg font-bold">No products found</p></div>
               ) : filteredProducts.map(p => {
                 const isAvailable = (p.kitchenStatus || 'available') === 'available';
                 return (
-                  <div key={p.id} className={`flex items-center justify-between px-8 py-5 transition-colors ${!isAvailable ? 'bg-red-950/20' : 'hover:bg-white/[0.02]'}`}>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <p className={`text-lg font-bold ${!isAvailable ? 'text-red-400' : 'text-white'}`}>{p.name}</p>
+                  <div key={p.id} className={`flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-5 transition-colors ${!isAvailable ? 'bg-red-950/20' : 'hover:bg-white/[0.02]'}`}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <p dir="auto" className={`text-lg font-bold break-words min-w-0 ${!isAvailable ? 'text-red-400' : 'text-white'}`}>{p.name}</p>
                         {!isAvailable && <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">Unavailable</span>}
                       </div>
                       <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mt-1">{p.category}</p>
                     </div>
                     <button onClick={() => toggleAvailability(p.id, isAvailable)}
-                      className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all active:scale-95 ${
+                      className={`shrink-0 px-4 sm:px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all active:scale-95 ${
                         isAvailable ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700' : 'bg-red-600 border-red-600 text-white hover:bg-red-700'
                       }`}>
                       {isAvailable ? 'Available' : 'Unavailable'}

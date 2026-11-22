@@ -46,7 +46,7 @@ export function EmployeePerformanceTab({ employee }: { employee: Employee }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-sm text-gray-500 flex-1 min-w-0">
+        <p className="text-sm text-gray-500 flex-1 basis-full sm:basis-auto min-w-0">
           Only indicators relevant to the <strong>{employee.role}</strong> role are shown.
         </p>
         <PeriodPicker value={period} onChange={setPeriod} />
@@ -94,11 +94,11 @@ function KpiGrid({ s }: { s: EmployeePerformanceSummary }) {
     { key: 'managerEvaluation', value: o.avgEvaluation === null ? '—' : `${o.avgEvaluation}/5`, hint: o.evaluationCount ? `${o.evaluationCount} evaluation(s)` : undefined },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       {cards.filter(c => s.metrics.includes(c.key)).map(c => (
-        <div key={c.key} className="bg-gray-50 rounded-xl p-4">
+        <div key={c.key} className="bg-gray-50 rounded-xl p-4 min-w-0">
           <p className="text-xs text-gray-500">{METRIC_LABELS[c.key]}</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">{c.value}</p>
+          <p className="text-lg font-bold text-gray-900 mt-1 break-words">{c.value}</p>
           {c.hint && <p className="text-[11px] text-gray-400 mt-0.5">{c.hint}</p>}
         </div>
       ))}
@@ -118,18 +118,18 @@ function TrendTable({ trend, showOrders }: { trend: TrendPoint[]; showOrders: bo
   return (
     <div className="overflow-x-auto">
       <h3 className="text-sm font-bold text-gray-900 mb-3">Weekly trend</h3>
-      <table className="w-full">
+      <table className="w-full min-w-[32rem]">
         <thead>
           <tr className="border-b border-gray-100">
             {['Week of', 'Days present', 'Late', ...(showOrders ? ['Orders'] : []), 'Compliments', 'Complaints'].map(h => (
-              <th key={h} className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+              <th key={h} className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {trend.map(t => (
             <tr key={t.weekStart}>
-              <td className="px-3 py-2 text-sm text-gray-900">{t.weekStart}</td>
+              <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">{t.weekStart}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="h-1.5 w-20 bg-gray-100 rounded-full overflow-hidden">

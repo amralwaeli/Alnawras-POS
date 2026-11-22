@@ -60,7 +60,7 @@ export function BusinessSettingsView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 max-w-2xl space-y-6">
+      <div className="p-4 sm:p-6 max-w-2xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tax &amp; Discounts</h1>
           <p className="text-gray-500 text-sm mt-0.5">Set the tax and quick-discount buttons applied at payment.</p>
@@ -72,7 +72,7 @@ export function BusinessSettingsView() {
             <Store className="size-4 text-gray-500" />
             <h2 className="font-semibold text-gray-900">Restaurant</h2>
           </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="bs-name" className="block text-xs font-medium text-gray-500 mb-1">Name on screens and receipts</label>
               <input id="bs-name" value={s.businessName} onChange={e => setS(p => ({ ...p, businessName: e.target.value }))}
@@ -104,7 +104,7 @@ export function BusinessSettingsView() {
             <h2 className="font-semibold text-gray-900">Tax</h2>
           </div>
           <div className="p-5 space-y-4">
-            <label className="flex items-center justify-between">
+            <label className="flex items-center justify-between gap-3 min-h-11">
               <span className="text-sm font-medium text-gray-700">Charge tax on bills</span>
               <input type="checkbox" checked={s.taxEnabled} onChange={e => set('taxEnabled', e.target.checked)}
                 className="size-5 rounded border-gray-300 text-gray-900 focus:ring-gray-800" />
@@ -112,7 +112,7 @@ export function BusinessSettingsView() {
 
             {s.taxEnabled && (
               <div className="space-y-4 pt-1">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Tax rate (%)</label>
                     <div className="relative">
@@ -129,13 +129,13 @@ export function BusinessSettingsView() {
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button onClick={() => set('taxInclusive', false)}
-                    className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-semibold ${!s.taxInclusive ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 text-gray-500'}`}>
+                    className={`flex-1 min-h-11 px-3 py-2.5 rounded-xl border-2 text-xs font-semibold ${!s.taxInclusive ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 text-gray-500'}`}>
                     Add tax on top of prices
                   </button>
                   <button onClick={() => set('taxInclusive', true)}
-                    className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-semibold ${s.taxInclusive ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 text-gray-500'}`}>
+                    className={`flex-1 min-h-11 px-3 py-2.5 rounded-xl border-2 text-xs font-semibold ${s.taxInclusive ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 text-gray-500'}`}>
                     Prices already include tax
                   </button>
                 </div>
@@ -151,31 +151,31 @@ export function BusinessSettingsView() {
 
         {/* ── Quick discounts ── */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Tag className="size-4 text-gray-500" />
               <h2 className="font-semibold text-gray-900">Quick Discounts</h2>
             </div>
-            <button onClick={addPreset} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-100">
+            <button onClick={addPreset} className="min-h-11 flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-100">
               <Plus className="size-3.5" /> Add
             </button>
           </div>
-          <div className="p-5 space-y-3">
+          <div className="p-4 sm:p-5 space-y-3">
             <p className="text-xs text-gray-400 -mt-1">One-tap buttons the cashier can apply at payment (e.g. a 10% Student discount).</p>
             {s.discountPresets.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">No quick discounts yet.</p>
             ) : s.discountPresets.map(p => (
-              <div key={p.id} className="flex items-center gap-2">
+              <div key={p.id} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                 <input value={p.label} onChange={e => updatePreset(p.id, { label: e.target.value })} placeholder="Name (e.g. Student)"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                  dir="auto" className="basis-full sm:basis-auto flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
                 <select value={p.type} onChange={e => updatePreset(p.id, { type: e.target.value as DiscountPreset['type'] })}
-                  className="w-28 px-2 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none">
+                  className="flex-1 sm:flex-none min-w-0 sm:w-28 px-2 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none">
                   <option value="percentage">Percent %</option>
                   <option value="fixed">Fixed RM</option>
                 </select>
                 <input type="number" min={0} step="0.01" value={p.value} onChange={e => updatePreset(p.id, { value: Number(e.target.value) })}
-                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                <button onClick={() => removePreset(p.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 className="size-4" /></button>
+                  className="w-24 shrink-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                <button onClick={() => removePreset(p.id)} aria-label="Remove discount" className="shrink-0 size-10 flex items-center justify-center text-red-400 hover:bg-red-50 rounded-lg"><Trash2 className="size-4" /></button>
               </div>
             ))}
           </div>
@@ -183,7 +183,7 @@ export function BusinessSettingsView() {
 
         <div className="flex justify-end">
           <button onClick={save} disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-black disabled:opacity-50">
+            className="min-h-11 flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-black disabled:opacity-50">
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save Settings
           </button>
         </div>

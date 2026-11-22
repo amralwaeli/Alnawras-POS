@@ -28,7 +28,7 @@ export function InventoryView() {
                 <s.icon className="size-5" />
               </div>
               <p className="text-sm text-gray-500 mb-0.5">{s.label}</p>
-              <p className={`text-3xl font-bold ${s.vc}`}>{s.value}</p>
+              <p className={`text-2xl sm:text-3xl font-bold ${s.vc}`}>{s.value}</p>
             </div>
           ))}
         </div>
@@ -45,7 +45,7 @@ export function InventoryView() {
             <h2 className="font-semibold text-gray-900">All Products</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="bg-gray-50 text-left">
                   <th className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</th>
@@ -62,16 +62,16 @@ export function InventoryView() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           {p.image
-                            ? <img src={p.image} alt={p.name} className="size-9 object-cover rounded-lg bg-gray-100" />
-                            : <div className="size-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold">{p.name[0]}</div>
+                            ? <img src={p.image} alt={p.name} className="size-9 shrink-0 object-cover rounded-lg bg-gray-100" />
+                            : <div className="size-9 shrink-0 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold">{p.name[0]}</div>
                           }
-                          <span className="font-medium text-sm text-gray-900">{p.name}</span>
+                          <span className="font-medium text-sm text-gray-900 break-words" dir="auto">{p.name}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500">{p.category}</td>
-                      <td className="px-5 py-3.5 text-sm font-medium text-right">{fmt(p.price)}</td>
+                      <td className="px-5 py-3.5 text-sm text-gray-500" dir="auto">{p.category}</td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-right whitespace-nowrap">{fmt(p.price)}</td>
                       <td className="px-5 py-3.5 text-center">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isAvailable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className={`whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${isAvailable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                           {isAvailable ? 'Available' : 'Not Available'}
                         </span>
                       </td>

@@ -145,45 +145,45 @@ export function AccountingView() {
           <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
             <div className="inline-flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mb-3"><TrendingUp className="size-5" /></div>
             <p className="text-sm text-gray-500">Total Revenue</p>
-            <p className="text-2xl font-bold text-emerald-700">{fmt(totalRevenue)}</p>
+            <p className="text-2xl font-bold text-emerald-700 break-words">{fmt(totalRevenue)}</p>
           </div>
           <div className="bg-red-50 rounded-2xl p-5 border border-red-100">
             <div className="inline-flex size-10 items-center justify-center rounded-xl bg-red-100 text-red-600 mb-3"><TrendingDown className="size-5" /></div>
             <p className="text-sm text-gray-500">Total Expenses</p>
-            <p className="text-2xl font-bold text-red-700">{fmt(totalExpenses)}</p>
+            <p className="text-2xl font-bold text-red-700 break-words">{fmt(totalExpenses)}</p>
           </div>
           <div className={`${netIncome >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'} rounded-2xl p-5 border`}>
             <div className={`inline-flex size-10 items-center justify-center rounded-xl ${netIncome >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'} mb-3`}><DollarSign className="size-5" /></div>
             <p className="text-sm text-gray-500">Net Income</p>
-            <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(netIncome)}</p>
+            <p className={`text-2xl font-bold break-words ${netIncome >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(netIncome)}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Expenses list */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-gray-900">Recent Expenses</h2>
               <button
                 onClick={() => { setForm(defaultForm()); setShowModal(true); }}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                className="min-h-11 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
               >
                 <Plus className="size-3.5" /> Add
               </button>
             </div>
             <div className="divide-y divide-gray-50">
               {periodExpenses.slice(0, 10).map(e => (
-                <div key={e.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{e.description}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                <div key={e.id} className="px-4 sm:px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 break-words" dir="auto">{e.description}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <span className={`inline-block size-2 rounded-full ${catColors[e.category] ?? 'bg-gray-400'}`} />
                       <span className="text-xs text-gray-400 capitalize">{e.category}</span>
                       <span className="text-xs text-gray-300">·</span>
                       <span className="text-xs text-gray-400">{new Date(e.date).toLocaleDateString('en-GB')}</span>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-red-600 shrink-0 ml-3">-{fmt(e.amount)}</p>
+                  <p className="text-sm font-bold text-red-600 shrink-0 ml-3 whitespace-nowrap">-{fmt(e.amount)}</p>
                 </div>
               ))}
               {periodExpenses.length === 0 && (
@@ -197,18 +197,18 @@ export function AccountingView() {
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">Expense Breakdown</h2>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4">
               {expenseCategories.map(cat => {
                 const total = periodExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
                 const pct   = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
                 return (
                   <div key={cat}>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between gap-3 mb-1.5">
                       <div className="flex items-center gap-2">
                         <span className={`inline-block size-2.5 rounded-full ${catColors[cat]}`} />
                         <span className="text-sm font-medium text-gray-700 capitalize">{cat}</span>
                       </div>
-                      <span className="text-sm text-gray-500">{fmt(total)}</span>
+                      <span className="text-sm text-gray-500 whitespace-nowrap">{fmt(total)}</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className={`${catColors[cat]} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
@@ -221,7 +221,7 @@ export function AccountingView() {
         </div>
 
         {/* Export */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
           <h2 className="font-semibold text-gray-900 mb-1">Export Reports</h2>
           <p className="text-xs text-gray-500 mb-4">Paid bills and expenses for the period chosen at the top</p>
           <button
@@ -241,10 +241,10 @@ export function AccountingView() {
           className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           onClick={e => e.target === e.currentTarget && setShowModal(false)}
         >
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-lg text-gray-900">Add Expense</h3>
-              <button onClick={() => setShowModal(false)} className="size-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => setShowModal(false)} aria-label="Close" className="size-11 -m-1.5 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="size-4" />
               </button>
             </div>
@@ -273,7 +273,7 @@ export function AccountingView() {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (RM) *</label>
                   <input
@@ -300,13 +300,13 @@ export function AccountingView() {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+              <button onClick={() => setShowModal(false)} className="flex-1 min-h-11 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 min-h-11 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? 'Saving…' : 'Save Expense'}
               </button>

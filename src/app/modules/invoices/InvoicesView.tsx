@@ -126,16 +126,16 @@ export function InvoicesView() {
       <div className="h-full overflow-hidden bg-gray-50 flex flex-col no-print">
       {/* Top bar (stays fixed; the content below scrolls) */}
       <div className="shrink-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {showBack && (
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium shrink-0"
+              className="min-h-11 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium shrink-0"
             >
               <ArrowLeft className="size-4" /> Back
             </button>
           )}
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <FileText className="size-5 sm:size-6 text-amber-500 shrink-0" />
               Create Invoice
@@ -146,7 +146,7 @@ export function InvoicesView() {
         <button
           onClick={handlePrint}
           disabled={!canPrint || generating}
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
+          className="min-h-11 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm shrink-0"
         >
           <Printer className="size-4" />
           <span className="hidden sm:inline">{generating ? 'Generating…' : 'Download PDF'}</span>
@@ -210,11 +210,11 @@ export function InvoicesView() {
 
             {/* Items */}
             <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-3 sm:mb-4">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800">Invoice Items</h2>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 font-medium bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+                  className="min-h-11 flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 font-medium bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   <Plus className="size-4" /> Add Item
                 </button>
@@ -225,7 +225,7 @@ export function InvoicesView() {
                   <div key={item.id} className="bg-gray-50 rounded-lg border border-gray-100 p-3 space-y-2">
                     {/* Item name row */}
                     <div className="flex gap-2 items-start">
-                      <div className="flex-1 relative">
+                      <div className="flex-1 min-w-0 relative">
                         <input
                           type="text"
                           value={item.name}
@@ -246,7 +246,7 @@ export function InvoicesView() {
                                   onPointerDown={e => { e.preventDefault(); selectProduct(item.id, p); }}
                                   className="px-3 py-2.5 text-sm hover:bg-amber-50 active:bg-amber-100 cursor-pointer border-b border-gray-50 last:border-0"
                                 >
-                                  <div className="font-medium text-gray-800">{p.name}</div>
+                                  <div className="font-medium text-gray-800 break-words" dir="auto">{p.name}</div>
                                   <div className="text-xs text-amber-600 font-semibold mt-0.5">RM {p.price.toFixed(2)}</div>
                                 </div>
                               )) : (
@@ -258,7 +258,8 @@ export function InvoicesView() {
                       </div>
                       <button
                         onClick={() => removeItem(item.id)}
-                        className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors shrink-0"
+                        aria-label="Remove item"
+                        className="size-10 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors shrink-0"
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -289,7 +290,7 @@ export function InvoicesView() {
                           className="flex-1 min-w-[70px] px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:outline-none focus:border-amber-500 bg-white"
                         />
                       </div>
-                      <div className="text-sm font-semibold text-gray-800 ml-auto shrink-0">
+                      <div className="text-sm font-semibold text-gray-800 ml-auto shrink-0 whitespace-nowrap">
                         = RM {(item.qty * item.unitPrice).toFixed(2)}
                       </div>
                     </div>
@@ -312,7 +313,7 @@ export function InvoicesView() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">Sub-Total (RM)</span>
-                    <span className="font-medium">{subTotal.toFixed(2)}</span>
+                    <span className="font-medium whitespace-nowrap">{subTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm gap-3">
                     <span className="text-gray-500 shrink-0">Discount (RM)</span>
@@ -323,12 +324,12 @@ export function InvoicesView() {
                       step="0.01"
                       value={discount || ''}
                       onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                      className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-right text-sm focus:outline-none focus:border-amber-500"
+                      className="w-28 min-w-0 px-2 py-1.5 border border-gray-300 rounded-lg text-right text-sm focus:outline-none focus:border-amber-500"
                     />
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center gap-3 pt-3 border-t border-gray-200">
                     <span className="font-semibold text-gray-900">Total Due (RM)</span>
-                    <span className="font-bold text-lg text-amber-600">{total.toFixed(2)}</span>
+                    <span className="font-bold text-lg text-amber-600 whitespace-nowrap">{total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -341,8 +342,8 @@ export function InvoicesView() {
               <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Live Preview</h2>
               <div className="bg-gray-100 p-2 rounded-xl border border-gray-200 overflow-hidden shadow-inner flex justify-center">
                 <div
-                  className="bg-white shadow-sm pointer-events-none origin-top"
-                  style={{ transform: 'scale(0.35)', width: '210mm', height: '297mm', marginBottom: '-190mm' }}
+                  className="bg-white shadow-sm pointer-events-none origin-top shrink-0 scale-[0.25] mb-[-220mm] xl:scale-[0.35] xl:mb-[-190mm]"
+                  style={{ width: '210mm', height: '297mm' }}
                 >
                   <InvoiceTemplate data={invoiceData} />
                 </div>

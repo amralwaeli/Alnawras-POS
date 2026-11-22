@@ -141,11 +141,11 @@ export function EmployeesView() {
   const showInactive = filters.status === 'inactive';
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {active} active · {inactive} inactive · {present} present today
@@ -154,7 +154,7 @@ export function EmployeesView() {
         {canEdit && (
           <button
             onClick={() => { setEditTarget(undefined); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 min-h-11 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600 transition-colors shadow-sm"
           >
             <Plus className="size-4" />
             Add Employee
@@ -163,17 +163,17 @@ export function EmployeesView() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Total Employees', value: total,    icon: Users,        color: 'bg-blue-50 text-blue-600' },
           { label: 'Present Today',   value: present,  icon: UserCheck,    color: 'bg-emerald-50 text-emerald-600' },
           { label: 'Inactive',        value: inactive, icon: UserX,        color: 'bg-red-50 text-red-600' },
           { label: 'Fingerprint',     value: `${withFP}/${total}`, icon: Fingerprint, color: 'bg-amber-50 text-amber-600' },
         ].map(card => (
-          <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{card.label}</p>
-              <div className={`size-9 rounded-xl flex items-center justify-center ${card.color}`}>
+          <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-sm min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide min-w-0">{card.label}</p>
+              <div className={`size-9 shrink-0 rounded-xl flex items-center justify-center ${card.color}`}>
                 <card.icon className="size-4" />
               </div>
             </div>
@@ -185,20 +185,22 @@ export function EmployeesView() {
       {/* ── Filters ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
             <input
               type="text"
+              dir="auto"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by name, ID or email…"
-              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full min-h-11 pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
+          <div className="flex gap-3">
           <select
             value={filters.role ?? ''}
             onChange={e => setFilters(f => ({ ...f, role: e.target.value || undefined }))}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+            className="flex-1 sm:flex-none min-w-0 min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
           >
             <option value="">All Roles</option>
             {Object.entries(ROLE_LABELS).map(([v, l]) => (
@@ -208,7 +210,7 @@ export function EmployeesView() {
           <select
             value={filters.status ?? 'active'}
             onChange={e => setFilters(f => ({ ...f, status: e.target.value as any }))}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+            className="flex-1 sm:flex-none min-w-0 min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
           >
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -216,10 +218,12 @@ export function EmployeesView() {
           </select>
           <button
             onClick={load}
-            className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            aria-label="Refresh"
+            className="flex shrink-0 items-center justify-center gap-2 min-h-11 min-w-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          </div>
         </div>
       </div>
 
@@ -262,7 +266,7 @@ export function EmployeesView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[36rem]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-5 py-3.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
@@ -287,21 +291,21 @@ export function EmployeesView() {
                         <div className={`size-9 rounded-full bg-gradient-to-br ${avatarColor(emp.id)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
                           {initials(emp.fullName)}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{emp.fullName}</p>
-                          <p className="text-xs text-gray-400">{emp.employeeNumber ?? emp.employeeId}</p>
+                        <div className="min-w-0">
+                          <p dir="auto" className="text-sm font-medium text-gray-900 truncate max-w-[14rem]">{emp.fullName}</p>
+                          <p className="text-xs text-gray-400 truncate">{emp.employeeNumber ?? emp.employeeId}</p>
                         </div>
                       </div>
                     </td>
 
                     {/* Department */}
                     <td className="px-4 py-4 hidden lg:table-cell">
-                      <span className="text-sm text-gray-600">{emp.department ?? '—'}</span>
+                      <span dir="auto" className="text-sm text-gray-600 break-words">{emp.department ?? '—'}</span>
                     </td>
 
                     {/* Role */}
                     <td className="px-4 py-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${ROLE_COLORS[emp.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${ROLE_COLORS[emp.role] ?? 'bg-gray-100 text-gray-600'}`}>
                         {ROLE_LABELS[emp.role] ?? emp.role}
                       </span>
                     </td>
@@ -342,7 +346,7 @@ export function EmployeesView() {
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => navigate(`/workforce/employees/${emp.employeeId}`)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                          className="p-1.5 pointer-coarse:p-3 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                           title="View Profile"
                         >
                           <ChevronRight className="size-4" />
@@ -351,7 +355,7 @@ export function EmployeesView() {
                           <>
                             <button
                               onClick={() => { setEditTarget(emp); setShowForm(true); }}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="p-1.5 pointer-coarse:p-3 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                               title="Edit"
                             >
                               <Edit2 className="size-4" />
@@ -360,7 +364,7 @@ export function EmployeesView() {
                               <button
                                 onClick={() => handleDeactivate(emp)}
                                 disabled={deleting === emp.employeeId}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                                className="p-1.5 pointer-coarse:p-3 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                                 title="Deactivate"
                               >
                                 <Trash2 className="size-4" />
@@ -369,7 +373,7 @@ export function EmployeesView() {
                               <button
                                 onClick={() => handleReactivate(emp)}
                                 disabled={deleting === emp.employeeId}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-40 text-xs font-medium px-2"
+                                className="p-1.5 pointer-coarse:p-3 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-40 text-xs font-medium px-2"
                                 title="Reactivate"
                               >
                                 Activate

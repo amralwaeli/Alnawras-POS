@@ -123,15 +123,16 @@ function StationDialog({
             <div className="mt-3 flex items-center gap-2">
               <span className="text-xs text-gray-500">Preview:</span>
               <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                className="text-xs font-semibold px-2 py-0.5 rounded-full min-w-0 break-words"
                 style={stationBadgeStyle(color)}
+                dir="auto"
               >
                 {name || 'Station'}
               </span>
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end pt-2">
+          <div className="flex flex-wrap gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit">{station ? 'Update' : 'Add'} Station</Button>
           </div>
@@ -245,8 +246,8 @@ function PrinterDialog({
           </div>
 
           {form.type === 'network' ? (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
                 <Label htmlFor="printer-ip">IP Address</Label>
                 <Input id="printer-ip" placeholder="192.168.1.100" value={form.ipAddress}
                   onChange={e => setForm(p => ({ ...p, ipAddress: e.target.value }))} />
@@ -297,9 +298,9 @@ function PrinterDialog({
                       className="accent-orange-500"
                     />
                     <ChefHat className="size-4 text-gray-400 shrink-0" />
-                    <span className="text-sm font-medium flex-1">{s.name}</span>
+                    <span className="text-sm font-medium flex-1 min-w-0 break-words" dir="auto">{s.name}</span>
                     <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 max-w-[40%] truncate"
                       style={stationBadgeStyle(s.color)}
                     >
                       {s.id}
@@ -310,7 +311,7 @@ function PrinterDialog({
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit">{printer ? 'Update' : 'Add'} Printer</Button>
           </div>
@@ -392,7 +393,7 @@ export function PrinterManagementView() {
   const stationById = (id: string) => stations.find(s => s.id === id);
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-4 sm:p-6 space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Printers</h1>
         <p className="text-gray-600">Manage preparation stations and assign printers to them</p>
@@ -400,7 +401,7 @@ export function PrinterManagementView() {
 
       {/* ── Stations ───────────────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-lg font-semibold">Stations</h2>
             <p className="text-sm text-gray-500">Define where orders are prepared</p>
@@ -424,23 +425,25 @@ export function PrinterManagementView() {
                   <CardContent className="py-4 px-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full min-w-0 break-words"
                         style={stationBadgeStyle(s.color)}
+                        dir="auto"
                       >
                         {s.name}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => { setEditingStation(s); setStationDialogOpen(true); }}
-                          className="p-1 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                          className="p-2 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
                           title="Edit station"
+                          aria-label="Edit station"
                         >
                           <Pencil className="size-3.5" />
                         </button>
                         {!s.isBuiltIn && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <button className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete station">
+                              <button className="p-2 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete station" aria-label="Delete station">
                                 <Trash2 className="size-3.5" />
                               </button>
                             </AlertDialogTrigger>
@@ -479,7 +482,7 @@ export function PrinterManagementView() {
 
       {/* ── Printers ───────────────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-lg font-semibold">Printers</h2>
             <p className="text-sm text-gray-500">Connect printers and assign them to stations</p>
@@ -504,14 +507,14 @@ export function PrinterManagementView() {
               <Card key={printer.id} className={printer.isActive ? '' : 'opacity-60'}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       {printer.type === 'network'
                         ? <Wifi className="size-4 text-blue-500 shrink-0" />
                         : <Usb className="size-4 text-purple-500 shrink-0" />
                       }
-                      <CardTitle className="text-base">{printer.name}</CardTitle>
+                      <CardTitle className="text-base break-words min-w-0" dir="auto">{printer.name}</CardTitle>
                     </div>
-                    <button onClick={() => toggleActive(printer.id)} title={printer.isActive ? 'Disable' : 'Enable'} className="shrink-0">
+                    <button onClick={() => toggleActive(printer.id)} title={printer.isActive ? 'Disable' : 'Enable'} aria-label={printer.isActive ? 'Disable' : 'Enable'} className="shrink-0 p-2 -m-2">
                       {printer.isActive
                         ? <CheckCircle2 className="size-4 text-emerald-500" />
                         : <XCircle className="size-4 text-gray-400" />
@@ -520,7 +523,7 @@ export function PrinterManagementView() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 break-all">
                     {printer.type === 'network'
                       ? `${printer.ipAddress}:${printer.port}`
                       : `USB — ${printer.usbPath}`
@@ -548,7 +551,7 @@ export function PrinterManagementView() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex flex-wrap gap-2 pt-1">
                     {printer.type === 'network' && (
                       <Button size="sm" variant="outline" onClick={async () => {
                         const res = await PrintService.sendToPrinter(PrintService.testPage(printer));
@@ -563,7 +566,7 @@ export function PrinterManagementView() {
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" aria-label="Remove printer">
                           <Trash2 className="size-3.5" />
                         </Button>
                       </AlertDialogTrigger>

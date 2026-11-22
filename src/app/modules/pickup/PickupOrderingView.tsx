@@ -53,8 +53,8 @@ export function PickupOrderingView() {
   }
   if (state === 'invalid' || !session) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
-        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4 py-6">
+        <div className="bg-white rounded-[40px] shadow-2xl p-7 sm:p-10 max-w-sm w-full text-center">
           <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5"><ShieldAlert className="size-10 text-red-500" /></div>
           <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Link Unavailable</h2>
           <p className="text-sm text-gray-400">This pickup link is invalid, expired, or has already been used to place an order. Please ask the restaurant for a new link.</p>
@@ -214,8 +214,8 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
 
   if (done) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
-        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4 py-6">
+        <div className="bg-white rounded-[40px] shadow-2xl p-7 sm:p-10 max-w-sm w-full text-center">
           <div className="bg-emerald-100 rounded-full p-4 w-fit mx-auto mb-5"><CheckCircle2 className="size-12 text-emerald-600" /></div>
           <h2 className="text-2xl font-black text-gray-900 mb-2">Order Placed!</h2>
           <p className="text-sm text-gray-500">
@@ -231,7 +231,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
   }
 
   const methodBtn = (m: Method, label: string, Icon: any) => (
-    <button onClick={() => setMethod(m)} className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 text-xs font-bold transition-all ${method === m ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
+    <button onClick={() => setMethod(m)} className={`flex flex-col items-center justify-center gap-1.5 min-h-16 px-1 py-3 text-center leading-tight rounded-2xl border-2 text-xs font-bold transition-all ${method === m ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
       <Icon className="size-5" /> {label}
     </button>
   );
@@ -240,57 +240,58 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
     <div className="flex flex-col h-[100dvh] bg-[#EAEEF3] overflow-hidden">
       {/* Header */}
       <div className="bg-white px-4 pt-safe pb-3 shadow-sm flex items-center justify-between gap-3 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="bg-orange-500 rounded-xl p-2"><UtensilsCrossed className="size-5 text-white" /></div>
-          <div>
-            <h1 className="font-black text-gray-900 text-base leading-tight">{businessName}</h1>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="bg-orange-500 rounded-xl p-2 shrink-0"><UtensilsCrossed className="size-5 text-white" /></div>
+          <div className="min-w-0">
+            <h1 dir="auto" className="font-black text-gray-900 text-base leading-tight truncate">{businessName}</h1>
             <p className="text-[11px] text-orange-500 font-bold uppercase tracking-wider">Pickup Order</p>
           </div>
         </div>
         {view === 'menu' ? (
-          <button onClick={() => setView('checkout')} disabled={cart.length === 0}
-            className="relative bg-orange-500 text-white p-2.5 rounded-xl shadow-lg shadow-orange-200 active:scale-95 disabled:opacity-40">
+          <button onClick={() => setView('checkout')} disabled={cart.length === 0} aria-label="Checkout"
+            className="relative shrink-0 bg-orange-500 text-white size-11 flex items-center justify-center rounded-xl shadow-lg shadow-orange-200 active:scale-95 disabled:opacity-40">
             <ShoppingCart className="size-5" />
             {totalItems > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black rounded-full size-5 flex items-center justify-center">{totalItems}</span>}
           </button>
         ) : (
-          <button onClick={() => setView('menu')} className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-xs font-bold"><ArrowLeft className="size-4" /> Menu</button>
+          <button onClick={() => setView('menu')} className="flex items-center gap-1.5 shrink-0 min-h-11 bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-xs font-bold"><ArrowLeft className="size-4" /> Menu</button>
         )}
       </div>
 
       {view === 'menu' ? (
         <>
           <div className="px-4 py-3 flex-shrink-0">
-            <div className="relative">
+            <div className="relative lg:max-w-xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search menu…"
-                className="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-sm border-0 shadow-sm outline-none focus:ring-2 focus:ring-orange-300" />
+                className="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-base sm:text-sm border-0 shadow-sm outline-none focus:ring-2 focus:ring-orange-300" />
             </div>
           </div>
+          {/* One scrolling row on phones, wrapped and fully visible on wide screens */}
           {!searchQuery && (
-            <div className="flex gap-2 px-4 pb-3 overflow-x-auto flex-shrink-0">
+            <div className="flex lg:flex-wrap gap-2 px-4 pb-3 overflow-x-auto flex-shrink-0 no-scrollbar">
               {categories.map(cat => (
-                <button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-gray-600'}`}>
+                <button key={cat.id} dir="auto" onClick={() => setSelectedCategory(cat.id)}
+                  className={`flex-shrink-0 min-h-11 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${selectedCategory === cat.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-gray-600'}`}>
                   {cat.name}
                 </button>
               ))}
             </div>
           )}
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-3">
               {filtered.map(p => {
                 const ok = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
                 return (
                   <div key={p.id} onClick={() => ok && addToCart(p)}
-                    className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-h-[100px] transition-all ${ok ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 opacity-60'}`}>
-                    {p.image && <ProductImage src={p.image} name={p.name} className="w-full h-20 rounded-t-[18px]" />}
+                    className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-w-0 min-h-[100px] transition-all ${ok ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 opacity-60'}`}>
+                    {p.image && <ProductImage src={p.image} name={p.name} className="w-full aspect-[4/3] rounded-t-[18px]" />}
                     <div className="p-3 flex flex-col flex-1 justify-between gap-2 relative">
                       {!ok && <div className="absolute inset-0 flex items-center justify-center z-10 rounded-[20px] bg-red-50/80"><span className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase">N/A</span></div>}
-                      <h3 className={`font-bold leading-snug break-words text-xs ${ok ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
+                      <h3 dir="auto" className={`font-bold leading-snug break-words line-clamp-3 text-xs sm:text-sm ${ok ? 'text-gray-800' : 'text-red-400'}`}>{p.name}</h3>
                       <div className="mt-auto flex items-center justify-between gap-1">
-                        <span className={`font-black text-sm ${ok ? 'text-orange-600' : 'text-red-400'}`}>{RM(p.price)}</span>
-                        {ok && <div className="bg-orange-500 text-white rounded-xl p-1.5"><Plus className="size-3.5" strokeWidth={4} /></div>}
+                        <span className={`font-black text-sm whitespace-nowrap ${ok ? 'text-orange-600' : 'text-red-400'}`}>{RM(p.price)}</span>
+                        {ok && <div className="bg-orange-500 text-white rounded-xl p-1.5 shrink-0"><Plus className="size-3.5" strokeWidth={4} /></div>}
                       </div>
                     </div>
                   </div>
@@ -298,34 +299,45 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
               })}
             </div>
           </div>
+
+          {/* Sticky bar to checkout while browsing */}
+          {totalItems > 0 && (
+            <div className="px-4 pt-2 pb-safe bg-white border-t flex-shrink-0">
+              <button onClick={() => setView('checkout')}
+                className="w-full sm:max-w-md sm:mx-auto min-h-12 bg-orange-500 text-white py-3 rounded-2xl font-black text-sm shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+                <ShoppingCart className="size-5 shrink-0" /> Your Items · {totalItems} · {RM(subtotal)}
+              </button>
+            </div>
+          )}
         </>
       ) : (
         /* ── Checkout ── */
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pt-4 pb-safe">
+          <div className="w-full max-w-2xl mx-auto space-y-4">
           {/* Cart */}
           <Section title="Your Items">
             {cart.length === 0 ? <p className="text-sm text-gray-400">Cart is empty.</p> : cart.map(item => (
               <div key={item.id} className="bg-orange-50/50 rounded-2xl p-3 border border-orange-100 space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-sm">{item.productName}</h4>
+                <div className="flex items-center gap-2 min-[360px]:gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h4 dir="auto" className="font-bold text-gray-800 text-sm break-words">{item.productName}</h4>
                     {!!item.modifiers?.length && (
-                      <p className="text-[11px] text-gray-500">{item.modifiers.map(m => m.optionName).join(', ')}</p>
+                      <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map(m => m.optionName).join(', ')}</p>
                     )}
-                    <p className="text-orange-600 font-black text-xs">{RM(item.price)}</p>
+                    <p className="text-orange-600 font-black text-xs whitespace-nowrap">{RM(item.price)}</p>
                   </div>
-                  <div className="flex items-center bg-white border-2 border-orange-100 rounded-xl p-1 gap-3">
-                    <button onClick={() => setQty(item.id, -1)} className="p-1.5 text-orange-500"><Minus className="size-4" strokeWidth={3} /></button>
-                    <span className="font-black text-gray-900 w-5 text-center text-sm">{item.quantity}</span>
-                    <button onClick={() => setQty(item.id, 1)} className="p-1.5 text-orange-500"><Plus className="size-4" strokeWidth={3} /></button>
+                  <div className="flex items-center shrink-0 bg-white border-2 border-orange-100 rounded-xl p-0.5 gap-0.5">
+                    <button onClick={() => setQty(item.id, -1)} aria-label="Decrease quantity" className="size-11 flex items-center justify-center text-orange-500"><Minus className="size-4" strokeWidth={3} /></button>
+                    <span className="font-black text-gray-900 min-w-5 text-center text-sm">{item.quantity}</span>
+                    <button onClick={() => setQty(item.id, 1)} aria-label="Increase quantity" className="size-11 flex items-center justify-center text-orange-500"><Plus className="size-4" strokeWidth={3} /></button>
                   </div>
                 </div>
-                <button onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)} className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <ChevronDown className={`size-3 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} /> {item.notes ? 'Edit note' : 'Add note (e.g. less sugar, no ice)'}
+                <button onClick={() => setExpandedNotes(expandedNotes === item.id ? null : item.id)} className="flex items-center gap-1 min-h-9 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  <ChevronDown className={`size-3 shrink-0 transition-transform ${expandedNotes === item.id ? 'rotate-180' : ''}`} /> {item.notes ? 'Edit note' : 'Add note (e.g. less sugar, no ice)'}
                 </button>
                 {expandedNotes === item.id && (
-                  <textarea value={item.notes} onChange={e => setNotes(item.id, e.target.value)} placeholder="e.g. Less sugar, no ice, extra spicy…" rows={2}
-                    className="w-full text-xs bg-white border border-orange-200 rounded-xl p-2.5 resize-none outline-none focus:ring-2 focus:ring-orange-300" />
+                  <textarea dir="auto" value={item.notes} onChange={e => setNotes(item.id, e.target.value)} placeholder="e.g. Less sugar, no ice, extra spicy…" rows={2}
+                    className="w-full text-base sm:text-xs bg-white border border-orange-200 rounded-xl p-2.5 resize-none outline-none focus:ring-2 focus:ring-orange-300" />
                 )}
               </div>
             ))}
@@ -333,7 +345,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
 
           {/* Customer info */}
           <Section title="Your Details">
-            <Field label="Full Name *"><input value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="e.g. Ahmad" /></Field>
+            <Field label="Full Name *"><input dir="auto" value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="e.g. Ahmad" /></Field>
             <Field label="Phone Number *"><input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" className={inputCls} placeholder="e.g. 012-3456789" /></Field>
             <Field label="Email (for status updates)" required><input value={email} onChange={e => setEmail(e.target.value)} inputMode="email" type="email" className={inputCls} placeholder="you@email.com" required /></Field>
           </Section>
@@ -351,26 +363,26 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
           <Section title="Order Summary">
             <Row k="Subtotal" v={RM(subtotal)} />
             {tax > 0 && <Row k={taxSettings.taxInclusive ? `${taxSettings.taxLabel} (included)` : taxSettings.taxLabel} v={RM(tax)} />}
-            <div className="flex justify-between font-black text-gray-900 pt-1 border-t"><span>Total</span><span>{RM(total)}</span></div>
+            <div className="flex justify-between gap-2 font-black text-gray-900 pt-1 border-t"><span>Total</span><span className="whitespace-nowrap">{RM(total)}</span></div>
             {method && <p className="text-xs text-gray-500 mt-2">Pickup via <b className="capitalize">{method === 'self' ? 'Self Pickup' : method}</b></p>}
           </Section>
 
           {/* Payment */}
           <Section title="Payment *">
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setPayType('online')} className={`py-3 rounded-2xl border-2 text-sm font-bold ${payType === 'online' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Online Payment</button>
-              <button onClick={() => setPayType('cash')} className={`py-3 rounded-2xl border-2 text-sm font-bold ${payType === 'cash' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Pay at Pickup</button>
+              <button onClick={() => setPayType('online')} className={`min-h-12 px-2 py-3 rounded-2xl border-2 text-sm font-bold ${payType === 'online' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Online Payment</button>
+              <button onClick={() => setPayType('cash')} className={`min-h-12 px-2 py-3 rounded-2xl border-2 text-sm font-bold ${payType === 'cash' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Pay at Pickup</button>
             </div>
 
             {payType === 'online' && (
               <div className="mt-3 space-y-3">
                 <div className="bg-white border border-gray-200 rounded-2xl p-3 flex flex-col items-center text-center">
                   <p className="text-xs font-bold text-gray-500 mb-2">Scan to pay, then upload your receipt below</p>
-                  <img src={merchantQrUrl(branchId)} alt="Payment QR" className="size-44 object-contain"
+                  <img src={merchantQrUrl(branchId)} alt="Payment QR" className="size-44 sm:size-56 max-w-full object-contain"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                 </div>
-                <label className="flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-orange-300 text-orange-600 font-bold text-sm cursor-pointer">
-                  <Upload className="size-4" /> {receipt ? receipt.name : 'Upload Payment Receipt *'}
+                <label className="flex items-center justify-center gap-2 min-h-12 px-3 py-3 rounded-2xl border-2 border-dashed border-orange-300 text-orange-600 font-bold text-sm cursor-pointer">
+                  <Upload className="size-4 shrink-0" /> <span className="min-w-0 truncate">{receipt ? receipt.name : 'Upload Payment Receipt *'}</span>
                   <input type="file" accept="image/*" className="hidden" onChange={e => setReceipt(e.target.files?.[0] ?? null)} />
                 </label>
               </div>
@@ -381,8 +393,8 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
           {/* Notice + acknowledgement */}
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
             <p className="text-xs text-amber-800">{NOTICE}</p>
-            <label className="flex items-center gap-2 mt-3 cursor-pointer">
-              <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} className="size-4 accent-orange-500" />
+            <label className="flex items-center gap-2 mt-2 min-h-11 cursor-pointer">
+              <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} className="size-5 shrink-0 accent-orange-500" />
               <span className="text-sm font-bold text-gray-800">I understand</span>
             </label>
           </div>
@@ -390,10 +402,11 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
           {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <button onClick={submit} disabled={submitting || !canSubmit}
-            className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-orange-200 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-            {submitting ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Placing…</> : <><ShoppingBag className="size-5" /> Place Pickup Order · {RM(total)}</>}
+            className="w-full min-h-12 bg-orange-500 text-white px-3 py-4 rounded-2xl font-black text-base shadow-xl shadow-orange-200 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            {submitting ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Placing…</> : <><ShoppingBag className="size-5 shrink-0" /> <span>Place Pickup Order · <span className="whitespace-nowrap">{RM(total)}</span></span></>}
           </button>
           <div className="h-4" />
+          </div>
         </div>
       )}
 
@@ -409,7 +422,8 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
   );
 }
 
-const inputCls = 'w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300';
+// text-base on phones: iOS Safari zooms the page when a focused input is under 16px.
+const inputCls = 'w-full min-h-11 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-base sm:text-sm outline-none focus:ring-2 focus:ring-orange-300';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -423,5 +437,5 @@ function Field({ label, children, required }: { label: string; children: React.R
   return <div><label className="block text-xs font-bold text-gray-500 mb-1">{label}{required && <span className="text-red-500"> *</span>}</label>{children}</div>;
 }
 function Row({ k, v }: { k: string; v: string }) {
-  return <div className="flex justify-between text-sm text-gray-600"><span>{k}</span><span>{v}</span></div>;
+  return <div className="flex justify-between gap-2 text-sm text-gray-600"><span className="min-w-0">{k}</span><span className="whitespace-nowrap">{v}</span></div>;
 }

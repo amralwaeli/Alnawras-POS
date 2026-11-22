@@ -56,44 +56,44 @@ function BranchCard({ branch, onChanged }: { branch: Branch; onChanged: () => vo
   const statusLabel = branch.status === 'active' ? (expired ? 'Contract Expired' : 'Active') : branch.status === 'suspended' ? 'Suspended' : 'Expired';
 
   return (
-    <div className="border border-gray-200 rounded-xl p-4 bg-white">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="border border-gray-200 rounded-xl p-3 sm:p-4 bg-white min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3 mb-3">
+        <div className="flex flex-1 items-center gap-2 min-w-0">
           <Store className="size-4 text-indigo-500 shrink-0" />
           <input
-            value={name} onChange={e => setName(e.target.value)}
-            className="font-semibold text-gray-900 text-sm bg-transparent border-b border-transparent hover:border-gray-200 focus:border-indigo-400 focus:outline-none min-w-0"
+            value={name} onChange={e => setName(e.target.value)} dir="auto"
+            className="w-full pointer-coarse:min-h-11 font-semibold text-gray-900 text-sm bg-transparent border-b border-transparent hover:border-gray-200 focus:border-indigo-400 focus:outline-none min-w-0"
           />
         </div>
         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}`}>{statusLabel}</span>
       </div>
 
-      <p className="text-[11px] text-gray-400 font-mono mb-3">branch_id: {branch.id}</p>
+      <p className="text-[11px] text-gray-400 font-mono mb-3 break-all">branch_id: {branch.id}</p>
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 mb-3">
         <div>
           <label className="block text-[11px] font-semibold text-gray-500 mb-1">Contract Start</label>
           <input type="date" value={contractStart} onChange={e => setContractStart(e.target.value)}
-            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
+            className="w-full min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
         </div>
         <div>
           <label className="block text-[11px] font-semibold text-gray-500 mb-1">Contract End</label>
           <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)}
-            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
+            className="w-full min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
         </div>
       </div>
 
       {expired && branch.status === 'active' && (
-        <div className="flex items-center gap-1.5 text-[11px] text-red-600 mb-3">
-          <AlertTriangle className="size-3.5" /> Contract end has passed — staff login is auto-blocked for this branch.
+        <div className="flex items-start gap-1.5 text-[11px] text-red-600 mb-3">
+          <AlertTriangle className="size-3.5 shrink-0 mt-px" /> Contract end has passed — staff login is auto-blocked for this branch.
         </div>
       )}
 
       <div className="mb-3">
         <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Enabled Modules</label>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-1.5">
           {FEATURE_KEYS.map(key => (
-            <label key={key} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+            <label key={key} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer pointer-coarse:min-h-11">
               <input
                 type="checkbox" checked={features[key] !== false}
                 onChange={e => setFeatures(f => ({ ...f, [key]: e.target.checked }))}
@@ -105,10 +105,10 @@ function BranchCard({ branch, onChanged }: { branch: Branch; onChanged: () => vo
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={save} disabled={!dirty || saving}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40"
+          className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40"
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />} Save
         </button>
@@ -165,21 +165,21 @@ function AddBranchForm({ orgId, onDone }: { orgId: string; onDone: () => void })
   return (
     <div className="border border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/40 space-y-2.5">
       <p className="text-xs font-semibold text-indigo-700">New Branch</p>
-      <div className="grid grid-cols-2 gap-2.5">
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Branch name"
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2.5">
+        <input value={name} dir="auto" onChange={e => setName(e.target.value)} placeholder="Branch name"
+          className="min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
         <input value={id} onChange={e => setId(e.target.value)} placeholder="branch_id (optional)"
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-400" />
+          className="min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:outline-none focus:border-indigo-400" />
         <input type="date" value={contractStart} onChange={e => setContractStart(e.target.value)}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
+          className="min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
         <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
+          className="min-w-0 pointer-coarse:min-h-11 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400" />
       </div>
-      <div className="flex gap-2">
-        <button onClick={create} disabled={saving} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={create} disabled={saving} className="min-h-11 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40">
           {saving ? 'Creating…' : 'Create Branch'}
         </button>
-        <button onClick={onDone} className="px-3 py-1.5 text-gray-500 rounded-lg text-xs font-semibold hover:bg-gray-100">Cancel</button>
+        <button onClick={onDone} className="min-h-11 px-3 py-1.5 text-gray-500 rounded-lg text-xs font-semibold hover:bg-gray-100">Cancel</button>
       </div>
       <p className="text-[10px] text-gray-400">Leave branch_id blank for a new branch. To register an existing restaurant already using a branch_id, enter that exact id.</p>
     </div>
@@ -193,9 +193,9 @@ function FieldCopy({ label, value, mono }: { label: string; value: string; mono?
       <label className="block text-[11px] font-semibold text-gray-500 mb-1">{label}</label>
       <div className="flex items-center gap-2">
         <input readOnly value={value} onFocus={e => e.currentTarget.select()}
-          className={`flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50 ${mono ? 'font-mono' : ''}`} />
+          className={`flex-1 min-w-0 min-h-11 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50 ${mono ? 'font-mono' : ''}`} />
         <button onClick={() => { navigator.clipboard?.writeText(value); toast.success('Copied'); }}
-          className="px-2.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600" title="Copy">
+          className="shrink-0 flex items-center justify-center min-h-11 min-w-11 px-2.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600" title="Copy" aria-label={`Copy ${label}`}>
           <Copy className="size-3.5" />
         </button>
       </div>
@@ -228,20 +228,20 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
 
   return (
     // Once the one-time password is on screen, only "Done" may close the modal, so it can't be lost by a stray click.
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={result ? undefined : onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4" onClick={result ? undefined : onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b">
           <h3 className="font-bold text-gray-900">{result ? 'Tenant created' : 'Add Tenant'}</h3>
-          {!result && <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>}
+          {!result && <button onClick={onClose} aria-label="Close" className="p-1.5 pointer-coarse:p-3.5 shrink-0 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>}
         </div>
 
         {!result ? (
           <>
             <div className="p-5 space-y-3">
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Restaurant / business name *" autoFocus
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Restaurant / business name *" autoFocus dir="auto"
+                className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
               <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Tenant admin email *"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
+                className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 mb-1">Contract end (optional)</label>
                 <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)}
@@ -249,23 +249,23 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
               </div>
               <p className="text-[11px] text-gray-400">Creates the organization, one branch, and the admin's login, then emails them a link to set their password.</p>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t">
-              <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={create} disabled={saving} className="px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">
+            <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t">
+              <button onClick={onClose} className="min-h-11 px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button onClick={create} disabled={saving} className="min-h-11 px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">
                 {saving ? 'Creating…' : 'Create & Invite'}
               </button>
             </div>
           </>
         ) : (
           <div className="p-5 space-y-3">
-            <div className={`text-xs font-semibold px-3 py-2 rounded-lg ${result.emailSent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            <div className={`text-xs font-semibold px-3 py-2 rounded-lg break-words ${result.emailSent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
               {result.emailSent ? `✓ Invite email sent to ${result.email}` : '⚠ Email could not be sent — share the details below with the tenant.'}
             </div>
             <FieldCopy label="Email" value={result.email} />
             <FieldCopy label="Temporary password" value={result.tempPassword} mono />
             <FieldCopy label="Set-password link" value={result.setPasswordUrl} mono />
             <p className="text-[11px] text-gray-400">The tenant can click the link to set their own password, or sign in with the temporary password and change it later.</p>
-            <button onClick={onClose} className="w-full px-4 py-2.5 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Done</button>
+            <button onClick={onClose} className="w-full min-h-11 px-4 py-2.5 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Done</button>
           </div>
         )}
       </div>
@@ -316,27 +316,27 @@ export function SuperAdminPanelView() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-950 text-white">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-indigo-500 flex items-center justify-center"><ShieldCheck className="size-5" /></div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-9 shrink-0 rounded-xl bg-indigo-500 flex items-center justify-center"><ShieldCheck className="size-5" /></div>
             <div>
               <h1 className="font-black tracking-tight leading-none">Super Admin</h1>
               <p className="text-[11px] text-slate-400 mt-0.5">Tenant &amp; contract management</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10">
+          <button onClick={handleLogout} className="flex shrink-0 items-center gap-1.5 min-h-11 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10">
             <LogOut className="size-4" /> Sign Out
           </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-6 space-y-5">
-        <div className="flex items-center justify-between">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Organizations</h2>
             <p className="text-sm text-gray-500">{orgs.length} tenant{orgs.length !== 1 ? 's' : ''}</p>
           </div>
-          <button onClick={() => setShowAddTenant(true)} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
+          <button onClick={() => setShowAddTenant(true)} className="flex items-center gap-1.5 min-h-11 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
             <Plus className="size-4" /> Add Tenant
           </button>
         </div>
@@ -348,18 +348,18 @@ export function SuperAdminPanelView() {
           </div>
         ) : orgs.map(org => (
           <div key={org.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-5 py-4 border-b border-gray-100">
+              <div className="flex flex-1 items-center gap-3 min-w-0 basis-56">
                 <div className="size-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0"><Building2 className="size-4 text-indigo-600" /></div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{org.name}</p>
+                  <p dir="auto" className="font-semibold text-gray-900 truncate">{org.name}</p>
                   <p className="text-xs text-gray-400 truncate">
                     {org.ownerName || '—'}{org.ownerEmail ? ` · ${org.ownerEmail}` : ''} · {org.branches.length} branch{org.branches.length !== 1 ? 'es' : ''}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${org.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${org.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                   {org.status === 'active' ? 'Active' : 'Suspended'}
                 </span>
                 {org.status === 'suspended' ? (
@@ -388,13 +388,13 @@ export function SuperAdminPanelView() {
               </div>
             </div>
 
-            <div className="p-5 space-y-3">
+            <div className="p-3 sm:p-5 space-y-3">
               {org.branches.map(b => <BranchCard key={b.id} branch={b} onChanged={load} />)}
 
               {addingBranchFor === org.id ? (
                 <AddBranchForm orgId={org.id} onDone={() => { setAddingBranchFor(null); void load(); }} />
               ) : (
-                <button onClick={() => setAddingBranchFor(org.id)} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+                <button onClick={() => setAddingBranchFor(org.id)} className="flex items-center gap-1.5 min-h-11 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
                   <Plus className="size-4" /> Add Branch
                 </button>
               )}

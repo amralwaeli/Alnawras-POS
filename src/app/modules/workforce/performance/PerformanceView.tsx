@@ -39,16 +39,16 @@ export function PerformanceView() {
   const employees = useMemo(() => team.map(t => t.employee), [team]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 basis-full sm:basis-auto min-w-0">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUp className="size-5 text-amber-500" /> Performance
+            <TrendingUp className="size-5 shrink-0 text-amber-500" /> Performance
           </h1>
           <p className="text-sm text-gray-500">Indicators built from attendance, POS activity and reviewed observations.</p>
         </div>
         <PeriodPicker value={period} onChange={setPeriod} />
-        <button onClick={load} className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50" aria-label="Refresh">
+        <button onClick={load} className="flex items-center justify-center min-h-11 min-w-11 p-2 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50" aria-label="Refresh">
           <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
         <AddObservationButton employees={employees} reviewer={reviewer} onSaved={load} />
@@ -59,7 +59,7 @@ export function PerformanceView() {
       {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* ── Review queue ── */}
-      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
         <h2 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
           <ClipboardCheck className="size-4 text-amber-500" />
           Awaiting review <span className="text-gray-400 font-medium">({queue.length})</span>
@@ -76,7 +76,7 @@ export function PerformanceView() {
       {/* ── Team indicators ── */}
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[52rem]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 {['Employee', 'Days present', 'Punctuality', 'Orders / tables', 'Payments', 'Feedback', 'Evaluation', 'Pending'].map(h => (
@@ -105,21 +105,21 @@ function TeamRow({ s, onOpen }: { s: EmployeePerformanceSummary; onOpen: () => v
   return (
     <tr className="hover:bg-gray-50 cursor-pointer" onClick={onOpen}>
       <td className="px-4 py-3">
-        <p className="text-sm font-medium text-gray-900">{s.employee.fullName}</p>
+        <p dir="auto" className="text-sm font-medium text-gray-900 max-w-[14rem] break-words">{s.employee.fullName}</p>
         <p className="text-xs text-gray-500">{roleLabel(s.employee.role)} · {s.employee.employeeNumber ?? s.employee.employeeId}</p>
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">{s.attendance.daysPresent}</td>
-      <td className="px-4 py-3 text-sm text-gray-700">
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
         {pct(s.attendance.punctualityRate)}
         {s.attendance.lateArrivals > 0 && <span className="text-xs text-amber-600 ml-1">({s.attendance.lateArrivals} late)</span>}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-700">
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
         {!has('ordersHandled') ? na : !s.posLinked ? notLinked : `${s.orders.ordersHandled} / ${s.orders.tablesServed}`}
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">
         {!has('paymentsProcessed') ? na : !s.posLinked ? notLinked : s.paymentsProcessed}
       </td>
-      <td className="px-4 py-3 text-sm">
+      <td className="px-4 py-3 text-sm whitespace-nowrap">
         {!has('customerFeedback') ? na : (
           <>
             <span className="text-emerald-600">+{o.compliments}</span>

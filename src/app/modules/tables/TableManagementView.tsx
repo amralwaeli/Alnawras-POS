@@ -110,9 +110,9 @@ export function TableManagementView() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* ── Device Station Binding ── */}
-      <div className="mb-8 bg-blue-50 border border-blue-100 rounded-2xl p-6">
+      <div className="mb-8 bg-blue-50 border border-blue-100 rounded-2xl p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 bg-blue-600 text-white rounded-xl">
             <Monitor className="size-5" />
@@ -149,7 +149,7 @@ export function TableManagementView() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Table Management</h1>
           <p className="text-gray-600">Manage restaurant tables and assignments</p>
@@ -202,7 +202,7 @@ export function TableManagementView() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -215,9 +215,9 @@ export function TableManagementView() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {tables.map(table => (
-          <div key={table.id} className="bg-white rounded-lg border p-4">
+          <div key={table.id} className="bg-white rounded-lg border p-4 min-w-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Hash className="size-5 text-gray-500" />
@@ -234,7 +234,7 @@ export function TableManagementView() {
                 <span>Capacity: {table.capacity}</span>
               </div>
               {table.assignedCashierId && (
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 break-words" dir="auto">
                   Cashier: {users.find(u => u.id === table.assignedCashierId)?.name || 'Unknown'}
                 </div>
               )}
@@ -252,7 +252,7 @@ export function TableManagementView() {
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                  <Button size="sm" variant="outline" aria-label="Delete table" className="text-red-600 hover:text-red-700">
                     <Trash2 className="size-4" />
                   </Button>
                 </AlertDialogTrigger>

@@ -67,7 +67,7 @@ function AccountDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{account ? 'Edit Account' : 'New Account'}</DialogTitle>
         </DialogHeader>
@@ -101,7 +101,7 @@ function AccountDialog({
               <span className="block text-xs font-normal text-gray-500">Closing stops new bills going on this account. An account with history can't be deleted.</span>
             </Label>
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={loading}>{loading ? 'Saving…' : account ? 'Update' : 'Create'}</Button>
           </div>
@@ -173,38 +173,38 @@ function AccountDetail({
 
   return (
     <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-2">
-            {account.name}
+          <DialogTitle className="flex flex-wrap items-center gap-2 break-words">
+            <span dir="auto" className="min-w-0 break-words">{account.name}</span>
             {account.overdue && <Badge className="bg-red-100 text-red-700">Overdue</Badge>}
             {!account.isActive && <Badge className="bg-gray-100 text-gray-600">Closed</Badge>}
           </DialogTitle>
-          <p className="text-sm text-gray-500">{[account.phone, `Pays ${TERMS[account.terms].toLowerCase()}`].filter(Boolean).join(' · ')}</p>
+          <p className="text-sm text-gray-500 break-words">{[account.phone, `Pays ${TERMS[account.terms].toLowerCase()}`].filter(Boolean).join(' · ')}</p>
         </DialogHeader>
 
-        <div className="grid grid-cols-3 gap-3 py-2 border-y">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 py-2 border-y">
           <div className="text-center">
-            <p className={`text-2xl font-bold ${account.balance > 0 ? 'text-red-600' : 'text-gray-800'}`}>{fmt(account.balance)}</p>
+            <p className={`text-base sm:text-2xl font-bold break-words ${account.balance > 0 ? 'text-red-600' : 'text-gray-800'}`}>{fmt(account.balance)}</p>
             <p className="text-xs text-gray-500">Owes</p>
           </div>
           <div className="text-center">
-            <p className={`text-2xl font-bold ${account.overdue ? 'text-red-600' : 'text-gray-800'}`}>{fmtDate(account.dueDate)}</p>
+            <p className={`text-base sm:text-2xl font-bold break-words ${account.overdue ? 'text-red-600' : 'text-gray-800'}`}>{fmtDate(account.dueDate)}</p>
             <p className="text-xs text-gray-500">Due</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800">{account.creditLimit == null ? 'No limit' : fmt(account.creditLimit)}</p>
+            <p className="text-base sm:text-2xl font-bold text-gray-800 break-words">{account.creditLimit == null ? 'No limit' : fmt(account.creditLimit)}</p>
             <p className="text-xs text-gray-500">Credit limit</p>
           </div>
         </div>
 
-        {account.notes && <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">{account.notes}</p>}
+        {account.notes && <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 break-words" dir="auto">{account.notes}</p>}
 
         <Button size="sm" variant="outline" onClick={onEdit} className="w-fit">
           <Edit2 className="size-3.5 mr-1" /> Edit account
         </Button>
 
-        <form onSubmit={recordPayment} className="space-y-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+        <form onSubmit={recordPayment} className="space-y-3 p-3 sm:p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
           <p className="font-semibold text-sm">Record payment</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -228,7 +228,7 @@ function AccountDetail({
         </form>
 
         {canCorrect && (
-          <form onSubmit={adjust} className="space-y-3 p-4 rounded-xl border border-amber-200 bg-amber-50/50">
+          <form onSubmit={adjust} className="space-y-3 p-3 sm:p-4 rounded-xl border border-amber-200 bg-amber-50/50">
             <p className="font-semibold text-sm">Correction</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -254,7 +254,7 @@ function AccountDetail({
             <p className="text-sm text-gray-400 text-center py-4">No history yet</p>
           ) : (
             <div className="rounded-xl border overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[600px] text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Date</th>
@@ -277,7 +277,7 @@ function AccountDetail({
                           {signed < 0 ? '−' : '+'}{fmt(Math.abs(signed))}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-gray-600">{en.method ? METHODS[en.method as DebtPayMethod] ?? en.method : '—'}</td>
-                        <td className="px-3 py-2 text-gray-600 min-w-40">{en.note || '—'}</td>
+                        <td className="px-3 py-2 text-gray-600 min-w-40 break-words" dir="auto">{en.note || '—'}</td>
                         <td className="px-3 py-2 whitespace-nowrap text-gray-600">{en.createdByName || '—'}</td>
                       </tr>
                     );
@@ -348,8 +348,8 @@ export function DebtAccountsView() {
           <Card>
             <CardContent className="flex items-center gap-3 py-4">
               <HandCoins className="size-8 text-orange-500 shrink-0" />
-              <div>
-                <p className="text-2xl font-bold">{fmt(totalOwed)}</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold break-words">{fmt(totalOwed)}</p>
                 <p className="text-xs text-gray-500">Total owed by customers</p>
               </div>
             </CardContent>
@@ -372,7 +372,7 @@ export function DebtAccountsView() {
             <Input className="pl-9" placeholder="Search by name or phone…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search accounts" />
           </div>
           <Tabs value={filter} onValueChange={v => setFilter(v as Filter)}>
-            <TabsList>
+            <TabsList className="w-full sm:w-auto">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="owing">Owing</TabsTrigger>
               <TabsTrigger value="overdue">Overdue</TabsTrigger>
@@ -390,7 +390,36 @@ export function DebtAccountsView() {
             {!accounts.length && <Button className="mt-3" onClick={() => setIsAddOpen(true)}><Plus className="size-4 mr-1" /> Add first account</Button>}
           </div>
         ) : (
-          <div className="bg-white rounded-xl border overflow-x-auto">
+          <>
+          {/* Phones: one card per account */}
+          <ul className="md:hidden space-y-2">
+            {filtered.map(a => (
+              <li key={a.id} className={`bg-white rounded-xl border flex items-stretch ${a.isActive ? '' : 'opacity-50'}`}>
+                <button type="button" onClick={() => setDetailId(a.id)} className="flex-1 min-w-0 text-left p-3 space-y-1" aria-label={`Open ${a.name}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium min-w-0 break-words" dir="auto">{a.name}{!a.isActive && <span className="ml-2 text-xs font-normal text-gray-500">(closed)</span>}</p>
+                    <span className={`font-bold whitespace-nowrap ${owing(a) ? 'text-red-600' : 'text-gray-500'}`}>{fmt(a.balance)}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 break-words">{a.phone || '—'}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                    <span>{TERMS[a.terms]}</span>
+                    <span className="whitespace-nowrap">Limit: {a.creditLimit == null ? 'No limit' : fmt(a.creditLimit)}</span>
+                    <span className="whitespace-nowrap">Due: {fmtDate(a.dueDate)}</span>
+                    {a.overdue && <Badge className="bg-red-100 text-red-700">Overdue</Badge>}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(a)}
+                  className="shrink-0 w-11 flex items-center justify-center border-l text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-r-xl"
+                  title="Edit" aria-label={`Edit ${a.name}`}
+                >
+                  <Edit2 className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden md:block bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
@@ -406,7 +435,7 @@ export function DebtAccountsView() {
                 {filtered.map(a => (
                   <tr key={a.id} className={`border-b last:border-0 hover:bg-gray-50 cursor-pointer ${a.isActive ? '' : 'opacity-50'}`} onClick={() => setDetailId(a.id)}>
                     <td className="px-4 py-3">
-                      <p className="font-medium">{a.name}{!a.isActive && <span className="ml-2 text-xs font-normal text-gray-500">(closed)</span>}</p>
+                      <p className="font-medium break-words" dir="auto">{a.name}{!a.isActive && <span className="ml-2 text-xs font-normal text-gray-500">(closed)</span>}</p>
                       <p className="text-xs text-gray-400">{a.phone || '—'}</p>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{TERMS[a.terms]}</td>
@@ -439,6 +468,7 @@ export function DebtAccountsView() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

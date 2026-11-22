@@ -17,15 +17,15 @@ export function TableQRView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="p-4 sm:p-6 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-semibold text-2xl">Table QR Codes</h1>
             <p className="text-gray-600">Print QR codes for customer self-ordering</p>
           </div>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="min-h-11 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
           >
             <Printer className="size-4" />
             Print All QR Codes
@@ -46,7 +46,7 @@ export function TableQRView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 print:grid-cols-3 gap-4 sm:gap-6">
           {tables.map(table => (
             <TableQRCard
               key={table.id}
@@ -147,7 +147,7 @@ function TableQRCard({
   };
 
   return (
-    <div className="bg-white border-2 rounded-xl p-6 text-center print:break-inside-avoid shadow-sm">
+    <div className="bg-white border-2 rounded-xl p-4 sm:p-6 min-w-0 text-center print:break-inside-avoid shadow-sm">
       <h3 className="font-semibold text-xl mb-4">Table {tableNumber}</h3>
 
       <div className="flex justify-center mb-4 relative">
@@ -156,7 +156,7 @@ function TableQRCard({
             <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        <canvas ref={canvasRef} className="border-2 border-gray-200 rounded-lg" />
+        <canvas ref={canvasRef} className="border-2 border-gray-200 rounded-lg max-w-full h-auto" />
       </div>
 
       {error && (
@@ -167,17 +167,17 @@ function TableQRCard({
       {token && !loading && (
         <div className="flex items-center justify-center gap-1.5 mb-3">
           <Clock className="size-3 text-gray-400" />
-          <p className="text-[10px] text-gray-400 font-mono">
+          <p className="text-[10px] text-gray-400 font-mono break-all">
             Token: {token.slice(0, 16)}… · Reusable · Multi-device
           </p>
         </div>
       )}
 
-      <div className="flex gap-2 justify-center">
+      <div className="flex flex-wrap gap-2 justify-center">
         <button
           onClick={handlePrintSingle}
           disabled={loading || !!error}
-          className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm font-medium print:hidden disabled:opacity-40"
+          className="min-h-11 flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm font-medium print:hidden disabled:opacity-40"
         >
           <Printer className="size-4" />
           Print
@@ -186,7 +186,7 @@ function TableQRCard({
           onClick={regenerate}
           disabled={loading}
           title="Regenerate — this invalidates the old QR code immediately"
-          className="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 text-sm font-medium print:hidden disabled:opacity-40"
+          className="min-h-11 flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 text-sm font-medium print:hidden disabled:opacity-40"
         >
           <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           Regenerate

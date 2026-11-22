@@ -24,22 +24,22 @@ export function WorkforceLayout() {
     <div className="h-full flex flex-col overflow-hidden">
       {/* Sub-navigation bar */}
       <div className="bg-white border-b border-gray-200 shrink-0">
-        <div className="px-6">
-          <nav className="flex overflow-x-auto scrollbar-hide -mb-px">
+        <div className="px-2 sm:px-6">
+          <nav className="flex overflow-x-auto overscroll-x-contain no-scrollbar -mb-px">
             {visibleNav.map(item => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === '/workforce'}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  `flex shrink-0 items-center gap-2 px-3 sm:px-4 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                     isActive
                       ? 'border-amber-500 text-amber-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`
                 }
               >
-                <item.icon className="size-4" />
+                <item.icon className="size-4 shrink-0" />
                 {item.label}
               </NavLink>
             ))}

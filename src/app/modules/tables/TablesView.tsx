@@ -19,18 +19,18 @@ function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (t
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h3 className="font-bold text-gray-900">Move to Table</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Close" className="size-11 -mr-2 flex items-center justify-center rounded-lg hover:bg-gray-100"><X className="size-4 text-gray-400" /></button>
         </div>
-        <div className="p-4 max-h-[60vh] overflow-y-auto">
+        <div className="p-4 max-h-[60dvh] overflow-y-auto">
           {available.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No available tables to move to.</p>
           ) : (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 min-[400px]:grid-cols-4 gap-2">
               {available.map(t => (
                 <button
                   key={t.id}
                   onClick={() => onMove(t.id)}
-                  className="py-3 rounded-xl border-2 border-gray-100 hover:border-emerald-400 hover:bg-emerald-50 font-bold text-gray-700 text-sm transition-colors"
+                  className="min-h-11 py-3 rounded-xl border-2 border-gray-100 hover:border-emerald-400 hover:bg-emerald-50 font-bold text-gray-700 text-sm transition-colors"
                 >
                   {t.number}
                 </button>
@@ -379,31 +379,31 @@ export function TablesView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-7xl">
+      <div className="p-4 sm:p-6 space-y-6 max-w-7xl">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Tables</h1>
             <p className="text-gray-500 text-sm mt-0.5">
               Live table status — updates in real time
             </p>
           </div>
-          <div className="flex gap-3 items-stretch">
+          <div className="flex flex-wrap gap-2 sm:gap-3 items-stretch">
             {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
               <button
                 onClick={() => navigate('/takeaway')}
-                className="flex items-center gap-2 bg-purple-600 text-white rounded-xl px-5 font-semibold text-sm shadow-sm hover:bg-purple-700 transition-colors"
+                className="w-full sm:w-auto justify-center min-h-11 flex items-center gap-2 bg-purple-600 text-white rounded-xl px-4 sm:px-5 font-semibold text-sm whitespace-nowrap shadow-sm hover:bg-purple-700 transition-colors"
               >
                 <ShoppingBag className="size-4" /> New Takeaway
               </button>
             )}
             {(
-              <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
+              <div className="flex-1 sm:flex-none text-center bg-white rounded-xl px-4 sm:px-5 py-2 sm:py-3 border border-gray-100 shadow-sm">
                 <p className="text-2xl font-bold text-emerald-600">{available}</p>
                 <p className="text-xs text-gray-400">Available</p>
               </div>
             )}
-            <div className="text-center bg-white rounded-xl px-5 py-3 border border-gray-100 shadow-sm">
+            <div className="flex-1 sm:flex-none text-center bg-white rounded-xl px-4 sm:px-5 py-2 sm:py-3 border border-gray-100 shadow-sm">
               <p className="text-2xl font-bold text-blue-600">{occupied}</p>
               <p className="text-xs text-gray-400">{currentUser.role === 'cashier' ? 'Ready to Bill' : 'Occupied'}</p>
             </div>
@@ -418,13 +418,13 @@ export function TablesView() {
               <h2 className="text-xl font-bold text-gray-900">Takeaway Orders</h2>
               <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-bold">{takeawayOrders.length}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {takeawayOrders.map(order => {
                 const { total } = calcOrderTotals(order);
                 const pendingItems = order?.items?.filter((i: any) => i.status === 'pending').length ?? 0;
 
                 return (
-                  <div key={order.id} className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-4 cursor-pointer transition-all shadow-sm hover:border-purple-300 hover:shadow-md">
+                  <div key={order.id} className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-3 sm:p-4 min-w-0 cursor-pointer transition-all shadow-sm hover:border-purple-300 hover:shadow-md">
                     <div className="flex items-start justify-between mb-3">
                       <div className="size-10 bg-purple-200 rounded-xl flex items-center justify-center">
                         <ShoppingBag className="size-5 text-purple-700" />
@@ -457,12 +457,12 @@ export function TablesView() {
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span>
-                          <span className="font-bold text-gray-900">{fmt(total)}</span>
+                          <span className="font-bold text-gray-900 whitespace-nowrap">{fmt(total)}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => openTakeawayOrderModal(order)}
-                        className="w-full py-2 bg-purple-600 text-white rounded-xl text-xs font-semibold hover:bg-purple-700 transition-colors"
+                        className="w-full min-h-11 py-2 bg-purple-600 text-white rounded-xl text-xs font-semibold hover:bg-purple-700 transition-colors"
                       >
                         Process Payment
                       </button>
@@ -482,7 +482,7 @@ export function TablesView() {
               <h2 className="text-xl font-bold text-gray-900">Pickup Orders</h2>
               <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-bold">{pickupOrders.length}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {pickupOrders.map((order: any) => {
                 const { total } = calcOrderTotals(order);
                 const actor = { id: currentUser?.id, name: currentUser?.name, branchId: currentUser?.branchId };
@@ -493,17 +493,17 @@ export function TablesView() {
                 const busy = pickupBusy === order.id;
                 const methodLabel = order.pickupMethod === 'grab' ? 'Grab Express' : order.pickupMethod === 'lalamove' ? 'Lalamove' : 'Self Pickup';
                 return (
-                  <div key={order.id} className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 shadow-sm flex flex-col">
+                  <div key={order.id} className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-3 sm:p-4 min-w-0 shadow-sm flex flex-col">
                     <div className="flex items-start justify-between mb-2">
                       <div className="size-10 bg-orange-200 rounded-xl flex items-center justify-center"><Package className="size-5 text-orange-700" /></div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${order.pickupStatus === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{(order.pickupStatus ?? 'preparing').toUpperCase()}</span>
                     </div>
-                    <p className="font-bold text-gray-900 text-base">{order.customerName || 'Customer'}</p>
-                    <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Clock className="size-3" /> #{order.billNumber ?? '—'} · {order.customerPhone}</p>
+                    <p className="font-bold text-gray-900 text-base truncate" dir="auto">{order.customerName || 'Customer'}</p>
+                    <p className="text-xs text-gray-400 mb-2 flex items-center gap-1 min-w-0 break-all"><Clock className="size-3 shrink-0" /> #{order.billNumber ?? '—'} · {order.customerPhone}</p>
                     <div className="bg-white/80 rounded-xl p-2.5 space-y-1.5 border border-black/5 mb-2">
                       <div className="flex justify-between text-xs"><span className="text-gray-500">Items</span><span className="font-medium">{order.items?.length ?? 0}</span></div>
-                      <div className="flex justify-between text-xs"><span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span><span className="font-bold text-gray-900">{fmt(total)}</span></div>
-                      <div className="flex justify-between text-xs"><span className="text-gray-500">Method</span><span className="font-medium">{methodLabel}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span><span className="font-bold text-gray-900 whitespace-nowrap">{fmt(total)}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-gray-500">Method</span><span className="font-medium text-right">{methodLabel}</span></div>
                       <div className="flex justify-between text-xs"><span className="text-gray-500">Payment</span>
                         <span className="font-bold">{isOnline ? (order.paymentStatus === 'paid' ? 'Online · Paid' : order.paymentStatus === 'rejected' ? 'Online · Rejected' : 'Online · Verify') : 'Cash'}</span>
                       </div>
@@ -513,11 +513,11 @@ export function TablesView() {
                     {pending && (
                       <div className="space-y-1.5 mb-2">
                         {order.paymentReceiptUrl && (
-                          <button onClick={() => setReceiptUrl(order.paymentReceiptUrl)} className="w-full py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold">View Receipt</button>
+                          <button onClick={() => setReceiptUrl(order.paymentReceiptUrl)} className="w-full min-h-11 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold">View Receipt</button>
                         )}
                         <div className="grid grid-cols-2 gap-1.5">
-                          <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.approvePayment(order.id, actor), 'Payment approved', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'paid' } : o))} className="py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold disabled:opacity-50">Approve</button>
-                          <button disabled={busy} onClick={() => confirm('Reject this payment? The order stays open until you cancel it.') && runPickup(order.id, () => PickupController.rejectPayment(order.id, actor), 'Payment rejected', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'rejected' } : o))} className="py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-50">Reject</button>
+                          <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.approvePayment(order.id, actor), 'Payment approved', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'paid' } : o))} className="min-h-11 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold disabled:opacity-50">Approve</button>
+                          <button disabled={busy} onClick={() => confirm('Reject this payment? The order stays open until you cancel it.') && runPickup(order.id, () => PickupController.rejectPayment(order.id, actor), 'Payment rejected', prev => prev.map(o => o.id === order.id ? { ...o, paymentStatus: 'rejected' } : o))} className="min-h-11 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-50">Reject</button>
                         </div>
                       </div>
                     )}
@@ -528,13 +528,13 @@ export function TablesView() {
                         <button disabled={busy} onClick={() => confirm('Cancel this pickup order? It is removed from the kitchen and the customer link stops working.') && runPickup(order.id, () => PickupController.cancelOrder(order.id, actor), 'Order cancelled', prev => prev.filter(o => o.id !== order.id))} className="w-full min-h-11 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Cancel order</button>
                       )}
                       {canAdvance && order.pickupStatus !== 'ready' && (
-                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.setPickupStatus(order.id, 'ready', actor), 'Marked Ready', prev => prev.map(o => o.id === order.id ? { ...o, pickupStatus: 'ready' } : o))} className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Ready</button>
+                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.setPickupStatus(order.id, 'ready', actor), 'Marked Ready', prev => prev.map(o => o.id === order.id ? { ...o, pickupStatus: 'ready' } : o))} className="w-full min-h-11 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Ready</button>
                       )}
                       {canAdvance && order.pickupStatus === 'ready' && !isOnline && (
-                        <button onClick={() => setSelectedOrder({ ...order, tableId: null, tableNumber: 'Pickup' })} className="w-full py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold">Collect Cash</button>
+                        <button onClick={() => setSelectedOrder({ ...order, tableId: null, tableNumber: 'Pickup' })} className="w-full min-h-11 py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold">Collect Cash</button>
                       )}
                       {canAdvance && order.pickupStatus === 'ready' && isOnline && (
-                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.markPicked(order.id, actor), 'Order collected', prev => prev.filter(o => o.id !== order.id))} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Picked</button>
+                        <button disabled={busy} onClick={() => runPickup(order.id, () => PickupController.markPicked(order.id, actor), 'Order collected', prev => prev.filter(o => o.id !== order.id))} className="w-full min-h-11 py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold disabled:opacity-50">Mark Picked</button>
                       )}
                     </div>
                   </div>
@@ -547,12 +547,12 @@ export function TablesView() {
         {/* Pickup receipt viewer */}
         {receiptUrl && (
           <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4" onClick={() => setReceiptUrl(null)}>
-            <img src={receiptUrl} alt="Payment receipt" className="max-h-[90vh] max-w-full rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+            <img src={receiptUrl} alt="Payment receipt" className="max-h-[90dvh] max-w-full rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
           </div>
         )}
 
         {/* Table Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filteredTables.map(table => {
             const order = getOrder(table.id);
             const cfg = statusConfig[table.status];
@@ -562,7 +562,7 @@ export function TablesView() {
             const hasOrderWithItems = order && order.items?.length > 0;
             
             return (
-              <div key={table.id} className={`rounded-2xl border-2 p-4 cursor-pointer transition-all shadow-sm ${cfg.card}`}>
+              <div key={table.id} className={`rounded-2xl border-2 p-3 sm:p-4 min-w-0 cursor-pointer transition-all shadow-sm ${cfg.card}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="size-10 bg-gray-100 rounded-xl flex items-center justify-center">
                     <UtensilsCrossed className="size-5 text-gray-600" />
@@ -610,31 +610,31 @@ export function TablesView() {
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-500 flex items-center gap-1"><DollarSign className="size-3" />Total</span>
-                        <span className="font-bold text-gray-900">{fmt(total)}</span>
+                        <span className="font-bold text-gray-900 whitespace-nowrap">{fmt(total)}</span>
                       </div>
                     </div>
                     {canPay && (
                       <button 
                         onClick={() => void openOrderModal(table.id)} 
-                        className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors"
+                        className="w-full min-h-11 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors"
                       >
                         {hasOrderWithItems ? 'Process Payment' : 'Open Bill'}
                       </button>
                     )}
                     {(currentUser.role === 'waiter' || currentUser.role === 'swaiter') && (
-                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full min-h-11 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors">
                         Add Items
                       </button>
                     )}
                     {currentUser.role === 'admin' && (
-                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-700 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors">
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full min-h-11 py-2 bg-gray-700 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors">
                         View Menu
                       </button>
                     )}
                     {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && table.currentOrderId && (
                       <button
                         onClick={() => setMovingTable({ orderId: table.currentOrderId!, fromTableId: table.id, fromNumber: table.number })}
-                        className="w-full py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+                        className="w-full min-h-11 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
                       >
                         <ArrowLeftRight className="size-3.5" /> Move Table
                       </button>
@@ -645,13 +645,13 @@ export function TablesView() {
                     {currentUser.role === 'cashier' && table.status === 'occupied' && (
                       <button
                         onClick={() => void openOrderModal(table.id)}
-                        className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors mt-1"
+                        className="w-full min-h-11 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors mt-1"
                       >
                         Open Bill
                       </button>
                     )}
                     {(currentUser.role === 'waiter' || currentUser.role === 'swaiter' || currentUser.role === 'admin' || currentUser.role === 'manager') && (
-                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full min-h-11 py-2 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors mt-1">
                         Start Order
                       </button>
                     )}

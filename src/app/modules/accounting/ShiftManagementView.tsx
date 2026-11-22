@@ -114,19 +114,19 @@ export function ShiftManagementView() {
   if (loading) return <div className="p-8 text-center text-gray-400">Loading shift data...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-8">
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
       <div className="flex items-center gap-3">
-        <div className="size-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
+        <div className="size-12 shrink-0 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
           <Clock className="size-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase italic">Shift Management</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight uppercase italic break-words">Shift Management</h1>
           <p className="text-sm text-gray-500 font-medium">Control your cash drawer and shift reports</p>
         </div>
       </div>
 
       {!currentShift ? (
-        <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-6 animate-in fade-in zoom-in duration-500">
+        <div className="bg-white rounded-[32px] border border-gray-100 p-5 sm:p-8 shadow-sm space-y-6 animate-in fade-in zoom-in duration-500">
           <div className="text-center space-y-2">
             <div className="size-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Banknote className="size-10 text-emerald-600" />
@@ -148,7 +148,7 @@ export function ShiftManagementView() {
             </div>
             <button 
               onClick={handleOpenShift}
-              className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 px-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider sm:tracking-widest hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
             >
               Start Shift <ArrowRight className="size-5" />
             </button>
@@ -156,29 +156,29 @@ export function ShiftManagementView() {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="bg-emerald-600 rounded-[32px] p-8 text-white shadow-lg relative overflow-hidden">
+          <div className="bg-emerald-600 rounded-[32px] p-5 sm:p-8 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10">
               <CheckCircle className="size-32" />
             </div>
             <div className="relative z-10 space-y-6">
               <div>
                 <p className="text-emerald-100 font-bold uppercase tracking-widest text-xs">Active Shift</p>
-                <h2 className="text-3xl font-black tracking-tight">{currentUser?.name}</h2>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight break-words" dir="auto">{currentUser?.name}</h2>
               </div>
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4 sm:gap-8">
                 <div>
                   <p className="text-emerald-100 text-xs font-medium uppercase mb-1">Opened At</p>
                   <p className="text-xl font-bold">{new Date(currentShift.opened_at).toLocaleTimeString()}</p>
                 </div>
                 <div>
                   <p className="text-emerald-100 text-xs font-medium uppercase mb-1">Opening Cash</p>
-                  <p className="text-xl font-bold">{fmt(currentShift.opening_cash)}</p>
+                  <p className="text-xl font-bold whitespace-nowrap">{fmt(currentShift.opening_cash)}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm space-y-6">
+          <div className="bg-white rounded-[32px] border border-gray-100 p-5 sm:p-8 shadow-sm space-y-6">
             <div className="flex items-center gap-3 mb-2">
               <AlertCircle className="size-5 text-amber-500" />
               <h3 className="font-bold text-gray-900">End Your Shift</h3>
@@ -198,7 +198,7 @@ export function ShiftManagementView() {
               </div>
               <button 
                 onClick={handleEndShift}
-                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 px-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-wider sm:tracking-widest text-center hover:bg-black transition-all flex items-center justify-center gap-2"
               >
                 End Shift & Print Report <FileText className="size-5" />
               </button>

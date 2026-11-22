@@ -28,7 +28,7 @@ export function PeriodPicker({ value, onChange }: { value: PeriodKey; onChange: 
     <select
       value={value}
       onChange={e => onChange(e.target.value as PeriodKey)}
-      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700"
+      className="min-h-11 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700"
       aria-label="Period"
     >
       <option value="this-month">This month</option>
@@ -46,7 +46,7 @@ export function AdvisoryBanner() {
   return (
     <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
       <ShieldAlert className="size-4 shrink-0 mt-0.5" />
-      <p>
+      <p className="min-w-0">
         Performance indicators are <strong>advisory</strong>. AI camera observations only count after a manager
         verifies them, and nothing here changes payroll or triggers disciplinary action automatically.
       </p>
@@ -138,7 +138,7 @@ export function ObservationList({
         // Only offer people whose role this category is part of.
         const candidates = employees.filter(e => isCategoryRelevant(e.role, o.category));
         return (
-          <div key={o.id} className="border border-gray-100 rounded-xl p-4">
+          <div key={o.id} className="border border-gray-100 rounded-xl p-3 sm:p-4 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="text-sm font-semibold text-gray-900">{CATEGORY_LABELS[o.category]}</span>
               <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${src.cls}`}>
@@ -148,23 +148,23 @@ export function ObservationList({
                 {o.reviewStatus}
               </span>
               {metric && <span className="text-xs font-medium text-gray-700">{metric}</span>}
-              <span className="text-xs text-gray-400 ml-auto">{fmtDateTime(o.observedAt)}</span>
+              <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">{fmtDateTime(o.observedAt)}</span>
             </div>
-            <p className="text-sm text-gray-700">{o.summary}</p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+            <p dir="auto" className="text-sm text-gray-700 break-words">{o.summary}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 break-words min-w-0">
               <span>
                 Employee: {o.employeeId
-                  ? <strong className="text-gray-800">{nameOf(o.employeeId)}</strong>
+                  ? <strong dir="auto" className="text-gray-800">{nameOf(o.employeeId)}</strong>
                   : <strong className="text-amber-700">Unattributed</strong>}
               </span>
               {o.originalEmployeeId && <span>AI originally: {nameOf(o.originalEmployeeId)}</span>}
               {o.confidence !== undefined && <span>Confidence: {Math.round(o.confidence * 100)}%</span>}
-              {evidenceEntries(o).map(([k, v]) => <span key={k}>{k}: {v}</span>)}
+              {evidenceEntries(o).map(([k, v]) => <span key={k} className="break-all">{k}: {v}</span>)}
             </div>
             {reason && o.reviewStatus === 'pending' && (
               <p className="mt-1 text-xs text-gray-400">Attribution: {reason}</p>
             )}
-            {o.reviewNote && <p className="mt-1 text-xs text-gray-500 italic">Review note: {o.reviewNote}</p>}
+            {o.reviewNote && <p dir="auto" className="mt-1 text-xs text-gray-500 italic break-words">Review note: {o.reviewNote}</p>}
 
             {allowed && o.reviewStatus === 'pending' && (
               <div className="mt-3 space-y-2">
@@ -173,7 +173,7 @@ export function ObservationList({
                     <select
                       value={target}
                       onChange={e => setTarget(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg"
+                      className="min-h-11 min-w-0 max-w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg"
                       aria-label="Correct employee"
                     >
                       <option value="">Select employee…</option>
@@ -181,27 +181,28 @@ export function ObservationList({
                     </select>
                     <input
                       value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)"
-                      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg flex-1 min-w-32"
+                      dir="auto"
+                      className="min-h-11 px-3 py-1.5 text-sm border border-gray-200 rounded-lg flex-1 min-w-32"
                     />
                     <button disabled={!target || busy === o.id} onClick={() => act(o, 'correct')}
-                      className="px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white disabled:opacity-50">Save</button>
+                      className="min-h-11 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white disabled:opacity-50">Save</button>
                     <button onClick={() => { setCorrecting(null); setTarget(''); }}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600">Cancel</button>
+                      className="min-h-11 px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600">Cancel</button>
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {o.employeeId && (
                       <button disabled={busy === o.id} onClick={() => act(o, 'verify')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                        className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
                         <CheckCircle className="size-4" /> Verify
                       </button>
                     )}
                     <button disabled={busy === o.id} onClick={() => { setCorrecting(o.id); setNote(''); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+                      className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
                       <UserCog className="size-4" /> {o.employeeId ? 'Correct employee' : 'Assign employee'}
                     </button>
                     <button disabled={busy === o.id} onClick={() => act(o, 'dismiss')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      className="flex items-center gap-1.5 min-h-11 px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
                       <XCircle className="size-4" /> Dismiss
                     </button>
                   </div>
@@ -234,7 +235,7 @@ export function AddObservationButton({
   return (
     <>
       <button onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-2 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600">
+        className="flex items-center gap-2 min-h-11 px-3 py-2 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600">
         <Plus className="size-4" /> Add observation
       </button>
       {open && (
@@ -287,18 +288,18 @@ function AddObservationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90dvh] overflow-y-auto overscroll-contain">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-gray-900">Add observation</h2>
-          <button onClick={onClose} aria-label="Close"><X className="size-5 text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Close" className="shrink-0 flex items-center justify-center size-11 -m-2 rounded-lg hover:bg-gray-100"><X className="size-5 text-gray-400" /></button>
         </div>
 
         {!fixedEmployee && (
           <label className="block text-sm">
             <span className="text-gray-600">Employee</span>
             <select value={employeeId} onChange={e => setEmployeeId(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-xl">
+              className="mt-1 w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl">
               <option value="">Select employee…</option>
               {employees.map(e => <option key={e.employeeId} value={e.employeeId}>{e.fullName} ({e.role})</option>)}
             </select>
@@ -308,7 +309,7 @@ function AddObservationModal({
         <label className="block text-sm">
           <span className="text-gray-600">Type</span>
           <select value={category} onChange={e => { setCategory(e.target.value as ObservationCategory); setValue(''); }}
-            className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-xl">
+            className="mt-1 w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl">
             {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
           </select>
         </label>
@@ -318,22 +319,22 @@ function AddObservationModal({
             <span className="text-gray-600">{valueLabel}</span>
             <input type="number" value={value} onChange={e => setValue(e.target.value)}
               min={category === 'manager_evaluation' ? 1 : 0} max={category === 'manager_evaluation' ? 5 : undefined}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-xl" />
+              className="mt-1 w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl" />
           </label>
         )}
 
         <label className="block text-sm">
           <span className="text-gray-600">Description</span>
-          <textarea value={summary} onChange={e => setSummary(e.target.value)} rows={3}
+          <textarea dir="auto" value={summary} onChange={e => setSummary(e.target.value)} rows={3}
             className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-xl" />
         </label>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700">{error}</div>}
 
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600">Cancel</button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button onClick={onClose} className="min-h-11 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600">Cancel</button>
           <button onClick={save} disabled={saving}
-            className="px-4 py-2 text-sm bg-amber-500 text-white rounded-xl disabled:opacity-50">
+            className="min-h-11 px-4 py-2 text-sm bg-amber-500 text-white rounded-xl disabled:opacity-50">
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>

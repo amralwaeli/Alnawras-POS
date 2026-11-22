@@ -146,15 +146,15 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-2xl mx-auto py-4 sm:py-8 px-0 sm:px-4">
 
       {/* Sub-tab switcher */}
-      <div className="flex gap-2 mb-6 bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06] w-fit">
+      <div className="flex gap-2 mb-6 bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06] w-fit max-w-full overflow-x-auto no-scrollbar">
         {(['form', 'history'] as const).map(v => (
           <button
             key={v}
             onClick={() => { setView(v); if (v === 'history') void loadHistory(); }}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`min-h-11 shrink-0 whitespace-nowrap px-4 sm:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
               view === v ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'
             }`}
           >
@@ -164,27 +164,27 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
       </div>
 
       {view === 'form' ? (
-        <div className="bg-[#161B22] rounded-[32px] border border-white/[0.06] overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="bg-[#161B22] rounded-3xl sm:rounded-[32px] border border-white/[0.06] overflow-hidden shadow-2xl">
+          <div className="p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
             <div className="flex items-center gap-3">
-              <div className="size-10 bg-orange-500 rounded-xl flex items-center justify-center">
+              <div className="size-10 shrink-0 bg-orange-500 rounded-xl flex items-center justify-center">
                 <ShoppingCart className="size-5 text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-lg font-black uppercase tracking-tight">Request Ingredients</h2>
                 <p className="text-xs text-gray-500">Owner will be notified via WhatsApp</p>
               </div>
             </div>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             {/* Items */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between gap-2 mb-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Items Needed</p>
                 <button
                   onClick={addRow}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/30 transition-colors"
+                  className="min-h-10 shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/30 transition-colors"
                 >
                   <Plus className="size-3.5" /> Add Item
                 </button>
@@ -192,13 +192,14 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
 
               <div className="space-y-2">
                 {items.map((item, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={i} className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                     <input
                       type="text"
                       placeholder="Ingredient name…"
                       value={item.name}
                       onChange={e => updateRow(i, 'name', e.target.value)}
-                      className="flex-1 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
+                      dir="auto"
+                      className="w-full sm:w-auto sm:flex-1 min-w-0 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                     />
                     <input
                       type="number"
@@ -206,17 +207,17 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
                       step="0.5"
                       value={item.quantity}
                       onChange={e => updateRow(i, 'quantity', e.target.value)}
-                      className="w-20 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-3 py-3 text-sm text-white text-center focus:outline-none focus:border-orange-500 transition-colors"
+                      className="flex-1 sm:flex-none min-w-0 sm:w-20 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-3 py-3 text-sm text-white text-center focus:outline-none focus:border-orange-500 transition-colors"
                     />
                     <select
                       value={item.unit}
                       onChange={e => updateRow(i, 'unit', e.target.value)}
-                      className="w-24 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-2 py-3 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
+                      className="flex-1 sm:flex-none min-w-0 sm:w-24 bg-[#0B0E14] border border-white/[0.08] rounded-xl px-2 py-3 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
                     >
                       {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                     {items.length > 1 && (
-                      <button onClick={() => removeRow(i)} className="p-2 text-gray-600 hover:text-red-400 transition-colors">
+                      <button onClick={() => removeRow(i)} aria-label="Remove item" className="p-3 shrink-0 text-gray-600 hover:text-red-400 transition-colors">
                         <Trash2 className="size-4" />
                       </button>
                     )}
@@ -241,19 +242,19 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+              className="w-full py-4 px-3 text-center text-sm sm:text-base bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black uppercase tracking-wider sm:tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
             >
-              <Send className="size-4" />
+              <Send className="size-4 shrink-0" />
               {submitting ? 'Sending…' : 'Submit & Notify Owner via WhatsApp'}
             </button>
           </div>
         </div>
       ) : (
         /* History */
-        <div className="bg-[#161B22] rounded-[32px] border border-white/[0.06] overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between">
+        <div className="bg-[#161B22] rounded-3xl sm:rounded-[32px] border border-white/[0.06] overflow-hidden shadow-2xl">
+          <div className="p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Your Requests</p>
-            <button onClick={loadHistory} className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/[0.05] transition-colors">
+            <button onClick={loadHistory} aria-label="Refresh" className="p-3 rounded-xl text-gray-500 hover:text-white hover:bg-white/[0.05] transition-colors">
               <RefreshCw className="size-4" />
             </button>
           </div>
@@ -270,11 +271,11 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
               <p className="text-gray-700 text-xs mt-1">Your submitted orders will appear here</p>
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.04] max-h-[60vh] overflow-y-auto kitchen-scroll">
+            <div className="divide-y divide-white/[0.04] max-h-[60dvh] overflow-y-auto kitchen-scroll">
               {history.map(order => {
                 const st = STATUS_STYLE[order.status] ?? STATUS_STYLE.pending;
                 return (
-                  <div key={order.id} className="p-5 hover:bg-white/[0.02] transition-colors">
+                  <div key={order.id} className="p-4 sm:p-5 hover:bg-white/[0.02] transition-colors">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2">
                         <Clock className="size-3.5 text-gray-600 shrink-0" />
@@ -282,20 +283,20 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
                           {new Date(order.created_at).toLocaleDateString('en-GB')} {new Date(order.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${st.cls}`}>
+                      <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${st.cls}`}>
                         {st.label}
                       </span>
                     </div>
                     <div className="space-y-1">
                       {order.items.map((item, i) => (
-                        <p key={i} className="text-sm text-white">
+                        <p key={i} className="text-sm text-white break-words" dir="auto">
                           <span className="text-orange-500 font-bold">•</span>{' '}
                           {item.name} — <span className="text-gray-400">{item.quantity} {item.unit}</span>
                         </p>
                       ))}
                     </div>
                     {order.notes && (
-                      <p className="text-xs text-amber-400/80 italic mt-2 bg-amber-500/10 px-3 py-2 rounded-xl border border-amber-900/20">
+                      <p dir="auto" className="text-xs text-amber-400/80 italic mt-2 bg-amber-500/10 px-3 py-2 rounded-xl border border-amber-900/20 break-words">
                         {order.notes}
                       </p>
                     )}
@@ -311,7 +312,7 @@ export function IngredientOrdersTab({ currentUser }: { currentUser: any }) {
                         });
                         sendWhatsApp(msg, settings.kitchenWhatsapp);
                       }}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-bold transition-colors"
+                      className="mt-3 min-h-10 flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-bold transition-colors"
                     >
                       <Send className="size-3" /> Resend to WhatsApp
                     </button>

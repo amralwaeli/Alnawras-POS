@@ -37,14 +37,14 @@ export function AlertOverlay() {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-3 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-sm space-y-3 max-h-[90dvh] overflow-y-auto overscroll-contain">
         {alerts.map(a => (
-          <div key={a.id} className="bg-white rounded-3xl shadow-2xl p-6 text-center border-4 border-orange-400 animate-pulse">
+          <div key={a.id} className="bg-white rounded-3xl shadow-2xl p-5 sm:p-6 text-center border-4 border-orange-400 animate-pulse">
             <div className="mx-auto mb-3 size-16 rounded-full bg-orange-100 flex items-center justify-center animate-bounce">
               {a.kind === 'table' ? <Bell className="size-8 text-orange-600" /> : <Package className="size-8 text-orange-600" />}
             </div>
-            <h2 className="text-2xl font-black text-gray-900">{a.title}</h2>
-            <p className="text-gray-600 mt-1 mb-5">{a.body}</p>
+            <h2 className="text-2xl font-black text-gray-900 break-words" dir="auto">{a.title}</h2>
+            <p className="text-gray-600 mt-1 mb-5 break-words" dir="auto">{a.body}</p>
             <button
               onClick={() => acknowledge(a)}
               className="w-full py-3.5 bg-orange-500 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 hover:bg-orange-600 transition-colors"

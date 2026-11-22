@@ -54,7 +54,7 @@ export function FreePlanUsage() {
         <div className="mt-3 flex flex-wrap gap-2">
           {months.map(m => (
             <button key={m.month} onClick={() => download(m.month)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50">
+              className="min-h-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50">
               <Download className="size-3.5" /> {m.month.slice(0, 7)} · {m.order_count} bills
             </button>
           ))}

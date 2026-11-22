@@ -69,19 +69,19 @@ export function ModifierPickerModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[88vh] flex flex-col"
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h3 className="font-black text-lg text-gray-900 truncate pr-2">{productName}</h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100"><X className="size-5 text-gray-500" /></button>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-b shrink-0">
+          <h3 dir="auto" className="font-black text-lg text-gray-900 truncate min-w-0">{productName}</h3>
+          <button onClick={onClose} aria-label="Close" className="size-11 shrink-0 flex items-center justify-center rounded-full hover:bg-gray-100"><X className="size-5 text-gray-500" /></button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-5 flex-1">
+        <div className="overflow-y-auto overscroll-contain px-5 py-4 space-y-5 flex-1 min-h-0">
           {groups.map(g => (
             <div key={g.id}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-gray-800">{g.name}</span>
-                <span className="text-xs font-semibold text-gray-400">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span dir="auto" className="font-bold text-gray-800 min-w-0 break-words">{g.name}</span>
+                <span className="text-xs font-semibold text-gray-400 whitespace-nowrap shrink-0">
                   {g.type === 'single' ? 'Pick one' : 'Pick any'}
                 </span>
               </div>
@@ -90,17 +90,17 @@ export function ModifierPickerModal({
                   const isOn = !!selected[g.id]?.has(o.id);
                   return (
                     <label key={o.id}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer ${isOn ? 'border-orange-500 bg-orange-50' : 'border-gray-200'}`}>
+                      className={`flex items-center gap-3 min-h-11 rounded-xl border px-3 py-2.5 cursor-pointer ${isOn ? 'border-orange-500 bg-orange-50' : 'border-gray-200'}`}>
                       <input
                         type={g.type === 'single' ? 'radio' : 'checkbox'}
                         name={`grp-${g.id}`}
                         checked={isOn}
                         onChange={() => g.type === 'single' ? pickSingle(g.id, o.id) : toggleMulti(g.id, o.id)}
-                        className="size-4 accent-orange-500"
+                        className="size-4 shrink-0 accent-orange-500"
                       />
-                      <span className="flex-1 text-sm text-gray-800">{o.name}</span>
+                      <span dir="auto" className="flex-1 min-w-0 break-words text-sm text-gray-800">{o.name}</span>
                       {o.addOnPrice > 0 && (
-                        <span className="text-sm font-semibold text-gray-600">+{currency} {o.addOnPrice.toFixed(2)}</span>
+                        <span className="text-sm font-semibold text-gray-600 whitespace-nowrap shrink-0">+{currency} {o.addOnPrice.toFixed(2)}</span>
                       )}
                     </label>
                   );
@@ -110,14 +110,14 @@ export function ModifierPickerModal({
           ))}
         </div>
 
-        <div className="px-5 py-4 border-t">
+        <div className="px-5 pt-4 pb-safe border-t shrink-0">
           {!canConfirm && (
-            <p className="text-xs text-red-500 mb-2">Please choose: {missing.map(g => g.name).join(', ')}</p>
+            <p dir="auto" className="text-xs text-red-500 mb-2 break-words">Please choose: {missing.map(g => g.name).join(', ')}</p>
           )}
           <button
             disabled={!canConfirm}
             onClick={() => onConfirm(chosen, extra)}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl py-3"
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl min-h-12 py-3"
           >
             Add{extra > 0 ? ` · +${currency} ${extra.toFixed(2)}` : ''}
           </button>

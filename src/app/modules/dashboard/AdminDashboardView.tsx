@@ -50,7 +50,7 @@ function KpiCard({
   icon: any; accent: string; trend?: string; sparkData?: number[];
 }) {
   return (
-    <div className="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
+    <div className="relative min-w-0 bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{ background: `radial-gradient(circle at 80% 20%, ${accent}10, transparent 60%)` }} />
       <div className="flex items-start justify-between mb-3">
@@ -61,7 +61,7 @@ function KpiCard({
           <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${accent}15`, color: accent }}>{trend}</span>
         )}
       </div>
-      <p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{value}</p>
+      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight break-words">{value}</p>
       <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
       {sub && <p className="text-[11px] text-gray-400 mt-1">{sub}</p>}
       {sparkData && <div className="mt-3 -mx-1"><Sparkline data={sparkData} color={accent} /></div>}
@@ -106,9 +106,12 @@ function RevenueChart({ days }: { days: { label: string; value: number }[] }) {
           {fmt(pts[hovered].value)}
         </div>
       )}
-      <div className="flex justify-between mt-1">
+      {/* Labels sit under their points; on narrow cards only every 3rd shows so 24 hours don't overflow. */}
+      <div className="relative h-4 mt-1">
         {days.map((d, i) => (
-          <span key={i} className={`text-[10px] font-medium ${hovered === i ? 'text-emerald-600' : 'text-gray-400'}`}>{d.label}</span>
+          <span key={i}
+            className={`absolute -translate-x-1/2 whitespace-nowrap text-[10px] font-medium ${i % 3 ? 'hidden md:inline lg:hidden xl:inline' : ''} ${hovered === i ? 'text-emerald-600' : 'text-gray-400'}`}
+            style={{ left: `${days.length > 1 ? (i / (days.length - 1)) * 100 : 0}%` }}>{d.label}</span>
         ))}
       </div>
     </div>
@@ -142,16 +145,16 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[85dvh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b">
-          <div className="flex items-center gap-3">
-            <div className={`size-10 rounded-xl flex items-center justify-center ${offPrem ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+        <div className="shrink-0 flex items-center justify-between gap-2 p-4 sm:p-5 border-b">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`size-10 shrink-0 rounded-xl flex items-center justify-center ${offPrem ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
               {offPrem ? <ShoppingBag className="size-5" /> : <Utensils className="size-5" />}
             </div>
-            <div>
-              <h2 className="font-bold text-gray-900 text-base">
+            <div className="min-w-0">
+              <h2 className="font-bold text-gray-900 text-base truncate">
                 {isPickup
                   ? `Pickup${order.billNumber ? ` #${order.billNumber}` : ''}`
                   : isTakeaway
@@ -164,18 +167,18 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${order.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
               {order.status}
             </span>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+            <button onClick={onClose} aria-label="Close" className="p-3 -mr-1 rounded-xl hover:bg-gray-100 transition-colors">
               <X className="size-4 text-gray-500" />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-5">
           {byWaiter.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">No items recorded for this order.</p>
           ) : byWaiter.map((group, gi) => (
@@ -184,10 +187,10 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
                 {group.isQr
                   ? <QrCode className="size-3.5 text-violet-500 flex-shrink-0" />
                   : <UserCheck className="size-3.5 text-blue-500 flex-shrink-0" />}
-                <span className={`text-xs font-bold uppercase tracking-widest ${group.isQr ? 'text-violet-700' : 'text-blue-700'}`}>
+                <span dir="auto" className={`min-w-0 truncate text-xs font-bold uppercase tracking-widest ${group.isQr ? 'text-violet-700' : 'text-blue-700'}`}>
                   {group.name}
                 </span>
-                <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${group.isQr ? 'bg-violet-100 text-violet-600' : 'bg-blue-100 text-blue-600'}`}>
+                <span className={`ml-auto shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${group.isQr ? 'bg-violet-100 text-violet-600' : 'bg-blue-100 text-blue-600'}`}>
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -197,9 +200,9 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
                     ? item.addedAt
                     : item.created_at ? new Date(item.created_at) : null;
                   return (
-                    <div key={ii} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                    <div key={ii} className="flex items-center gap-2 sm:gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">
+                        <p className="text-sm font-semibold text-gray-800 truncate" dir="auto">
                           {item.productName || item.product_name || 'Item'}
                         </p>
                         {addedAt && (
@@ -207,14 +210,14 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
                             Added {addedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         )}
-                        {item.notes && <p className="text-[10px] text-amber-600 mt-0.5 italic">Note: {item.notes}</p>}
+                        {item.notes && <p dir="auto" className="text-[10px] text-amber-600 mt-0.5 italic break-words">Note: {item.notes}</p>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
                           {item.status ?? 'pending'}
                         </span>
                         <span className="text-xs text-gray-400">×{item.quantity ?? 1}</span>
-                        <span className="text-sm font-bold text-gray-900 w-16 text-right">
+                        <span className="text-sm font-bold text-gray-900 min-w-16 text-right whitespace-nowrap">
                           {fmt((item.price ?? item.unit_price ?? 0) * (item.quantity ?? 1))}
                         </span>
                       </div>
@@ -227,9 +230,9 @@ function OrderDetailModal({ order, onClose }: { order: any; onClose: () => void 
         </div>
 
         {/* Footer */}
-        <div className="border-t p-5 flex items-center justify-between bg-gray-50 rounded-b-2xl">
+        <div className="shrink-0 border-t p-4 sm:p-5 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl">
           <span className="text-sm text-gray-500 font-medium">Total</span>
-          <span className="text-xl font-bold text-gray-900">{fmt(orderTotal(order))}</span>
+          <span className="text-xl font-bold text-gray-900 whitespace-nowrap">{fmt(orderTotal(order))}</span>
         </div>
       </div>
     </div>
@@ -271,7 +274,7 @@ function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
           </span>
           {waiterNames.slice(0, 2).map(name => (
             <span key={name} className="text-[10px] bg-blue-50 text-blue-600 font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-              <UserCheck className="size-2.5" />{name}
+              <UserCheck className="size-2.5 shrink-0" /><span dir="auto" className="truncate max-w-[8rem]">{name}</span>
             </span>
           ))}
           {hasQrItems && (
@@ -285,7 +288,7 @@ function OrderRow({ order, onClick }: { order: any; onClick: () => void }) {
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusStyle[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
           {order.status}
         </span>
-        <span className="text-sm font-bold text-gray-900 w-20 text-right">{fmt(orderTotal(order))}</span>
+        <span className="text-sm font-bold text-gray-900 min-w-20 text-right whitespace-nowrap">{fmt(orderTotal(order))}</span>
       </div>
     </button>
   );
@@ -314,14 +317,14 @@ function WaiterLeaderboard({ orders, users }: { orders: any[]; users: any[] }) {
     <div className="space-y-4">
       {performance.map((p, i) => (
         <div key={p.id} className="group">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <div className={`size-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`size-6 shrink-0 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
                 {i === 0 ? <Trophy className="size-3" /> : i + 1}
               </div>
-              <span className="text-xs font-bold text-gray-700">{p.name}</span>
+              <span className="text-xs font-bold text-gray-700 truncate" dir="auto">{p.name}</span>
             </div>
-            <span className="text-xs font-bold text-gray-900">{fmt(p.total)}</span>
+            <span className="text-xs font-bold text-gray-900 shrink-0 whitespace-nowrap">{fmt(p.total)}</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${(p.total / maxTotal) * 100}%` }} />
@@ -433,25 +436,25 @@ export function AdminDashboardView() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-700">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Admin Dashboard</h1>
-          <p className="text-gray-500 font-medium flex items-center gap-2 mt-1">
-            <Building2 className="size-4" /> {businessName} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Admin Dashboard</h1>
+          <p className="text-gray-500 font-medium flex flex-wrap items-center gap-x-2 mt-1">
+            <Building2 className="size-4 shrink-0" /> <span dir="auto">{businessName}</span> · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={handleBackup}
             disabled={isBackingUp}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            className="min-h-11 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold text-sm whitespace-nowrap hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >
             <Download className={`size-4 ${isBackingUp ? 'animate-bounce' : ''}`} />
             {isBackingUp ? 'Exporting...' : 'Export Sales Data'}
           </button>
-          <Link to="/inventory" className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
+          <Link to="/inventory" className="min-h-11 flex items-center gap-2 px-4 py-2.5 whitespace-nowrap bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-lg shadow-orange-200">
             <Package className="size-4" /> Manage Inventory
           </Link>
         </div>
@@ -461,7 +464,7 @@ export function AdminDashboardView() {
 
       {/* Low Stock Alert */}
       {lowStock.length > 0 && (
-        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center justify-between animate-pulse">
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-pulse">
           <div className="flex items-center gap-3">
             <div className="bg-red-100 p-2 rounded-xl">
               <AlertTriangle className="size-5 text-red-600" />
@@ -476,7 +479,7 @@ export function AdminDashboardView() {
       )}
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         <KpiCard
           label="Today's Revenue"
           value={fmt(stats.revenue)}
@@ -507,11 +510,11 @@ export function AdminDashboardView() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Left Column: Recent Activity */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 min-w-0 space-y-6 lg:space-y-8">
           {/* Revenue Chart */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+          <div className="bg-white rounded-3xl border border-gray-100 p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="font-bold text-gray-900">Revenue Flow</h3>
@@ -526,7 +529,7 @@ export function AdminDashboardView() {
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+          <div className="bg-white rounded-3xl border border-gray-100 p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-gray-900">Recent Orders</h3>
               <Link to="/reports" className="text-xs font-bold text-blue-600 hover:underline">View All</Link>
@@ -547,9 +550,9 @@ export function AdminDashboardView() {
         </div>
 
         {/* Right Column: Insights */}
-        <div className="space-y-8">
+        <div className="min-w-0 space-y-6 lg:space-y-8">
           {/* Waiter Performance */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+          <div className="bg-white rounded-3xl border border-gray-100 p-4 sm:p-6 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
               <Star className="size-4 text-amber-500" /> Top Performers
             </h3>
@@ -557,7 +560,7 @@ export function AdminDashboardView() {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 text-white shadow-xl shadow-gray-200">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-4 sm:p-6 text-white shadow-xl shadow-gray-200">
             <h3 className="font-bold mb-4">Quick Insights</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-white/10 rounded-2xl">

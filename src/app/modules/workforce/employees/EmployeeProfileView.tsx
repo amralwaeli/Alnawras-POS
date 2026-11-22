@@ -166,7 +166,7 @@ export function EmployeeProfileView() {
 
   if (error || !employee) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <button onClick={() => navigate('/workforce/employees')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-4">
           <ArrowLeft className="size-4" /> Back
         </button>
@@ -185,18 +185,18 @@ export function EmployeeProfileView() {
   ];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
 
       {/* ── Back ── */}
       <button
         onClick={() => navigate('/workforce/employees')}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+        className="flex items-center gap-2 min-h-11 text-sm text-gray-500 hover:text-gray-900 transition-colors"
       >
         <ArrowLeft className="size-4" /> All Employees
       </button>
 
       {/* ── Profile card ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-5">
 
           {/* Avatar */}
@@ -207,9 +207,9 @@ export function EmployeeProfileView() {
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-start gap-3">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{employee.fullName}</h1>
-                <p className="text-sm text-gray-500 mt-0.5">
+              <div className="min-w-0">
+                <h1 dir="auto" className="text-xl font-bold text-gray-900 break-words">{employee.fullName}</h1>
+                <p dir="auto" className="text-sm text-gray-500 mt-0.5 break-words">
                   {employee.employeeNumber ?? employee.employeeId} · {employee.department}
                 </p>
               </div>
@@ -231,48 +231,48 @@ export function EmployeeProfileView() {
             </div>
 
             {/* Contact + Employment details */}
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-4 grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {employee.email && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                   <Mail className="size-4 text-gray-400 shrink-0" />
                   <span className="truncate">{employee.email}</span>
                 </div>
               )}
               {employee.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                   <Phone className="size-4 text-gray-400 shrink-0" />
                   <span>{employee.phone}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                 <Calendar className="size-4 text-gray-400 shrink-0" />
                 <span>Hired {fmt(employee.hireDate)}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                 <DollarSign className="size-4 text-gray-400 shrink-0" />
-                <span>{cur(employee.monthlySalary)}/mo</span>
+                <span className="whitespace-nowrap">{cur(employee.monthlySalary)}/mo</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                 <Clock className="size-4 text-gray-400 shrink-0" />
                 <span>{employee.shiftStart} – {employee.shiftEnd}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-gray-600 min-w-0">
                 <Building2 className="size-4 text-gray-400 shrink-0" />
-                <span>{employee.department}</span>
+                <span dir="auto" className="break-words min-w-0">{employee.department}</span>
               </div>
             </div>
 
             {employee.notes && (
-              <p className="mt-3 text-sm text-gray-500 italic">"{employee.notes}"</p>
+              <p dir="auto" className="mt-3 text-sm text-gray-500 italic break-words">"{employee.notes}"</p>
             )}
           </div>
 
           {/* Actions */}
           {canEdit && (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 onClick={() => setShowEdit(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 min-h-11 text-sm border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Edit2 className="size-4" /> Edit
               </button>
@@ -280,7 +280,7 @@ export function EmployeeProfileView() {
                 <button
                   onClick={handleDeactivate}
                   disabled={acting}
-                  className="flex items-center gap-2 px-3 py-2 text-sm border border-red-200 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-2 min-h-11 text-sm border border-red-200 rounded-xl text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
                   <UserX className="size-4" /> Deactivate
                 </button>
@@ -288,7 +288,7 @@ export function EmployeeProfileView() {
                 <button
                   onClick={handleReactivate}
                   disabled={acting}
-                  className="flex items-center gap-2 px-3 py-2 text-sm border border-emerald-200 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-2 min-h-11 text-sm border border-emerald-200 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
                 >
                   <UserCheck className="size-4" /> Reactivate
                 </button>
@@ -300,12 +300,12 @@ export function EmployeeProfileView() {
 
       {/* ── Tabs ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="border-b border-gray-100 flex overflow-x-auto">
+        <div className="border-b border-gray-100 flex overflow-x-auto overscroll-x-contain no-scrollbar">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`flex shrink-0 items-center gap-2 px-4 sm:px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors ${
                 activeTab === tab.id
                   ? 'border-b-2 border-amber-500 text-amber-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -317,7 +317,7 @@ export function EmployeeProfileView() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {tabLoading ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="size-5 text-amber-500 animate-spin" />
@@ -406,32 +406,32 @@ function AttendanceTab({ logs }: { logs: AttendanceLog[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: 'Days Present',   value: present,           color: 'text-emerald-600' },
           { label: 'Late Arrivals',  value: late,              color: 'text-amber-600' },
           { label: 'Overtime (min)', value: totalOT,           color: 'text-blue-600' },
         ].map(s => (
-          <div key={s.label} className="bg-gray-50 rounded-xl p-4 text-center">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+          <div key={s.label} className="bg-gray-50 rounded-xl p-3 sm:p-4 text-center min-w-0">
+            <p className={`text-xl sm:text-2xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
         ))}
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[36rem]">
           <thead>
             <tr className="border-b border-gray-100">
               {['Date', 'Check In', 'Check Out', 'Late (min)', 'OT (min)', 'Status'].map(h => (
-                <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {logs.map(log => (
               <tr key={log.id}>
-                <td className="px-3 py-3 text-sm text-gray-900">{log.logDate}</td>
+                <td className="px-3 py-3 text-sm text-gray-900 whitespace-nowrap">{log.logDate}</td>
                 <td className="px-3 py-3 text-sm text-gray-700">{fmtT(log.checkInTime)}</td>
                 <td className="px-3 py-3 text-sm text-gray-700">{fmtT(log.checkOutTime)}</td>
                 <td className="px-3 py-3 text-sm">
@@ -460,11 +460,11 @@ function PayrollTab({ payrolls }: { payrolls: PayrollSummary[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[36rem]">
         <thead>
           <tr className="border-b border-gray-100">
             {['Period', 'Base Salary', 'Present Days', 'Late Deduction', 'OT Bonus', 'Net Pay', 'Status'].map(h => (
-              <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+              <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
@@ -472,11 +472,11 @@ function PayrollTab({ payrolls }: { payrolls: PayrollSummary[] }) {
           {payrolls.map(p => (
             <tr key={p.id}>
               <td className="px-3 py-3 text-sm text-gray-900">{p.month}/{p.year}</td>
-              <td className="px-3 py-3 text-sm text-gray-700">{cur(p.monthlySalary)}</td>
+              <td className="px-3 py-3 text-sm text-gray-700 whitespace-nowrap">{cur(p.monthlySalary)}</td>
               <td className="px-3 py-3 text-sm text-gray-700">{p.presentDays}/{p.workingDays}</td>
-              <td className="px-3 py-3 text-sm text-red-600">-{cur(p.lateDeduction)}</td>
-              <td className="px-3 py-3 text-sm text-emerald-600">+{cur(p.overtimeBonus)}</td>
-              <td className="px-3 py-3 text-sm font-bold text-gray-900">{cur(p.netSalary)}</td>
+              <td className="px-3 py-3 text-sm text-red-600 whitespace-nowrap">-{cur(p.lateDeduction)}</td>
+              <td className="px-3 py-3 text-sm text-emerald-600 whitespace-nowrap">+{cur(p.overtimeBonus)}</td>
+              <td className="px-3 py-3 text-sm font-bold text-gray-900 whitespace-nowrap">{cur(p.netSalary)}</td>
               <td className="px-3 py-3">
                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                   p.status === 'paid'     ? 'bg-emerald-100 text-emerald-700' :
@@ -516,7 +516,7 @@ function BiometricsTab({ employee, onRefresh }: { employee: EmployeeWithUser; on
         <Fingerprint className={`size-10 ${employee.hasFingerprint ? 'text-blue-500' : 'text-gray-300'}`} />
       </div>
 
-      <div className="text-center">
+      <div className="text-center px-2">
         <p className="font-semibold text-gray-900">
           {employee.hasFingerprint ? 'Fingerprint Enrolled' : 'No Fingerprint Enrolled'}
         </p>
@@ -528,12 +528,12 @@ function BiometricsTab({ employee, onRefresh }: { employee: EmployeeWithUser; on
       </div>
 
       {canManage && (
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           {employee.hasFingerprint ? (
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-2 px-4 py-2 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 min-h-11 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50"
             >
               <XCircle className="size-4" /> Remove Fingerprint
             </button>
@@ -542,7 +542,7 @@ function BiometricsTab({ employee, onRefresh }: { employee: EmployeeWithUser; on
             href="#/fingerprint-checkin"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 min-h-11 text-sm bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors"
           >
             <Fingerprint className="size-4" />
             {employee.hasFingerprint ? 'Re-enroll' : 'Enroll Now'} (Kiosk)
@@ -574,7 +574,7 @@ function StatusBadge({ status }: { status: string }) {
     'absent':     'bg-red-100 text-red-700',
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-500'}`}>
+    <span className={`whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-500'}`}>
       {status.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
     </span>
   );

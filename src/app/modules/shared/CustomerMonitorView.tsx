@@ -41,12 +41,12 @@ export function CustomerMonitorView() {
 
   if (!order) {
     return (
-      <div className="h-screen bg-[#0B0E14] flex flex-col items-center justify-center text-white p-12 text-center">
-        <div className="bg-orange-500/10 p-8 rounded-[60px] mb-8">
-          <ShoppingCart className="size-32 text-orange-500 opacity-20" />
+      <div className="min-h-dvh bg-[#0B0E14] flex flex-col items-center justify-center text-white p-6 sm:p-12 text-center">
+        <div className="bg-orange-500/10 p-6 sm:p-8 rounded-[40px] sm:rounded-[60px] mb-6 sm:mb-8">
+          <ShoppingCart className="size-20 sm:size-32 text-orange-500 opacity-20" />
         </div>
-        <h1 className="text-5xl font-black italic tracking-tighter uppercase mb-4">Welcome to {businessName}</h1>
-        <p className="text-xl text-gray-500 max-w-md">Please check your items on this screen before payment.</p>
+        <h1 dir="auto" className="text-3xl sm:text-5xl font-black italic tracking-tighter uppercase mb-4 break-words max-w-full">Welcome to {businessName}</h1>
+        <p className="text-base sm:text-xl text-gray-500 max-w-md">Please check your items on this screen before payment.</p>
       </div>
     );
   }
@@ -56,40 +56,40 @@ export function CustomerMonitorView() {
   const total = Math.max(0, subtotal + tax - (Number(order.discount) || 0));
 
   return (
-    <div className="h-screen bg-white flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+    <div className="h-dvh bg-white flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
       {/* Left Side: Order Items */}
-      <div className="flex-1 flex flex-col p-6 lg:p-12 bg-gray-50">
-        <div className="flex items-center gap-4 mb-12">
-          <div className="size-16 bg-orange-500 rounded-2xl flex items-center justify-center text-white text-3xl font-black italic">A</div>
-          <div>
-            <h2 className="text-3xl font-black tracking-tight">YOUR ORDER</h2>
+      <div className="lg:flex-1 lg:min-h-0 min-w-0 flex flex-col p-4 sm:p-6 xl:p-12 bg-gray-50">
+        <div className="flex items-center gap-4 mb-6 xl:mb-12 shrink-0">
+          <div className="size-12 sm:size-16 shrink-0 bg-orange-500 rounded-2xl flex items-center justify-center text-white text-2xl sm:text-3xl font-black italic">A</div>
+          <div className="min-w-0">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">YOUR ORDER</h2>
             <p className="text-gray-500 font-medium uppercase tracking-widest text-sm">Table {order.tableNumber || 'Takeaway'}</p>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-6 pr-4 custom-scroll">
+        <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto space-y-3 sm:space-y-6 lg:pr-4 custom-scroll">
           {order.items.map((item: any) => (
-            <div key={item.id} className="flex items-center justify-between bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
-              <div className="flex items-center gap-6">
-                <div className="size-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-bold text-xl">×{item.quantity}</div>
-                <span className="text-2xl font-bold text-gray-800">{item.productName}</span>
+            <div key={item.id} className="flex items-center justify-between gap-3 bg-white p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+                <div className="size-10 sm:size-12 shrink-0 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-bold text-base sm:text-xl">×{item.quantity}</div>
+                <span dir="auto" className="text-lg sm:text-2xl font-bold text-gray-800 min-w-0 break-words">{item.productName}</span>
               </div>
-              <span className="text-2xl font-black text-gray-900">{fmt(item.price * item.quantity)}</span>
+              <span className="text-lg sm:text-2xl font-black text-gray-900 whitespace-nowrap shrink-0">{fmt(item.price * item.quantity)}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Right Side: Payment Info */}
-      <div className="w-full lg:w-[450px] bg-white border-t-2 lg:border-t-0 lg:border-l-2 border-gray-100 flex flex-col p-6 lg:p-12">
-        <div className="flex-1 flex flex-col justify-center text-center space-y-8">
+      <div className="w-full lg:w-[400px] xl:w-[450px] lg:shrink-0 lg:min-h-0 lg:overflow-y-auto bg-white border-t-2 lg:border-t-0 lg:border-l-2 border-gray-100 flex flex-col p-4 sm:p-6 xl:p-12">
+        <div className="flex-1 flex flex-col justify-center text-center space-y-6 xl:space-y-8">
           {paymentQR ? (
             <div className="space-y-6 animate-in fade-in zoom-in duration-500">
-              <div className="bg-violet-50 p-8 rounded-[40px] border-2 border-violet-100 inline-block mx-auto">
+              <div className="bg-violet-50 p-4 sm:p-8 rounded-[32px] sm:rounded-[40px] border-2 border-violet-100 inline-block mx-auto max-w-full">
                 <img
                   src={qrImage ?? undefined}
                   alt="Payment QR"
-                  className="size-64"
+                  className="size-56 sm:size-64 max-w-full"
                 />
               </div>
               <div>
@@ -108,26 +108,26 @@ export function CustomerMonitorView() {
           )}
         </div>
 
-        <div className="mt-auto space-y-4 pt-12 border-t-2 border-dashed border-gray-200">
-          <div className="flex justify-between text-xl text-gray-500 font-medium">
+        <div className="mt-auto space-y-3 sm:space-y-4 pt-6 xl:pt-12 border-t-2 border-dashed border-gray-200">
+          <div className="flex justify-between gap-3 text-lg sm:text-xl text-gray-500 font-medium">
             <span>Subtotal</span>
-            <span>{fmt(subtotal)}</span>
+            <span className="whitespace-nowrap">{fmt(subtotal)}</span>
           </div>
           {order.discount > 0 && (
-            <div className="flex justify-between text-xl text-emerald-600 font-bold">
+            <div className="flex justify-between gap-3 text-lg sm:text-xl text-emerald-600 font-bold">
               <span>Discount</span>
-              <span>-{fmt(order.discount)}</span>
+              <span className="whitespace-nowrap">-{fmt(order.discount)}</span>
             </div>
           )}
           {tax > 0 && (
-            <div className="flex justify-between text-xl text-gray-500 font-medium">
+            <div className="flex justify-between gap-3 text-lg sm:text-xl text-gray-500 font-medium">
               <span>Tax</span>
-              <span>{fmt(tax)}</span>
+              <span className="whitespace-nowrap">{fmt(tax)}</span>
             </div>
           )}
-          <div className="flex justify-between text-5xl font-black text-gray-900 pt-4">
+          <div className="flex flex-wrap justify-between items-baseline gap-x-3 text-3xl sm:text-5xl lg:text-4xl xl:text-5xl font-black text-gray-900 pt-2 sm:pt-4">
             <span>TOTAL</span>
-            <span>{fmt(total)}</span>
+            <span className="whitespace-nowrap">{fmt(total)}</span>
           </div>
         </div>
       </div>

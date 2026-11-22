@@ -60,11 +60,11 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90dvh] flex flex-col min-w-0">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 shrink-0">
           <div>
             <h2 className="font-bold text-gray-900 text-lg">
               {isEdit ? 'Edit Employee' : 'Add Employee'}
@@ -75,13 +75,13 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
               </p>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="p-1.5 pointer-coarse:p-3 shrink-0 rounded-lg hover:bg-gray-100 transition-colors">
             <X className="size-5 text-gray-400" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 overflow-y-auto flex-1">
+        <div className="px-4 sm:px-6 py-5 overflow-y-auto overscroll-contain flex-1 min-h-0">
           {error && (
             <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
               <AlertCircle className="size-4 text-red-500 mt-0.5 shrink-0" />
@@ -89,13 +89,14 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Full Name */}
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-500 mb-1">Full Name *</label>
               <input
                 type="text"
+                dir="auto"
                 value={form.fullName}
                 onChange={e => set('fullName', e.target.value)}
                 placeholder="e.g. Ahmed Al-Salem"
@@ -203,9 +204,10 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
             </div>
 
             {/* Notes */}
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
               <textarea
+                dir="auto"
                 value={form.notes ?? ''}
                 onChange={e => set('notes', e.target.value)}
                 rows={2}
@@ -217,17 +219,17 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 min-h-11 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="px-5 py-2 text-sm rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors disabled:opacity-60 flex items-center gap-2"
+            className="px-5 py-2 min-h-11 text-sm rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors disabled:opacity-60 flex items-center gap-2"
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
             {isEdit ? 'Save Changes' : 'Create Employee'}

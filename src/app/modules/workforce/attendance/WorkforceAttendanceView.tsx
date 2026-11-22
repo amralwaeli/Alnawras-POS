@@ -28,15 +28,15 @@ function StatCard({ label, value, icon: Icon, colorText, colorBg, colorIcon, pul
   colorText: string; colorBg: string; colorIcon: string; pulse?: boolean;
 }) {
   return (
-    <div className={`${colorBg} rounded-2xl p-5 border border-black/5 relative overflow-hidden`}>
+    <div className={`${colorBg} rounded-2xl p-4 sm:p-5 border border-black/5 relative overflow-hidden min-w-0`}>
       {pulse && Number(value) > 0 && (
         <span className="absolute top-3 right-3 size-2 rounded-full bg-emerald-400 animate-ping" />
       )}
       <div className={`inline-flex size-10 items-center justify-center rounded-xl ${colorIcon} mb-3`}>
         <Icon className="size-5" />
       </div>
-      <p className="text-sm text-gray-500 mb-0.5">{label}</p>
-      <p className={`text-3xl font-bold ${colorText}`}>{value}</p>
+      <p className="text-sm text-gray-500 mb-0.5 truncate">{label}</p>
+      <p className={`text-2xl sm:text-3xl font-bold ${colorText}`}>{value}</p>
     </div>
   );
 }
@@ -115,12 +115,12 @@ export function WorkforceAttendanceView() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
             <p className="text-gray-500 text-sm">
               {new Date(filterDate + 'T12:00:00').toLocaleDateString('en-US', {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -134,19 +134,19 @@ export function WorkforceAttendanceView() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href="#/fingerprint-checkin"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 min-h-11 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors shadow-sm"
           >
             <Fingerprint className="size-4" /> Open Kiosk
             <ExternalLink className="size-3.5 opacity-70" />
           </a>
           <button
             onClick={() => exportCSV(logs, absentEmps, filterDate)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-white transition-colors bg-white"
+            className="flex items-center gap-2 px-4 py-2 min-h-11 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-white transition-colors bg-white"
           >
             <Download className="size-4" /> Export
           </button>
@@ -154,7 +154,7 @@ export function WorkforceAttendanceView() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCard label="Total Employees" value={employees.length} icon={Users}
           colorText="text-gray-700" colorBg="bg-white" colorIcon="bg-gray-100 text-gray-500" />
         <StatCard label="Present" value={presentLogs.length} icon={UserCheck}
@@ -173,31 +173,32 @@ export function WorkforceAttendanceView() {
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-52">
+        <div className="relative flex-1 basis-full sm:basis-auto min-w-0 sm:min-w-52">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search employee…"
+            dir="auto"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full min-h-11 pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>
         <input
           type="date"
           value={filterDate}
           onChange={e => setFilterDate(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="min-h-11 min-w-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
         />
         <button
           onClick={() => setShowAbsent(s => !s)}
-          className={`px-3 py-2.5 rounded-xl text-sm border transition-colors ${
+          className={`min-h-11 px-3 py-2.5 rounded-xl text-sm border transition-colors ${
             showAbsent ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-gray-200 text-gray-500'
           }`}
         >
           {showAbsent ? 'Hide Absent' : 'Show Absent'}
         </button>
-        <button onClick={loadData} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors bg-white">
+        <button onClick={loadData} aria-label="Refresh" className="flex items-center justify-center min-h-11 min-w-11 p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors bg-white">
           <RefreshCw className={`size-4 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
         </button>
         <span className="text-xs text-gray-400">Updated {fmt(lastUpdate)}</span>
@@ -205,7 +206,7 @@ export function WorkforceAttendanceView() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-gray-900">
             Attendance Log
             <span className="ml-2 text-sm font-normal text-gray-400">
@@ -232,11 +233,11 @@ export function WorkforceAttendanceView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[52rem]">
               <thead>
                 <tr className="bg-gray-50 text-left">
                   {['Employee', 'Department', 'Shift', 'Check In', 'Check Out', 'Late', 'Overtime', 'Status'].map(h => (
-                    <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -248,18 +249,18 @@ export function WorkforceAttendanceView() {
                         <div className="size-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
                           {log.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm text-gray-900">{log.fullName}</p>
+                        <div className="min-w-0">
+                          <p dir="auto" className="font-medium text-sm text-gray-900 truncate max-w-[12rem]">{log.fullName}</p>
                           <p className="text-xs text-gray-400">{log.employeeId}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-500">
+                    <td dir="auto" className="px-5 py-3.5 text-sm text-gray-500">
                       {empDeptMap.get(log.employeeId) || '—'}
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-500">{log.scheduledStart} – {log.scheduledEnd}</td>
-                    <td className="px-5 py-3.5 text-sm font-medium text-gray-800">{fmt(log.checkInTime)}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{fmt(log.checkOutTime)}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">{log.scheduledStart} – {log.scheduledEnd}</td>
+                    <td className="px-5 py-3.5 text-sm font-medium text-gray-800 whitespace-nowrap">{fmt(log.checkInTime)}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap">{fmt(log.checkOutTime)}</td>
                     <td className="px-5 py-3.5 text-sm">
                       {log.lateMinutes > 0
                         ? <span className="text-red-600 font-semibold">{log.lateMinutes}m</span>
@@ -272,7 +273,7 @@ export function WorkforceAttendanceView() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1.5">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle[log.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle[log.status] ?? 'bg-gray-100 text-gray-600'}`}>
                           {log.status.replace('-', ' ')}
                         </span>
                         {log.checkInMethod === 'fingerprint' && (
@@ -290,14 +291,14 @@ export function WorkforceAttendanceView() {
                         <div className="size-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
                           {emp.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm text-gray-600">{emp.fullName}</p>
+                        <div className="min-w-0">
+                          <p dir="auto" className="font-medium text-sm text-gray-600 truncate max-w-[12rem]">{emp.fullName}</p>
                           <p className="text-xs text-gray-400">{emp.employeeId}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-400">{emp.department ?? '—'}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-400">{emp.shiftStart} – {emp.shiftEnd}</td>
+                    <td dir="auto" className="px-5 py-3.5 text-sm text-gray-400">{emp.department ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-400 whitespace-nowrap">{emp.shiftStart} – {emp.shiftEnd}</td>
                     <td colSpan={4} className="px-5 py-3.5 text-sm text-red-400 font-medium italic">Not yet checked in</td>
                     <td className="px-5 py-3.5">
                       <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">absent</span>
@@ -312,14 +313,14 @@ export function WorkforceAttendanceView() {
 
       {/* Summary strip */}
       {logs.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: 'Attendance Rate', value: employees.length > 0 ? `${Math.round((presentLogs.length / employees.length) * 100)}%` : '—', sub: `${presentLogs.length} of ${employees.length}`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
             { label: 'Checked Out',     value: checkedOutLogs.length, sub: `${presentLogs.length - checkedOutLogs.length} still on shift`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Total Late Mins', value: `${lateLogs.reduce((s, l) => s + l.lateMinutes, 0)}m`, sub: `across ${lateLogs.length} employees`, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
             { label: 'Total Overtime',  value: `${logs.reduce((s, l) => s + l.overtimeMinutes, 0)}m`, sub: `across ${logs.filter(l => l.overtimeMinutes > 0).length} employees`, icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map(s => (
-            <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-black/5`}>
+            <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-black/5 min-w-0`}>
               <s.icon className={`size-5 ${s.color} mb-2`} />
               <p className="text-xs text-gray-500">{s.label}</p>
               <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>

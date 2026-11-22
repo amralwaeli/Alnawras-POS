@@ -37,24 +37,24 @@ const fmtShort = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute
 function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Date; scannerReady: boolean }) {
   const { businessName } = useBranch();
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 select-none">
+    <div className="flex flex-col items-center justify-center min-h-full gap-5 sm:gap-8 px-4 py-6 select-none">
       {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div className="size-10 rounded-xl bg-amber-500 flex items-center justify-center">
+      <div className="flex items-center gap-3 max-w-full">
+        <div className="size-10 shrink-0 rounded-xl bg-amber-500 flex items-center justify-center">
           <UtensilsCrossed className="size-5 text-white" />
         </div>
-        <div>
-          <p className="font-bold text-white text-lg leading-tight">{businessName}</p>
+        <div className="min-w-0">
+          <p dir="auto" className="font-bold text-white text-lg leading-tight break-words">{businessName}</p>
           <p className="text-[11px] text-gray-500 uppercase tracking-wider">Fingerprint Attendance</p>
         </div>
       </div>
 
       {/* Clock */}
       <div className="text-center">
-        <p className="text-7xl font-bold text-white tabular-nums tracking-tight">
+        <p className="text-[clamp(3rem,12vmin,4.5rem)] leading-none font-bold text-white tabular-nums tracking-tight">
           {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
-        <p className="text-gray-400 mt-2 text-sm">
+        <p className="text-gray-400 mt-2 text-sm px-2">
           {now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -65,7 +65,7 @@ function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Da
         disabled={!scannerReady}
         className="group relative flex flex-col items-center gap-4"
       >
-        <div className={`relative size-44 rounded-full flex items-center justify-center transition-all duration-300
+        <div className={`relative size-[clamp(8rem,28vmin,11rem)] rounded-full flex items-center justify-center transition-all duration-300
           ${scannerReady
             ? 'bg-amber-500/10 ring-4 ring-amber-500/30 hover:ring-amber-500/60 hover:bg-amber-500/20 cursor-pointer'
             : 'bg-gray-800 ring-4 ring-gray-700 cursor-not-allowed opacity-50'
@@ -78,9 +78,9 @@ function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Da
               <span className="absolute inset-4 rounded-full ring-2 ring-amber-400/10 animate-ping [animation-delay:0.3s]" />
             </>
           )}
-          <Fingerprint className={`size-20 transition-colors ${scannerReady ? 'text-amber-400 group-hover:text-amber-300' : 'text-gray-600'}`} />
+          <Fingerprint className={`size-[clamp(3.5rem,12vmin,5rem)] transition-colors ${scannerReady ? 'text-amber-400 group-hover:text-amber-300' : 'text-gray-600'}`} />
         </div>
-        <div className="text-center">
+        <div className="text-center px-2">
           <p className="font-semibold text-white">
             {scannerReady ? 'Place Finger to Scan' : 'Scanner Not Ready'}
           </p>
@@ -100,11 +100,11 @@ function IdleScreen({ onScan, now, scannerReady }: { onScan: () => void; now: Da
 // ─────────────────────────────────────────────
 function ScanningScreen({ phase }: { phase: 'scanning' | 'processing' }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6">
-      <div className="relative size-48 flex items-center justify-center">
+    <div className="flex flex-col items-center justify-center min-h-full gap-6 px-4 py-6">
+      <div className="relative size-[clamp(9rem,30vmin,12rem)] flex items-center justify-center">
         <span className="absolute inset-0 rounded-full ring-4 ring-amber-400/40 animate-ping" />
         <span className="absolute inset-4 rounded-full ring-2 ring-amber-400/20 animate-ping [animation-delay:0.2s]" />
-        <div className="size-32 rounded-full bg-amber-500/10 flex items-center justify-center">
+        <div className="size-[clamp(6rem,20vmin,8rem)] rounded-full bg-amber-500/10 flex items-center justify-center">
           {phase === 'scanning'
             ? <Fingerprint className="size-16 text-amber-400 animate-pulse" />
             : <Activity className="size-16 text-amber-400 animate-spin" />
@@ -112,7 +112,7 @@ function ScanningScreen({ phase }: { phase: 'scanning' | 'processing' }) {
         </div>
       </div>
       <div className="text-center">
-        <p className="text-2xl font-bold text-white">
+        <p className="text-xl sm:text-2xl font-bold text-white">
           {phase === 'scanning' ? 'Reading Fingerprint…' : 'Identifying Employee…'}
         </p>
         <p className="text-gray-400 mt-1 text-sm">
@@ -148,7 +148,7 @@ function SuccessScreen({ result }: { result: ScanResult }) {
   const bg = isCheckIn ? 'from-emerald-500/10 to-emerald-500/5' : 'from-blue-500/10 to-blue-500/5';
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 px-8">
+    <div className="flex flex-col items-center justify-center min-h-full gap-4 sm:gap-6 px-4 sm:px-8 py-6">
       {/* Action badge */}
       <div className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-gradient-to-r ${bg} border border-white/10`}>
         {isCheckIn
@@ -161,16 +161,16 @@ function SuccessScreen({ result }: { result: ScanResult }) {
       </div>
 
       {/* Avatar + name */}
-      <div className="text-center">
-        <div className="size-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 ring-4 ring-amber-500/30">
+      <div className="text-center max-w-full">
+        <div className="size-[clamp(4rem,14vmin,6rem)] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold mx-auto mb-4 ring-4 ring-amber-500/30">
           {result.employee.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
         </div>
-        <p className="text-3xl font-bold text-white">{result.employee.fullName}</p>
+        <p dir="auto" className="text-2xl sm:text-3xl font-bold text-white break-words">{result.employee.fullName}</p>
         <p className="text-gray-400 text-sm mt-1">{result.employee.employeeId} · {result.employee.role}</p>
       </div>
 
       {/* Time card */}
-      <div className="bg-gray-800/60 border border-white/10 rounded-2xl px-8 py-5 text-center">
+      <div className="bg-gray-800/60 border border-white/10 rounded-2xl px-6 sm:px-8 py-5 text-center max-w-full">
         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
           {isCheckIn ? 'Check-in Time' : 'Check-out Time'}
         </p>
@@ -195,7 +195,7 @@ function SuccessScreen({ result }: { result: ScanResult }) {
 // ─────────────────────────────────────────────
 function ErrorScreen({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-5">
+    <div className="flex flex-col items-center justify-center min-h-full gap-5 px-4 py-6">
       <div className="size-28 rounded-full bg-red-500/10 ring-4 ring-red-500/20 flex items-center justify-center">
         <XCircle className="size-16 text-red-400" />
       </div>
@@ -203,7 +203,7 @@ function ErrorScreen({ message }: { message: string }) {
         <p className="text-2xl font-bold text-white">Not Recognized</p>
         <p className="text-red-400 mt-2 text-sm max-w-xs text-center">{message}</p>
       </div>
-      <p className="text-gray-500 text-sm">Please try again or contact HR</p>
+      <p className="text-gray-500 text-sm text-center">Please try again or contact HR</p>
     </div>
   );
 }
@@ -222,7 +222,7 @@ function RecentLog({ logs }: { logs: { name: string; action: 'check-in' | 'check
             {l.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">{l.name}</p>
+            <p dir="auto" className="text-xs font-medium text-white truncate">{l.name}</p>
             <p className="text-[11px] text-gray-500">{fmtShort(l.time)} · {l.action === 'check-in' ? 'In' : 'Out'}</p>
           </div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
@@ -375,25 +375,25 @@ export function FingerprintCheckInView() {
   };
 
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden relative">
+    <div className="h-dvh bg-gray-950 flex flex-col overflow-hidden relative">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="size-8 rounded-lg bg-amber-500 flex items-center justify-center">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:px-6 py-3 sm:py-4 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="size-8 shrink-0 rounded-lg bg-amber-500 flex items-center justify-center">
             <UtensilsCrossed className="size-4 text-white" />
           </div>
-          <div>
-            <p className="font-bold text-white text-sm leading-tight">{businessName}</p>
+          <div className="min-w-0">
+            <p dir="auto" className="font-bold text-white text-sm leading-tight truncate">{businessName}</p>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fingerprint Attendance Kiosk</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 ml-auto">
           {/* Live clock */}
-          <span className="text-xs text-gray-500 font-mono">{fmt(now)}</span>
+          <span className="text-xs text-gray-500 font-mono whitespace-nowrap">{fmt(now)}</span>
 
           {/* Scanner status */}
-          <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border ${
+          <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border whitespace-nowrap ${
             scannerReady
               ? 'bg-emerald-900/30 border-emerald-800/50 text-emerald-400'
               : 'bg-gray-800 border-gray-700 text-gray-500'
@@ -406,13 +406,13 @@ export function FingerprintCheckInView() {
             <>
               <button
                 onClick={connectScanner}
-                className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors font-medium"
+                className="inline-flex items-center min-h-11 text-xs px-4 py-1.5 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors font-medium"
               >
                 Connect USB
               </button>
               <button
                 onClick={enableDemo}
-                className="text-xs px-3 py-1.5 border border-gray-700 text-gray-400 rounded-full hover:bg-gray-800 transition-colors"
+                className="inline-flex items-center min-h-11 text-xs px-4 py-1.5 border border-gray-700 text-gray-400 rounded-full hover:bg-gray-800 transition-colors"
               >
                 Demo Mode
               </button>
@@ -422,7 +422,7 @@ export function FingerprintCheckInView() {
           {/* Back to POS */}
           <a
             href="#/"
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors border border-gray-800 rounded-full px-3 py-1.5"
+            className="flex items-center gap-1.5 min-h-11 text-xs text-gray-500 hover:text-gray-300 transition-colors border border-gray-800 rounded-full px-4 py-1.5"
           >
             POS <ArrowRight className="size-3" />
           </a>
@@ -430,7 +430,7 @@ export function FingerprintCheckInView() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 min-h-0 relative overflow-y-auto overflow-x-hidden">
         {phase === 'idle' && (
           <IdleScreen
             onScan={handleScan}
@@ -455,7 +455,7 @@ export function FingerprintCheckInView() {
       </div>
 
       {/* Bottom hint */}
-      <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between shrink-0">
+      <div className="px-3 sm:px-6 py-2 sm:py-3 border-t border-white/5 flex items-center justify-between gap-3 shrink-0">
         <p className="text-xs text-gray-600">
           {demoMode
             ? '⚠ Demo mode — scans cycle through enrolled employees'
@@ -465,7 +465,7 @@ export function FingerprintCheckInView() {
         {phase !== 'idle' && (
           <button
             onClick={() => { setPhase('idle'); clearTimeout(resetTimer.current); }}
-            className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            className="shrink-0 min-h-11 px-3 text-xs text-gray-600 hover:text-gray-400 transition-colors"
           >
             Cancel
           </button>

@@ -89,7 +89,7 @@ function CustomerDialog({
             <Label>Email (optional)</Label>
             <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="customer@email.com" type="email" />
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={loading}>{loading ? 'Saving…' : customer ? 'Update' : 'Add'} Customer</Button>
           </div>
@@ -139,7 +139,7 @@ function AdjustPointsDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Adjust {settings.pointsLabel} — {customer?.name}</DialogTitle>
+          <DialogTitle className="break-words">Adjust {settings.pointsLabel} — <span dir="auto">{customer?.name}</span></DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="text-center py-2">
@@ -154,7 +154,7 @@ function AdjustPointsDialog({
             <Label>Reason *</Label>
             <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Compensation, correction…" required />
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={loading}>{loading ? 'Saving…' : 'Apply Adjustment'}</Button>
           </div>
@@ -188,32 +188,32 @@ function CustomerDetail({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <h2 className="font-bold text-lg">{customer.name}</h2>
-            <p className="text-sm text-gray-500">{customer.phone}{customer.email ? ` · ${customer.email}` : ''}</p>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b">
+          <div className="min-w-0">
+            <h2 className="font-bold text-lg break-words" dir="auto">{customer.name}</h2>
+            <p className="text-sm text-gray-500 break-words">{customer.phone}{customer.email ? ` · ${customer.email}` : ''}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
+          <button onClick={onClose} aria-label="Close" className="shrink-0 size-11 flex items-center justify-center rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
         </div>
 
-        <div className="px-6 py-4 grid grid-cols-3 gap-3 border-b">
+        <div className="px-4 sm:px-6 py-4 grid grid-cols-3 gap-2 sm:gap-3 border-b">
           <div className="text-center">
-            <p className="text-2xl font-bold text-amber-600">{customer.pointsBalance}</p>
+            <p className="text-lg sm:text-2xl font-bold text-amber-600 break-words">{customer.pointsBalance}</p>
             <p className="text-xs text-gray-500">{settings.pointsLabel}</p>
-            <p className="text-xs text-gray-400">≈ {fmt(Number(pointsValue))}</p>
+            <p className="text-xs text-gray-400 break-words">≈ {fmt(Number(pointsValue))}</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800">{customer.totalVisits}</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-800">{customer.totalVisits}</p>
             <p className="text-xs text-gray-500">Visits</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800">{fmt(customer.totalSpent)}</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-800 break-words">{fmt(customer.totalSpent)}</p>
             <p className="text-xs text-gray-500">Total Spent</p>
           </div>
         </div>
 
-        <div className="flex gap-2 px-6 py-3 border-b">
+        <div className="flex flex-wrap gap-2 px-4 sm:px-6 py-3 border-b">
           <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">
             <Edit2 className="size-3.5 mr-1" /> Edit
           </Button>
@@ -222,7 +222,7 @@ function CustomerDetail({
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Transaction History</p>
           {loading && <p className="text-sm text-gray-400 text-center py-4">Loading…</p>}
           {!loading && transactions.length === 0 && (
@@ -235,10 +235,10 @@ function CustomerDetail({
                   {tx.type === 'earn' ? <ArrowUpCircle className="size-4" /> : tx.type === 'redeem' ? <ArrowDownCircle className="size-4" /> : <RotateCcw className="size-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{tx.description}</p>
+                  <p className="text-sm truncate" dir="auto">{tx.description}</p>
                   <p className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleString()}</p>
                 </div>
-                <span className={`text-sm font-bold ${tx.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <span className={`shrink-0 whitespace-nowrap text-sm font-bold ${tx.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {tx.points > 0 ? '+' : ''}{tx.points}
                 </span>
               </div>
@@ -362,14 +362,14 @@ export function LoyaltyManagementView() {
   const totalSpent  = customers.reduce((s, c) => s + c.totalSpent, 0);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Loyalty Program</h1>
           <p className="text-gray-500">Manage customers, points, and loyalty settings</p>
         </div>
         {!settings.enabled && (
-          <Badge className="bg-amber-100 text-amber-700 flex items-center gap-1">
+          <Badge className="bg-amber-100 text-amber-700 flex items-center gap-1 whitespace-normal">
             <AlertCircle className="size-3" /> Program disabled — enable in Settings
           </Badge>
         )}
@@ -391,8 +391,8 @@ export function LoyaltyManagementView() {
             <Card>
               <CardContent className="flex items-center gap-3 py-4">
                 <Users className="size-8 text-blue-500 shrink-0" />
-                <div>
-                  <p className="text-2xl font-bold">{customers.length}</p>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold break-words">{customers.length}</p>
                   <p className="text-xs text-gray-500">Members</p>
                 </div>
               </CardContent>
@@ -400,8 +400,8 @@ export function LoyaltyManagementView() {
             <Card>
               <CardContent className="flex items-center gap-3 py-4">
                 <Star className="size-8 text-amber-500 shrink-0" />
-                <div>
-                  <p className="text-2xl font-bold">{totalPoints.toLocaleString()}</p>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold break-words">{totalPoints.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">{settings.pointsLabel} in Circulation</p>
                 </div>
               </CardContent>
@@ -409,8 +409,8 @@ export function LoyaltyManagementView() {
             <Card>
               <CardContent className="flex items-center gap-3 py-4">
                 <TrendingUp className="size-8 text-emerald-500 shrink-0" />
-                <div>
-                  <p className="text-2xl font-bold">{fmt(totalSpent)}</p>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold break-words">{fmt(totalSpent)}</p>
                   <p className="text-xs text-gray-500">Member Revenue</p>
                 </div>
               </CardContent>
@@ -418,8 +418,8 @@ export function LoyaltyManagementView() {
           </div>
 
           {/* Toolbar */}
-          <div className="flex gap-3">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[12rem]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
               <Input className="pl-9" placeholder="Search by name or phone…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
@@ -438,8 +438,8 @@ export function LoyaltyManagementView() {
               {!search && <Button className="mt-3" onClick={() => setIsAddOpen(true)}><Plus className="size-4 mr-1" /> Add First Member</Button>}
             </div>
           ) : (
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="bg-white rounded-xl border overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Customer</th>
@@ -453,33 +453,33 @@ export function LoyaltyManagementView() {
                   {filtered.map(c => (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50 cursor-pointer" onClick={() => setDetailCustomer(c)}>
                       <td className="px-4 py-3">
-                        <p className="font-medium">{c.name}</p>
+                        <p className="font-medium break-words" dir="auto">{c.name}</p>
                         <p className="text-xs text-gray-400">{c.phone}</p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-bold text-amber-600">{c.pointsBalance.toLocaleString()}</span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600">{c.totalVisits}</td>
-                      <td className="px-4 py-3 text-right font-medium">{fmt(c.totalSpent)}</td>
+                      <td className="px-4 py-3 text-right font-medium whitespace-nowrap">{fmt(c.totalSpent)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => { setAdjustingCustomer(c); }}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50"
-                            title="Adjust points"
+                            className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50"
+                            title="Adjust points" aria-label="Adjust points"
                           >
                             <RotateCcw className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setEditingCustomer(c)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                            title="Edit"
+                            className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            title="Edit" aria-label="Edit"
                           >
                             <Edit2 className="size-3.5" />
                           </button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <button className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50" title="Delete">
+                              <button className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50" title="Delete" aria-label="Delete">
                                 <Trash2 className="size-3.5" />
                               </button>
                             </AlertDialogTrigger>

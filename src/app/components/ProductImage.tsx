@@ -26,6 +26,7 @@ export function ProductImage({ src, name, className = '' }: ProductImageProps) {
         src={src}
         alt={name}
         loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         className={`object-cover bg-gray-100 ${className}`}
       />

@@ -136,7 +136,7 @@ export function BillFormatView() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="p-6 space-y-6 max-w-7xl">
+      <div className="p-4 sm:p-6 space-y-6 max-w-7xl">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Bill Format</h1>
@@ -144,7 +144,7 @@ export function BillFormatView() {
               Control how the printed bill should look, with a live receipt preview based on your sample.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button type="button" variant="outline" onClick={handleReset}>
               <RotateCcw className="size-4 mr-2" />
               Reset
@@ -157,7 +157,7 @@ export function BillFormatView() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6">
-          <Card className="rounded-3xl border-gray-200">
+          <Card className="rounded-3xl border-gray-200 min-w-0">
             <CardHeader>
               <CardTitle>Receipt Settings</CardTitle>
             </CardHeader>
@@ -176,7 +176,7 @@ export function BillFormatView() {
               {/* Logo Upload */}
               <div className="space-y-2">
                 <Label>Logo Image</Label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {settings.logoUrl ? (
                     <img
                       src={settings.logoUrl}
@@ -320,7 +320,7 @@ export function BillFormatView() {
               </div>
 
               {/* Info banner */}
-              <div className="md:col-span-2 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+              <div className="md:col-span-2 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-900 break-words">
                 {previewOrder
                   ? isTakeawayPreview
                     ? `Preview is using takeaway order #${previewOrder.billNumber ?? '—'} with ${previewItems.length} item${previewItems.length === 1 ? '' : 's'}.`
@@ -334,7 +334,7 @@ export function BillFormatView() {
           </Card>
 
           {/* ── Live Preview ── */}
-          <div className="xl:sticky xl:top-6 h-fit">
+          <div className="xl:sticky xl:top-6 h-fit min-w-0">
             <Card className="rounded-3xl border-gray-200 overflow-hidden">
               <CardHeader className="border-b bg-white">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -342,8 +342,9 @@ export function BillFormatView() {
                   Bill Preview
                 </CardTitle>
               </CardHeader>
-              <CardContent className="bg-[#eef1f4] p-6">
-                <div className="mx-auto w-[290px] bg-[#f7f4ea] text-[#3f3a33] shadow-xl rounded-sm px-5 py-6 font-mono text-[11px] leading-relaxed">
+              <CardContent className="bg-[#eef1f4] p-3 sm:p-6">
+                {/* Receipt mock: 290px wide, narrows on very small phones instead of overflowing */}
+                <div className="mx-auto w-full max-w-[290px] break-words bg-[#f7f4ea] text-[#3f3a33] shadow-xl rounded-sm px-5 py-6 font-mono text-[11px] leading-relaxed">
 
                   {/* Header */}
                   <div className="text-center border-b border-dashed border-[#bcb6aa] pb-4">
@@ -358,8 +359,8 @@ export function BillFormatView() {
                         S
                       </div>
                     )}
-                    <p className="text-[22px] font-serif italic leading-none">{settings.branchTagline}</p>
-                    <p className="mt-2 text-[15px] font-bold uppercase tracking-wide">{settings.restaurantName}</p>
+                    <p className="text-[22px] font-serif italic leading-none" dir="auto">{settings.branchTagline}</p>
+                    <p className="mt-2 text-[15px] font-bold uppercase tracking-wide" dir="auto">{settings.restaurantName}</p>
                     <p className="mt-3 text-[13px]">{previewHeaderNote}</p>
                     <p className="text-[34px] font-bold leading-none">{previewDisplayNumber}</p>
                   </div>
@@ -385,7 +386,7 @@ export function BillFormatView() {
                     <div className="mt-2 space-y-3">
                       {previewItems.map(item => (
                         <div key={item.name}>
-                          <p className="font-semibold text-[11px] leading-tight">{item.name}</p>
+                          <p className="font-semibold text-[11px] leading-tight" dir="auto">{item.name}</p>
                           <div className="grid grid-cols-[1.6fr_.7fr_.45fr_.75fr_.8fr] gap-2">
                             <span />
                             <span className="text-right">{item.price.toFixed(2)}</span>
@@ -400,15 +401,15 @@ export function BillFormatView() {
 
                   {/* Totals */}
                   <div className="py-3 space-y-1 border-b border-dashed border-[#bcb6aa]">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span>{settings.subtotalLabel}</span>
                       <span>{CURRENCY} {totals.subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span>{settings.discountLabel}</span>
                       <span>{CURRENCY} {totals.discount.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span>{settings.taxLabel}</span>
                       <span>{CURRENCY} {totals.tax.toFixed(2)}</span>
                     </div>

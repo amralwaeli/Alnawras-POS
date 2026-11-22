@@ -43,8 +43,8 @@ export function GroupOrderingView() {
 
   if (state === 'invalid' || state === 'closed' || !sessionToken) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4">
-        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-sm w-full text-center">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[#EAEEF3] px-4 py-6">
+        <div className="bg-white rounded-[40px] shadow-2xl p-7 sm:p-10 max-w-sm w-full text-center">
           <div className="bg-red-100 rounded-full p-4 w-fit mx-auto mb-5"><ShieldAlert className="size-10 text-red-500" /></div>
           <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">{state === 'closed' ? 'Temporarily Unavailable' : 'Table Unavailable'}</h2>
           <p className="text-sm text-gray-400">{state === 'closed' ? 'Online ordering is not available right now. Please order with a team member.' : 'This QR code is invalid, or the table session was closed. Please ask a team member or scan the table QR again.'}</p>

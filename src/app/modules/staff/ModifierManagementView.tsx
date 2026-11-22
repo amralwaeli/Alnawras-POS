@@ -133,8 +133,8 @@ export function ModifierManagementView() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Modifier Groups</h1>
           <p className="text-gray-600">Reusable option sets (e.g. Chicken → Leg / Chest) you can link to products</p>
@@ -169,20 +169,20 @@ export function ModifierManagementView() {
             {!loading && groups.map(g => (
               <tr key={g.id} className="border-t hover:bg-gray-50">
                 <td className="px-4 py-3">
-                  <div className="font-semibold text-gray-900">{g.name}</div>
+                  <div className="font-semibold text-gray-900 break-words" dir="auto">{g.name}</div>
                   <div className="text-xs text-gray-400">{g.options.length} modifier(s)</div>
                 </td>
-                <td className="px-4 py-3 text-gray-700">{g.type === 'single' ? 'Single Choice' : 'Multiple Choice'}</td>
-                <td className="px-4 py-3 text-gray-600">{g.options.map(o => o.name).join(', ')}</td>
+                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{g.type === 'single' ? 'Single Choice' : 'Multiple Choice'}</td>
+                <td className="px-4 py-3 text-gray-600 break-words" dir="auto">{g.options.map(o => o.name).join(', ')}</td>
                 <td className="px-4 py-3 text-right text-gray-700">{g.linkedProductCount ?? g.productIds?.length ?? 0}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(g)}>
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(g)} aria-label={`Edit ${g.name}`}>
                       <Edit className="size-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700">
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" aria-label={`Delete ${g.name}`}>
                           <Trash2 className="size-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -209,7 +209,7 @@ export function ModifierManagementView() {
 
       {/* Create / Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Modifier Group' : 'Create Modifier Group'}</DialogTitle>
           </DialogHeader>
@@ -247,14 +247,14 @@ export function ModifierManagementView() {
               <div>
                 <Label>Modifier Options</Label>
                 <div className="mt-1 space-y-2">
-                  <div className="grid grid-cols-[1fr_84px_52px_32px] sm:grid-cols-[1fr_120px_70px_36px] gap-2 text-xs font-semibold text-gray-500 px-1">
+                  <div className="grid grid-cols-[minmax(0,1fr)_84px_52px_32px] sm:grid-cols-[minmax(0,1fr)_120px_70px_36px] gap-2 text-xs font-semibold text-gray-500 px-1">
                     <span>Option Name</span>
                     <span>Add-on Price</span>
                     <span className="text-center">Default</span>
                     <span></span>
                   </div>
                   {options.map((o, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_84px_52px_32px] sm:grid-cols-[1fr_120px_70px_36px] gap-2 items-center">
+                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_84px_52px_32px] sm:grid-cols-[minmax(0,1fr)_120px_70px_36px] gap-2 items-center">
                       <Input value={o.name} onChange={e => setOption(i, { name: e.target.value })} placeholder="e.g. Leg" />
                       <Input type="number" step="0.01" value={o.addOnPrice}
                         onChange={e => setOption(i, { addOnPrice: e.target.value })} />
@@ -262,7 +262,7 @@ export function ModifierManagementView() {
                         <input type="checkbox" className="size-4 accent-orange-500"
                           checked={o.isDefault} onChange={() => toggleDefault(i)} />
                       </div>
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500" onClick={() => removeOption(i)}>
+                      <Button type="button" size="sm" variant="ghost" className="text-red-500 px-0" onClick={() => removeOption(i)} aria-label="Remove option">
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
@@ -286,8 +286,8 @@ export function ModifierManagementView() {
                   <label key={p.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
                     <input type="checkbox" className="size-4 accent-orange-500"
                       checked={linkedIds.has(p.id)} onChange={() => toggleProduct(p.id)} />
-                    <span className="flex-1 text-sm">{p.name}</span>
-                    <Badge variant="secondary" className="text-xs">{p.category}</Badge>
+                    <span className="flex-1 min-w-0 text-sm break-words" dir="auto">{p.name}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0 max-w-[40%] truncate" dir="auto">{p.category}</Badge>
                   </label>
                 ))}
               </div>
@@ -295,7 +295,7 @@ export function ModifierManagementView() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button type="button" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Group'}

@@ -223,17 +223,17 @@ function CustomerPanel({ branchId, loyaltyDiscount, onCustomerChange, onRedempti
         </div>
       ) : (
         <div className="p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <UserCheck className="size-4 text-emerald-500" />
-              <div>
-                <p className="text-sm font-semibold">{linkedCustomer.name}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold break-words" dir="auto">{linkedCustomer.name}</p>
                 <p className="text-xs text-gray-400">{linkedCustomer.phone}</p>
               </div>
             </div>
             <button onClick={unlink} className="text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded">Unlink</button>
           </div>
-          <div className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2">
             <div className="flex items-center gap-1.5">
               <Gift className="size-3.5 text-amber-500" />
               <span className="text-sm font-bold text-amber-700">{linkedCustomer.pointsBalance.toLocaleString()}</span>
@@ -271,7 +271,7 @@ function CashChangeRow({ total, value, onChange }: { total: number; value: strin
   const change = Math.max(0, (parseFloat(value) || 0) - total);
   return (
     <div className="flex items-center gap-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <p className="text-xs text-emerald-700 mb-1 font-medium">Cash received</p>
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">{CURRENCY}</span>
@@ -281,9 +281,9 @@ function CashChangeRow({ total, value, onChange }: { total: number; value: strin
         </div>
       </div>
       {change > 0 && (
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <p className="text-xs text-emerald-600 font-medium">Change</p>
-          <p className="text-lg font-bold text-emerald-700">{fmt(change)}</p>
+          <p className="text-lg font-bold text-emerald-700 whitespace-nowrap">{fmt(change)}</p>
         </div>
       )}
     </div>
@@ -493,7 +493,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   };
 
   const methodBtn = (mode: PaymentMode, active: string) =>
-    `flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all
+    `min-w-0 min-h-11 flex flex-wrap items-center justify-center gap-1.5 px-1 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all
     ${paymentMode === mode ? `${active} shadow-sm` : 'border-gray-200 hover:border-gray-300 text-gray-700'}`;
 
   // Shared tail for any payment path that just completed the WHOLE order:
@@ -700,19 +700,19 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // ── Print prompt ─────────────────────────────────────────────────────────
   if (showPrint) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <div><h2 className="font-bold text-lg">Payment Completed</h2><p className="text-xs text-gray-400 mt-0.5">Bill #{lastBillNo}</p></div>
-            <button onClick={onClose} aria-label="Close" className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="bg-white rounded-2xl w-full max-w-md max-h-[calc(100dvh-1rem)] sm:max-h-[90dvh] overflow-y-auto overscroll-contain shadow-2xl">
+          <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b">
+            <div className="min-w-0"><h2 className="font-bold text-lg">Payment Completed</h2><p className="text-xs text-gray-400 mt-0.5 break-all">Bill #{lastBillNo}</p></div>
+            <button onClick={onClose} aria-label="Close" className="p-3 -mr-1 shrink-0 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
           </div>
-          <div className="px-6 py-8 text-center space-y-4">
+          <div className="px-4 sm:px-6 py-6 sm:py-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
               <CheckCircle className="size-8 text-emerald-600" />
             </div>
             <div><p className="text-lg font-semibold text-gray-900">Payment Successful!</p><p className="text-sm text-gray-500 mt-1">{lanPrinted ? 'Receipt sent to the printer.' : 'Would you like to print a receipt?'}</p></div>
           </div>
-          <div className="px-6 py-4 border-t space-y-3">
+          <div className="px-4 sm:px-6 py-4 border-t space-y-3">
             <button onClick={() => { printReceipt({ ...(receiptOrder ?? order), billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo); onClose(); }}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -725,12 +725,16 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     );
   }
 
+  const canTakePayment = ROLE_PERMISSIONS[currentUser.role as keyof typeof ROLE_PERMISSIONS]?.canProcessPayments && order.status !== 'completed';
+
   // ── Payment modal ─────────────────────────────────────────────────────────
+  // Header and the Complete Payment button stay put; everything between scrolls,
+  // so the button is always reachable on a phone (portrait or landscape).
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl">
         {!isAuthorized ? (
-          <div className="p-12 text-center">
+          <div className="p-6 sm:p-12 text-center overflow-y-auto">
             <div className="size-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldAlert className="size-8" />
             </div>
@@ -744,57 +748,58 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <div>
-                <h2 className="font-bold text-lg">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : getOrderType(order) === 'pickup' ? 'Pickup Order' : `Table ${order.tableNumber}`}</h2>
+            <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b">
+              <div className="min-w-0">
+                <h2 className="font-bold text-lg truncate">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : getOrderType(order) === 'pickup' ? 'Pickup Order' : `Table ${order.tableNumber}`}</h2>
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <Clock className="size-3" />
                   {order.billNumber ? `Bill #${order.billNumber} • ` : ''}
                   {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
                 </p>
               </div>
-              <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
+              <button onClick={onClose} aria-label="Close" className="p-3 -mr-1 shrink-0 rounded-xl hover:bg-gray-100"><X className="size-5" /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            <div className="px-4 sm:px-6 py-4 space-y-2">
               {(order.items ?? []).length === 0 ? (
                 <p className="text-center text-gray-400 py-8">No items in this order</p>
               ) : (order.items ?? []).map((item: any) => {
                 const isPaid = item.status !== 'cancelled' && (item.paid || paidItemIds.has(item.id));
                 return (
-                <div key={item.id} className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${isPaid || item.status === 'cancelled' ? 'opacity-50' : ''}`}>
+                <div key={item.id} className={`flex items-center justify-between gap-2 py-2.5 border-b border-gray-50 last:border-0 ${isPaid || item.status === 'cancelled' ? 'opacity-50' : ''}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.productName || item.product_name}</p>
+                    <p className="text-sm font-medium truncate" dir="auto">{item.productName || item.product_name}</p>
                     {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
-                      <p className="text-xs text-gray-500 truncate">{item.modifiers.map((m: any) => m.optionName || m.option_name).join(', ')}</p>
+                      <p className="text-xs text-gray-500 truncate" dir="auto">{item.modifiers.map((m: any) => m.optionName || m.option_name).join(', ')}</p>
                     )}
-                    <p className="text-xs text-gray-400">by {item.addedByName || item.added_by_name}</p>
+                    <p className="text-xs text-gray-400 truncate">by {item.addedByName || item.added_by_name}</p>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                     {isPaid ? (
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700">Paid</span>
                     ) : (
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${itemStatusColors[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
                     )}
                     <span className="text-xs text-gray-500 w-6 text-center">×{item.quantity}</span>
-                    <span className={`text-sm font-semibold w-24 text-right ${item.status === 'cancelled' ? 'line-through' : ''}`}>{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
+                    <span className={`text-sm font-semibold min-w-20 sm:min-w-24 text-right whitespace-nowrap ${item.status === 'cancelled' ? 'line-through' : ''}`}>{fmt((item.price ?? 0) * (item.quantity ?? 1))}</span>
                   </div>
                 </div>
                 );
               })}
             </div>
 
-            <div className="px-6 py-3 border-t bg-gray-50 space-y-1">
+            <div className="px-4 sm:px-6 py-3 border-t bg-gray-50 space-y-1 [&>div]:gap-3 [&>div>span:last-child]:whitespace-nowrap">
               <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
               {baseTotals.discount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span>−{fmt(baseTotals.discount)}</span></div>}
-              {presetDiscount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>{branchSettings.discountPresets.find(p => p.id === appliedPresetId)?.label ?? 'Discount'}</span><span>−{fmt(presetDiscount)}</span></div>}
-              {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span>⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
-              {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span>{branchSettings.taxLabel}{branchSettings.taxInclusive ? ' (incl.)' : ` (${branchSettings.taxRate}%)`}</span><span>{fmt(totals.tax)}</span></div>}
+              {presetDiscount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span className="min-w-0 break-words" dir="auto">{branchSettings.discountPresets.find(p => p.id === appliedPresetId)?.label ?? 'Discount'}</span><span>−{fmt(presetDiscount)}</span></div>}
+              {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span className="min-w-0 break-words">⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
+              {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span className="min-w-0 break-words">{branchSettings.taxLabel}{branchSettings.taxInclusive ? ' (incl.)' : ` (${branchSettings.taxRate}%)`}</span><span>{fmt(totals.tax)}</span></div>}
               <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
             </div>
 
-            {ROLE_PERMISSIONS[currentUser.role as keyof typeof ROLE_PERMISSIONS]?.canProcessPayments && order.status !== 'completed' && (
-              <div className="px-6 py-4 border-t space-y-3">
+            {canTakePayment && (
+              <div className="px-4 sm:px-6 py-4 border-t space-y-3">
                 <CustomerPanel
                   branchId={currentUser.branchId}
                   linkedCustomer={linkedCustomer}
@@ -815,7 +820,8 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                           <button
                             key={preset.id}
                             onClick={() => applyPreset(preset)}
-                            className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+                            dir="auto"
+                            className={`min-h-10 max-w-full break-words px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all ${
                               active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
                             }`}
                           >
@@ -828,7 +834,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                   </div>
                 )}
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-x-2">
                   <p className="text-sm font-semibold text-gray-700">Payment Method</p>
                   {lockedToSplit && <p className="text-[11px] font-semibold text-pink-600">Partially paid — continue by item</p>}
                 </div>
@@ -854,37 +860,37 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                     </div>
                     <div>
                       <p className="text-xs font-bold text-violet-700 uppercase tracking-tight">Scan to Pay</p>
-                      <p className="text-[10px] text-violet-600/70">Dynamic QR generated for {fmt(totals.total)}</p>
+                      <p className="text-[10px] text-violet-600/70 break-words">Dynamic QR generated for {fmt(totals.total)}</p>
                     </div>
                   </div>
                 )}
 
                 {paymentMode === 'mix' && (
                   <div className="space-y-2 bg-orange-50 rounded-xl p-3 border border-orange-100">
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between gap-2 text-xs mb-1">
                       <span className="font-medium text-orange-800">Split Payment</span>
-                      <span className={`font-semibold ${splitExact ? 'text-emerald-600' : splitRemain > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                      <span className={`font-semibold text-right ${splitExact ? 'text-emerald-600' : splitRemain > 0 ? 'text-amber-600' : 'text-red-500'}`}>
                         {splitExact ? '✓ Balanced' : splitRemain > 0 ? `${fmt(splitRemain)} remaining` : `${fmt(splitTotal - totals.total)} over`}
                       </span>
                     </div>
                     {splits.map((entry, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <select value={entry.method} onChange={e => updateSplit(idx, 'method', e.target.value as MixMethod)}
-                          className="flex-none w-24 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none" disabled={processing}>
+                          className="flex-none w-24 min-h-10 text-xs border border-orange-200 rounded-lg px-2 py-2 bg-white focus:outline-none" disabled={processing}>
                           {(['cash','card','qr','account'] as MixMethod[]).map(m => (
                             <option key={m} value={m} disabled={splits.some((s,i) => i !== idx && s.method === m)}>
                               {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : m === 'qr' ? '📱 QR' : '🧾 Account'}
                             </option>
                           ))}
                         </select>
-                        <div className="flex-1 relative">
+                        <div className="flex-1 min-w-0 relative">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">{CURRENCY}</span>
                           <input type="number" min="0" step="0.01" placeholder="0.00" value={entry.amount}
                             onChange={e => updateSplit(idx, 'amount', e.target.value)}
-                            className="w-full pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none focus:border-orange-400" disabled={processing} />
+                            className="w-full min-h-10 pl-9 pr-2 py-2 text-sm border border-orange-200 rounded-lg bg-white focus:outline-none focus:border-orange-400" disabled={processing} />
                         </div>
                         {splits.length > 1 && (
-                          <button onClick={() => setSplits(prev => prev.filter((_, i) => i !== idx))} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
+                          <button onClick={() => setSplits(prev => prev.filter((_, i) => i !== idx))} aria-label="Remove payment row" className="p-2.5 shrink-0 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
                             <Minus className="size-4" />
                           </button>
                         )}
@@ -910,31 +916,31 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                       {debtAccounts === null && <p className="text-xs text-gray-500 py-2">Loading…</p>}
                       {debtAccounts?.filter(a => `${a.name} ${a.phone ?? ''}`.toLowerCase().includes(debtSearch.toLowerCase())).map(a => (
                         <button key={a.id} type="button" onClick={() => setDebtAccountId(a.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm ${debtAccountId === a.id ? 'border-amber-500 bg-white shadow-sm' : 'border-transparent hover:bg-white/70'}`}>
-                          <span className="truncate"><span className="font-semibold">{a.name}</span>{a.phone ? <span className="text-gray-500"> · {a.phone}</span> : null}</span>
-                          <span className={`shrink-0 text-xs ${a.overdue ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                          className={`w-full min-h-11 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 px-3 py-2 rounded-lg border text-left text-sm ${debtAccountId === a.id ? 'border-amber-500 bg-white shadow-sm' : 'border-transparent hover:bg-white/70'}`}>
+                          <span className="truncate min-w-0 max-w-full"><span className="font-semibold" dir="auto">{a.name}</span>{a.phone ? <span className="text-gray-500"> · {a.phone}</span> : null}</span>
+                          <span className={`ml-auto text-right text-xs ${a.overdue ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                             owes {fmt(a.balance)}{a.creditLimit != null ? ` / ${fmt(a.creditLimit)}` : ''}{a.overdue ? ' · overdue' : ''}
                           </span>
                         </button>
                       ))}
                       {debtAccounts?.length === 0 && <p className="text-xs text-gray-500 py-2">No customer accounts yet — add one below.</p>}
                     </div>
-                    <div className="flex gap-2 pt-1">
-                      <input value={newDebtName} onChange={e => setNewDebtName(e.target.value)} placeholder="New customer name"
-                        className="flex-1 min-w-0 px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <input value={newDebtName} onChange={e => setNewDebtName(e.target.value)} placeholder="New customer name" dir="auto"
+                        className="flex-1 min-w-[10rem] px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
                       <input value={newDebtPhone} onChange={e => setNewDebtPhone(e.target.value)} placeholder="Phone"
-                        className="w-28 px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
+                        className="flex-1 min-w-0 sm:flex-none w-28 px-2 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:outline-none" />
                       <button type="button" onClick={createDebtAccount}
-                        className="px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600">Add</button>
+                        className="min-h-10 px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600">Add</button>
                     </div>
                   </div>
                 )}
 
                 {paymentMode === 'split-items' && (
                   <div className="space-y-2 bg-pink-50 rounded-xl p-3 border border-pink-100">
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between gap-2 text-xs mb-1">
                       <span className="font-medium text-pink-800">Select what this guest is paying for</span>
-                      <span className="font-semibold text-pink-600">{unpaidItems.length} item{unpaidItems.length !== 1 ? 's' : ''} left</span>
+                      <span className="font-semibold text-pink-600 shrink-0 whitespace-nowrap">{unpaidItems.length} item{unpaidItems.length !== 1 ? 's' : ''} left</span>
                     </div>
 
                     {unpaidItems.length === 0 ? (
@@ -958,8 +964,8 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                               <span className={`size-4 rounded flex items-center justify-center border-2 flex-shrink-0 ${checked ? 'bg-pink-600 border-pink-600' : 'border-gray-300'}`}>
                                 {checked && <Check className="size-3 text-white" strokeWidth={3} />}
                               </span>
-                              <span className="flex-1 text-xs font-medium text-gray-800 truncate">{item.productName || item.product_name} ×{item.quantity}</span>
-                              <span className="text-xs font-bold text-gray-900">{fmt(Number(item.price ?? 0) * Number(item.quantity ?? 1))}</span>
+                              <span className="flex-1 min-w-0 text-xs font-medium text-gray-800 truncate" dir="auto">{item.productName || item.product_name} ×{item.quantity}</span>
+                              <span className="text-xs font-bold text-gray-900 shrink-0 whitespace-nowrap">{fmt(Number(item.price ?? 0) * Number(item.quantity ?? 1))}</span>
                             </button>
                           );
                         })}
@@ -971,7 +977,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                         <div className="grid grid-cols-3 gap-1.5 pt-1">
                           {(['cash', 'card', 'qr'] as SimpleMethod[]).map(m => (
                             <button key={m} onClick={() => setSplitMethod(m)}
-                              className={`py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                              className={`min-h-10 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
                                 splitMethod === m ? 'bg-pink-600 border-pink-600 text-white' : 'bg-white border-pink-200 text-pink-700'
                               }`}>
                               {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'QR'}
@@ -984,7 +990,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                         <div className="pt-1 text-sm space-y-0.5">
                           <div className="flex justify-between items-center">
                             <span className="text-pink-700 font-medium">Selected items</span>
-                            <span className="text-gray-600">{fmt(splitSelectedTotal)}</span>
+                            <span className="text-gray-600 whitespace-nowrap">{fmt(splitSelectedTotal)}</span>
                           </div>
                           {splitSelectedDue > splitSelectedTotal && (
                             <div className="flex justify-between items-center text-xs text-gray-500">
@@ -994,14 +1000,19 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                           )}
                           <div className="flex justify-between items-center font-bold text-gray-900">
                             <span>Due now</span>
-                            <span>{fmt(splitSelectedDue)}</span>
+                            <span className="whitespace-nowrap">{fmt(splitSelectedDue)}</span>
                           </div>
                         </div>
                       </>
                     )}
                   </div>
                 )}
+              </div>
+            )}
+            </div>
 
+            {canTakePayment && (
+              <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t bg-white">
                 <button
                   onClick={paymentMode === 'split-items' ? handleSplitPay : handlePayment}
                   disabled={
@@ -1009,7 +1020,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                       ? (splitProcessing || splitSelected.size === 0)
                       : (processing || (paymentMode === 'mix' && !splitExact) || (usesAccount && !debtAccountId))
                   }
-                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full min-h-12 py-3 sm:py-4 px-3 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex flex-wrap items-center justify-center gap-x-2 text-center disabled:opacity-50"
                 >
                   {paymentMode === 'split-items' ? (
                     splitProcessing ? (

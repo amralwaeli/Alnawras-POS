@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Edit, Trash2, Upload, Download, Package, Tag, DollarSign, ChefHat, Printer } from 'lucide-react';
+import { CURRENCY } from '../../../lib/currency';
 import { usePOS } from '../../context/POSContext';
 import { loadStations, Station } from '../../models/types';
 import { Button } from '../../components/ui/button';
@@ -411,8 +412,8 @@ export function ProductManagementView() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Product Management</h1>
           <p className="text-gray-600">Manage products and categories for your menu</p>
@@ -433,8 +434,8 @@ export function ProductManagementView() {
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400"
           />
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={() => { resetProductForm(); setIsProductDialogOpen(true); }} disabled={!categories.length}>
                 <Plus className="size-4 mr-2" />
                 Add Product
@@ -479,8 +480,8 @@ export function ProductManagementView() {
                       className="size-12 rounded-xl shrink-0"
                     />
                     <div className="min-w-0">
-                      <CardTitle className="text-lg truncate">{product.name}</CardTitle>
-                      <Badge variant="secondary" className="mt-1">{product.category}</Badge>
+                      <CardTitle className="text-lg truncate" dir="auto">{product.name}</CardTitle>
+                      <Badge variant="secondary" className="mt-1 max-w-full truncate" dir="auto">{product.category}</Badge>
                     </div>
                   </div>
                 </CardHeader>
@@ -488,14 +489,14 @@ export function ProductManagementView() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <DollarSign className="size-4 text-gray-500" />
-                      <span className="font-semibold">${product.price.toFixed(2)}</span>
+                      <span className="font-semibold whitespace-nowrap">{CURRENCY} {product.price.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Package className="size-4 text-gray-500" />
                       <span>Stock: {product.stock}</span>
                     </div>
                     {product.sku && (
-                      <div className="text-sm text-gray-600">SKU: {product.sku}</div>
+                      <div className="text-sm text-gray-600 break-words">SKU: {product.sku}</div>
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
                       <ChefHat className="size-3.5 text-gray-400" />
@@ -522,7 +523,7 @@ export function ProductManagementView() {
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" aria-label="Delete">
                           <Trash2 className="size-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -572,9 +573,9 @@ export function ProductManagementView() {
             {categories.map(category => (
               <Card key={category.id}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {category.icon && <span>{category.icon}</span>}
-                    <CardTitle className="text-lg">{category.name}</CardTitle>
+                    <CardTitle className="text-lg truncate" dir="auto">{category.name}</CardTitle>
                   </div>
                   <div
                     className="w-4 h-4 rounded-full"
@@ -583,7 +584,7 @@ export function ProductManagementView() {
                 </CardHeader>
                 <CardContent>
                   {category.description && (
-                    <p className="text-sm text-gray-600 mb-4">{category.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 break-words" dir="auto">{category.description}</p>
                   )}
                   <div className="flex gap-2">
                     <Button
@@ -597,7 +598,7 @@ export function ProductManagementView() {
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" aria-label="Delete">
                           <Trash2 className="size-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -706,7 +707,7 @@ export function ProductManagementView() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="product-price">Price</Label>
                 <Input
@@ -755,7 +756,7 @@ export function ProductManagementView() {
               </Select>
               <p className="text-xs text-gray-500 mt-1">Where orders for this product are sent for preparation</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="product-tax">Tax Rate (%)</Label>
                 <Input
@@ -788,7 +789,7 @@ export function ProductManagementView() {
                 <p className="text-xs text-gray-500 mt-1">Each sale takes it off the stock above; at 0 it shows as sold out. Voiding a line puts it back.</p>
               </div>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsProductDialogOpen(false)}>
                 Cancel
               </Button>
@@ -825,7 +826,7 @@ export function ProductManagementView() {
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="category-color">Color</Label>
                 <Input
@@ -854,7 +855,7 @@ export function ProductManagementView() {
                 placeholder="e.g., 🍽️, 🥗, 🍰"
               />
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
                 Cancel
               </Button>

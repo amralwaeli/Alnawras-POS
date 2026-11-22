@@ -54,12 +54,12 @@ export function PeriodPicker({ p }: { p: ReturnType<typeof usePeriod> }) {
         ))}
       </div>
       {p.period === 'custom' && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input type="date" aria-label="From date" value={p.customFrom} onChange={e => p.setCustomFrom(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            className="min-h-11 min-w-0 flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           <span className="text-gray-500 text-sm">to</span>
           <input type="date" aria-label="To date" value={p.customTo} onChange={e => p.setCustomTo(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            className="min-h-11 min-w-0 flex-1 sm:flex-none border border-gray-200 rounded-lg px-3 py-2 text-sm" />
         </div>
       )}
     </div>

@@ -78,17 +78,17 @@ export function LeaveManagementView() {
     : requests.filter(r => r.status === statusFilter);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">Review and manage employee leave requests</p>
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 min-h-11 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >
           <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -96,37 +96,37 @@ export function LeaveManagementView() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-amber-50 flex items-center justify-center">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 min-w-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <div className="size-10 shrink-0 rounded-lg bg-amber-50 flex items-center justify-center">
               <Clock className="size-5 text-amber-600" />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{pending}</p>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Pending</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide truncate">Pending</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-green-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 min-w-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <div className="size-10 shrink-0 rounded-lg bg-green-50 flex items-center justify-center">
               <CheckCircle className="size-5 text-green-600" />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{approved}</p>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Approved</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide truncate">Approved</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-red-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 min-w-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <div className="size-10 shrink-0 rounded-lg bg-red-50 flex items-center justify-center">
               <XCircle className="size-5 text-red-600" />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{rejected}</p>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Rejected</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide truncate">Rejected</p>
             </div>
           </div>
         </div>
@@ -134,12 +134,12 @@ export function LeaveManagementView() {
 
       {/* Status filter tabs */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto overscroll-x-contain no-scrollbar">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setStatusFilter(tab.key)}
-              className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-3 min-h-11 text-sm font-medium transition-colors border-b-2 ${
                 statusFilter === tab.key
                   ? 'border-amber-500 text-amber-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -167,7 +167,7 @@ export function LeaveManagementView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[48rem] text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Employee</th>
@@ -185,22 +185,22 @@ export function LeaveManagementView() {
               <tbody className="divide-y divide-gray-100">
                 {displayed.map(req => (
                   <tr key={req.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td dir="auto" className="px-4 py-3 font-medium text-gray-900 max-w-[14rem] break-words">
                       {req.employeeName ?? req.employeeId}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {LEAVE_TYPE_LABELS[req.leaveType] ?? req.leaveType}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{req.startDate}</td>
-                    <td className="px-4 py-3 text-gray-700">{req.endDate}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{req.startDate}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{req.endDate}</td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {req.daysCount}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate">
+                    <td dir="auto" className="px-4 py-3 text-gray-500 max-w-xs truncate">
                       {req.reason ?? '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[req.status]}`}>
+                      <span className={`inline-flex whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[req.status]}`}>
                         {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
                       </span>
                     </td>
@@ -211,20 +211,20 @@ export function LeaveManagementView() {
                             <button
                               onClick={() => handleReview(req.id, 'approved')}
                               disabled={actionLoading === req.id + 'approved'}
-                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                              className="px-3 py-1 pointer-coarse:py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
                             >
                               {actionLoading === req.id + 'approved' ? '…' : 'Approve'}
                             </button>
                             <button
                               onClick={() => handleReview(req.id, 'rejected')}
                               disabled={actionLoading === req.id + 'rejected'}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                              className="px-3 py-1 pointer-coarse:py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
                             >
                               {actionLoading === req.id + 'rejected' ? '…' : 'Reject'}
                             </button>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">
+                          <span dir="auto" className="text-xs text-gray-400">
                             {req.reviewedBy ? `by ${req.reviewedBy}` : '—'}
                           </span>
                         )}

@@ -33,14 +33,15 @@ export function Layout() {
     // These roles only exist in the installed app, where logout just drops the
     // staff PIN (the device stays bound) — so the next person can PIN in.
     return (
-      <div className="h-screen w-screen overflow-hidden flex flex-col">
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-1.5 bg-gray-900 text-white">
-          <p className="text-sm truncate">
-            <span className="font-semibold">{currentUser.name}</span>
+      <div className="h-dvh w-full overflow-hidden flex flex-col bg-gray-900 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        {/* Phones: name + Switch user on row 1, the cashier links scroll on row 2. */}
+        <div className="shrink-0 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-1 px-3 sm:px-4 py-1.5 bg-gray-900 text-white">
+          <p className="text-sm truncate min-w-0 flex-1 sm:flex-initial">
+            <span className="font-semibold" dir="auto">{currentUser.name}</span>
             <span className="text-gray-400 capitalize"> · {currentUser.role}</span>
           </p>
           {currentUser.role === 'cashier' && (
-            <nav className="flex items-center gap-1 overflow-x-auto">
+            <nav className="order-last sm:order-none w-full sm:w-auto min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar">
               {[['/tables', 'Tables'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']].map(([to, label]) => (
                 <NavLink key={to} to={to}
                   className={({ isActive }) => `min-h-11 px-3 flex items-center rounded-lg text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white text-gray-900' : 'hover:bg-white/10'}`}>
@@ -51,12 +52,12 @@ export function Layout() {
           )}
           <button
             onClick={logout}
-            className="min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold"
+            className="shrink-0 min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold whitespace-nowrap"
           >
             Switch user
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto"><Outlet /></div>
+        <div className="flex-1 min-h-0 overflow-y-auto bg-background"><Outlet /></div>
       </div>
     );
   }
@@ -153,7 +154,7 @@ export function Layout() {
   };
 
   return (
-    <div className="h-screen flex bg-gray-50 overflow-hidden">
+    <div className="h-dvh w-full flex bg-gray-50 overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
 
       {/* ── MOBILE BACKDROP ── */}
       {mobileOpen && (
@@ -170,7 +171,8 @@ export function Layout() {
         flex flex-col bg-gray-900 text-white shrink-0
         fixed lg:static inset-y-0 left-0
         z-40 lg:z-auto
-        ${collapsed ? 'lg:w-16' : 'lg:w-60'} w-64
+        pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] lg:pt-0 lg:pb-0
+        ${collapsed ? 'lg:w-16' : 'lg:w-60'} w-64 max-w-[85vw]
         transition-all duration-200
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -180,7 +182,7 @@ export function Layout() {
             <UtensilsCrossed className="size-5 text-white" />
           </div>
           <div className={`flex-1 min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
-            <p className="font-bold text-base leading-tight truncate">{businessName}</p>
+            <p className="font-bold text-base leading-tight truncate" dir="auto">{businessName}</p>
             <p className="text-[11px] text-gray-400 uppercase tracking-wider">Point of Sale</p>
           </div>
           {/* Desktop: collapse toggle */}
@@ -194,7 +196,8 @@ export function Layout() {
           {/* Mobile: close button */}
           <button
             onClick={closeMobile}
-            className="lg:hidden p-2 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close menu"
+            className="lg:hidden p-3 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="size-4" />
           </button>
@@ -332,27 +335,27 @@ export function Layout() {
       {/* ── MAIN AREA ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+        <div className="lg:hidden shrink-0 z-20 bg-white border-b border-gray-200 px-3 sm:px-4 py-2 flex items-center gap-3">
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            aria-label="Open menu"
+            className="size-11 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors shrink-0"
           >
             <Menu className="size-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="size-6 rounded-lg bg-amber-500 flex items-center justify-center">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="size-6 rounded-lg bg-amber-500 flex items-center justify-center shrink-0">
               <UtensilsCrossed className="size-3.5 text-white" />
             </div>
-            <span className="font-bold text-sm text-gray-900">{businessName}</span>
+            <span className="font-bold text-sm text-gray-900 truncate" dir="auto">{businessName}</span>
           </div>
-          <div className="flex-1" />
-          <div className={`size-7 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold`}>
+          <div className={`size-7 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xs font-bold`}>
             {initials}
           </div>
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto">
           <Outlet />
         </main>
       </div>

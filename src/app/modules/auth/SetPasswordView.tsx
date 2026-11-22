@@ -8,9 +8,9 @@ import { supabase } from '../../../lib/supabase';
  *  the account password. No login required — the token is the credential. */
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0E14] p-6">
+    <div className="min-h-dvh flex items-center justify-center bg-[#0B0E14] p-4 sm:p-6">
       <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-10">
+        <div className="flex flex-col items-center mb-6 sm:mb-10">
           <div className="size-14 rounded-[22px] bg-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/20 mb-4">
             <UtensilsCrossed className="size-7 text-white" />
           </div>
@@ -78,11 +78,11 @@ export function SetPasswordView() {
 
   return (
     <Shell>
-      <form onSubmit={submit} className="bg-[#161B22] border border-gray-800 rounded-2xl p-6 space-y-4">
+      <form onSubmit={submit} className="bg-[#161B22] border border-gray-800 rounded-2xl p-5 sm:p-6 space-y-4">
         <p className="text-center text-gray-500 text-xs font-medium">Choose a password for your account.</p>
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-            <p className="text-center text-red-400 text-xs font-bold uppercase tracking-wider">{error}</p>
+            <p className="text-center text-red-400 text-xs font-bold uppercase tracking-wider break-words">{error}</p>
           </div>
         )}
         <div>

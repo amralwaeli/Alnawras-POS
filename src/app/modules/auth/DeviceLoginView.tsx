@@ -33,10 +33,10 @@ export function DeviceLoginView() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0E14] p-6">
+    <div className="min-h-dvh flex items-center justify-center bg-[#0B0E14] p-4 sm:p-6">
       <div className="w-full max-w-sm">
         {/* Brand */}
-        <div className="flex flex-col items-center mb-10">
+        <div className="flex flex-col items-center mb-6 sm:mb-10">
           <div className="size-14 rounded-[22px] bg-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/20 mb-4">
             <UtensilsCrossed className="size-7 text-white" />
           </div>
@@ -46,7 +46,7 @@ export function DeviceLoginView() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#161B22] border border-gray-800 rounded-2xl p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[#161B22] border border-gray-800 rounded-2xl p-5 sm:p-6 space-y-4">
           <div className="text-center mb-2">
             <h2 className="text-lg font-black text-white tracking-tight uppercase italic">
               {native ? 'Sign this device in' : 'Sign in'}
@@ -60,7 +60,7 @@ export function DeviceLoginView() {
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-              <p className="text-center text-red-400 text-xs font-bold uppercase tracking-wider">{error}</p>
+              <p className="text-center text-red-400 text-xs font-bold uppercase tracking-wider break-words">{error}</p>
             </div>
           )}
 

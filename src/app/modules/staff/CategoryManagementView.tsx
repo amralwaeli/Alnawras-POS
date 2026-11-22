@@ -245,7 +245,7 @@ export function CategoryManagementView() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Manage Menu</h1>
@@ -287,7 +287,7 @@ export function CategoryManagementView() {
                   rows={3}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="category-color">Color</Label>
                   <Input
@@ -316,7 +316,7 @@ export function CategoryManagementView() {
                   placeholder="Optional icon or emoji"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -329,8 +329,8 @@ export function CategoryManagementView() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Waiter Tabs</h2>
                 <p className="text-sm text-gray-500">Drag categories to change the order on the waiter page.</p>
@@ -367,17 +367,18 @@ export function CategoryManagementView() {
                           style={{ backgroundColor: category.color || '#F97316' }}
                         />
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">{index + 1}. {category.name}</p>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="font-semibold text-gray-900 truncate" dir="auto">{index + 1}. {category.name}</p>
+                          <p className="text-xs text-gray-500 truncate" dir="auto">
                             {category.description || 'No description'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           size="sm"
                           variant="ghost"
+                          aria-label={`Edit ${category.name}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEdit(category);
@@ -391,6 +392,7 @@ export function CategoryManagementView() {
                               size="sm"
                               variant="ghost"
                               className="text-red-600 hover:text-red-700"
+                              aria-label={`Delete ${category.name}`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Trash2 className="size-4" />
@@ -430,7 +432,7 @@ export function CategoryManagementView() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="min-w-0 rounded-3xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Tab Products</h2>
@@ -451,8 +453,8 @@ export function CategoryManagementView() {
           {selectedCategory ? (
             <>
               {/* Search + Select All toolbar */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="relative flex-1">
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <div className="relative flex-1 min-w-[12rem]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
                   <input
                     type="text"
@@ -492,7 +494,7 @@ export function CategoryManagementView() {
                       onCheckedChange={(checked) => handleProductToggle(product.id, checked as boolean)}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                      <p className="font-medium text-gray-900 truncate" dir="auto">{product.name}</p>
                       <p className="text-sm text-gray-500 truncate">
                         RM {product.price.toFixed(2)} | Current: {product.category || 'Uncategorized'}
                       </p>

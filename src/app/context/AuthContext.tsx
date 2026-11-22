@@ -6,6 +6,9 @@ import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 import { DeviceService } from '../services/DeviceService';
 import { PrinterController } from '../controllers/PrinterController';
+import { isNativeApp } from '../../lib/platform';
+import { isNetworkError } from '../services/OfflineSyncEngine';
+import { rememberOfflinePin, checkOfflinePin, pruneOfflinePins } from '../../lib/offlinePins';
 
 /** Staff-facing message when a branch is locked out (contract lapsed or the
  *  super-admin suspended it). Kept generic — staff shouldn't see billing detail. */
@@ -27,6 +30,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Device role locking: waiters only on waiter tablets, cashier roles only on the
+ *  cashier device. Admin always passes, so the owner can never be locked out. */
+function stationRefusal(user: User): string | null {
+  if (user.role === 'admin') return null;
+  const station = DeviceService.getStationType();
+  if (station === 'waiter' && !['waiter', 'swaiter'].includes(user.role)) return 'This tablet is for Waiters only. Please use the Cashier station.';
+  if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) return 'This station is for Cashiers only.';
+  return null;
+}
+
 export function AuthProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -38,7 +51,12 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   // The staff list is loaded only for a signed-in user (the API refuses it to anyone else).
   useEffect(() => {
     if (!currentUser) { setUsers([]); return; }
-    StaffController.getStaff().then(res => { if (res.success && res.data) setUsers(res.data); });
+    StaffController.getStaff().then(res => {
+      if (!res.success || !res.data) return;
+      setUsers(res.data);
+      // Staff no longer active can't keep signing in offline on this device.
+      if (isNativeApp()) pruneOfflinePins(res.data.filter(u => u.status === 'active').map(u => u.id));
+    });
   }, [currentUser?.id]);
 
   // The branch's shared printer list → this device's copy used for printing (works offline).
@@ -59,9 +77,20 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       return { success: false, error: 'PIN must be 4 digits' };
     }
 
-    if (!navigator.onLine) return { success: false, error: 'No internet — PIN sign-in needs a connection.' };
+    // No internet: the app signs in staff who signed in on this device before (lib/offlinePins).
+    const offline = async () => {
+      if (!isNativeApp()) return { success: false, error: 'No internet — PIN sign-in needs a connection.' };
+      const res = await checkOfflinePin(pin);
+      if (!res.user) return { success: false, error: res.error };
+      const refused = stationRefusal(res.user);
+      if (refused) return { success: false, error: refused };
+      setCurrentUser(res.user);
+      return { success: true, user: res.user };
+    };
+    if (!navigator.onLine) return offline();
     // Checked on the server, for this device's branch only (migration 0030).
     const { data, error } = await supabase.rpc('verify_staff_pin', { p_pin: pin, p_device: DeviceService.getDeviceId() });
+    if (error && isNetworkError(error)) return offline();
     if (error) {
       // The server's messages are written for staff ("Too many wrong PINs…").
       return { success: false, error: error.message || 'Could not check the PIN. Try again.' };
@@ -79,22 +108,10 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
         return { success: false, error: branchBlockedMessage(access.reason) };
       }
 
-      // ── DEVICE ROLE LOCKING ───────────────────────────────────────────────
-      // Secure the tablet and cashier devices: only accept waiter on tablets,
-      // and only cashier/admin on the cashier device.
-      // Admin always bypasses the lock so the owner can never lock themselves
-      // out of a device (e.g. to re-assign its station binding).
-      const station = DeviceService.getStationType();
-      if (user.role !== 'admin') {
-        if (station === 'waiter' && !['waiter', 'swaiter'].includes(user.role)) {
-          return { success: false, error: 'This tablet is for Waiters only. Please use the Cashier station.' };
-        }
-        if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) {
-          return { success: false, error: 'This station is for Cashiers only.' };
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────────
+      const refused = stationRefusal(user);
+      if (refused) return { success: false, error: refused };
 
+      if (isNativeApp()) rememberOfflinePin(pin, user).catch(() => { /* offline sign-in just won't be available */ });
       setCurrentUser(user);
       return { success: true, user };
   };

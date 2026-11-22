@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { isNativeApp } from '../../lib/platform';
+import { clearOfflinePins } from '../../lib/offlinePins';
 
 /**
  * DeviceAuthController — the branch/terminal login layer.
@@ -19,7 +20,8 @@ import { isNativeApp } from '../../lib/platform';
 const BRANCH_KEY = 'alnawras_device_branch';
 const lastBranch = () => { try { return localStorage.getItem(BRANCH_KEY); } catch { return null; } };
 const rememberBranch = (b: string) => { try { localStorage.setItem(BRANCH_KEY, b); } catch { /* ignore */ } };
-const forgetBranch = () => { try { localStorage.removeItem(BRANCH_KEY); } catch { /* ignore */ } };
+// Leaving the branch also forgets every offline staff PIN kept on this device.
+const forgetBranch = () => { try { localStorage.removeItem(BRANCH_KEY); } catch { /* ignore */ } clearOfflinePins(); };
 
 export class DeviceAuthController {
   /** Sign the device into a branch account. Rejects any Supabase account that

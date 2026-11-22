@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { flushSync } from 'react-dom';
+import { flushSync, createPortal } from 'react-dom';
 import { useSavedDocuments, SavedDocumentsList, SavedDoc } from '../../hooks/useSavedDocuments';
 import { useNavigate } from 'react-router';
 import { Plus, Trash2, Printer, FileText, ArrowLeft } from 'lucide-react';
@@ -122,7 +122,8 @@ export function QuotationsView() {
 
   return (
     <>
-      <style>{`@media print { @page { size: A4 portrait; margin: 0; } html, body { margin: 0; padding: 0; width: 100%; height: 100%; } body * { visibility: hidden !important; } .print-only, .print-only * { visibility: visible !important; } .print-only { display: block !important; position: fixed !important; top: 0; left: 0; width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 0 !important; box-sizing: border-box !important; background: #fff !important; } .no-print { display: none !important; visibility: hidden !important; } }`}</style>
+      {/* Print: only the .print-only layer (a direct child of <body>, see the portal below) is laid out; everything else is display:none so it can't add pages. */}
+      <style>{`@media screen { .print-only { display: none !important; } } @media print { @page { size: A4 portrait; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; height: auto !important; } body > *:not(.print-only) { display: none !important; } .print-only { display: block !important; width: 210mm; background: #fff; } .print-only .alnawras-pdf-doc { min-height: 0 !important; } }`}</style>
       <div className="h-full overflow-hidden bg-gray-50 flex flex-col no-print">
       {/* Top bar (stays fixed; the content below scrolls) */}
       <div className="shrink-0 z-10 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3">
@@ -358,9 +359,7 @@ export function QuotationsView() {
     </div>
 
     {/* Admin print target (hidden on screen, shown by @media print). */}
-    <div className="print-only hidden">
-      <QuotationTemplate data={quotationData} />
-    </div>
+    {createPortal(<div className="print-only"><QuotationTemplate data={quotationData} /></div>, document.body)}
     {/* Off-screen but rendered copy that html2canvas rasterises for the APK PDF. */}
     <div aria-hidden style={{ position: 'fixed', left: '-10000px', top: 0, width: '210mm', background: '#fff' }}>
       <QuotationTemplate ref={printRef} data={quotationData} />

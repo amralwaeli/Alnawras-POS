@@ -113,10 +113,10 @@ describe('saved invoices and quotations', () => {
     [branch, kind, JSON.stringify({ invoiceTo: { name: 'Ali', phone: '012' }, total: 50, items: [] })]));
 
   it('numbers each kind sequentially per branch', async () => {
-    expect((await save(DEV_A, 'A', 'invoice')).number).toBe('INV-0001');
-    expect((await save(DEV_A, 'A', 'invoice')).number).toBe('INV-0002');
+    expect((await save(DEV_A, 'A', 'invoice')).number).toBe('INV-1000');   // 0042: invoices start at 1000
+    expect((await save(DEV_A, 'A', 'invoice')).number).toBe('INV-1001');
     expect((await save(DEV_A, 'A', 'quotation')).number).toBe('QUO-0001');
-    expect((await save(DEV_B, 'B', 'invoice')).number).toBe('INV-0001');
+    expect((await save(DEV_B, 'B', 'invoice')).number).toBe('INV-1000');
   });
 
   it('the public bill-number call cannot move the document counters', async () => {
@@ -131,7 +131,7 @@ describe('saved invoices and quotations', () => {
 
   it("is readable by the branch's own devices only, and writable only through the function", async () => {
     const seen = await as(db, 'authenticated', DEV_B, () => db.query<any>(`SELECT number FROM documents ORDER BY number`));
-    expect(seen.rows.map(r => r.number)).toEqual(['INV-0001']);
+    expect(seen.rows.map(r => r.number)).toEqual(['INV-1000']);
     expect(await as(db, 'authenticated', DEV_A, () => fails(db,
       `INSERT INTO documents(branch_id, kind, number, data) VALUES ('A', 'invoice', 'INV-9999', '{}')`))).toMatch(/permission denied/);
     expect(await as(db, 'authenticated', DEV_B, () => fails(db,

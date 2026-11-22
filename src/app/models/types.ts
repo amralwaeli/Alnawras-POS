@@ -14,6 +14,8 @@ export interface User {
   name: string;
   employmentNumber: string;
   role: UserRole;
+  /** Other jobs this person also does (0044); permissions are combined. */
+  extraRoles?: UserRole[];
   pin: string;
   email: string;
   status: 'active' | 'inactive';
@@ -597,6 +599,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
 };
 
+/** All roles a person works as: their main role plus any extra roles (0044). */
+export const rolesOf = (u: { role: string; extraRoles?: string[] }): UserRole[] =>
+  [u.role, ...(u.extraRoles ?? [])].filter((r, i, all) => all.indexOf(r) === i) as UserRole[];
+
+/** Permissions for everything a person works as: each one is granted if ANY of their roles has it. */
+export function permissionsFor(u: { role: string; extraRoles?: string[] }): RolePermissions {
+  const sets = rolesOf(u).map(r => ROLE_PERMISSIONS[r]).filter(Boolean);
+  const base = { ...(ROLE_PERMISSIONS[u.role as UserRole] ?? ROLE_PERMISSIONS.staff) };
+  for (const k of Object.keys(base) as (keyof RolePermissions)[]) (base as any)[k] = sets.some(p => p[k]);
+  return base;
+}
+
 // ==================== Role Catalog (single source of truth) ====================
 // Every screen (Add Employee form, filters, role badges) MUST read role labels,
 // colours and the assignable list from here so they never drift apart again.
@@ -649,6 +663,7 @@ export interface Employee {
   email?: string;
   phone?: string;
   role: string;
+  extraRoles?: string[];
   department?: string;
   hireDate?: string;
   monthlySalary: number;
@@ -679,6 +694,7 @@ export interface CreateEmployeeInput {
   email: string;
   phone?: string;
   role: Exclude<UserRole, 'admin'>;
+  extraRoles?: Exclude<UserRole, 'admin'>[];
   department?: string;
   pin: string;
   monthlySalary: number;

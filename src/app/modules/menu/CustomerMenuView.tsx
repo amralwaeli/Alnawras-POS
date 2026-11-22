@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { createPickupToken } from '../../services/PickupService';
-import { Product, ROLE_PERMISSIONS, ModifierGroup, SelectedModifier } from '../../models/types';
+import { Product, ROLE_PERMISSIONS, permissionsFor, ModifierGroup, SelectedModifier } from '../../models/types';
 import { ModifierController } from '../../controllers/ModifierController';
 import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { toast } from 'sonner';
@@ -213,7 +213,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   // Waiters have no sidebar here, so this is their only way to the real Tables screen (QR toggle, move, void).
-  const canViewTables = !!ROLE_PERMISSIONS[currentUser.role]?.canViewTables;
+  const canViewTables = !!permissionsFor(currentUser)?.canViewTables;
   const newItemsOnly = cartItems.filter(i => i.source === 'new');
   // The cart lives only on this screen — warn before leaving with unsent items.
   const goToTables = () => {

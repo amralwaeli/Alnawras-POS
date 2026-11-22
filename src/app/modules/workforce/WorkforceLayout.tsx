@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router';
 import { Users, Clock, DollarSign, CalendarOff, Fingerprint, TrendingUp } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
-import { ROLE_PERMISSIONS } from '../../models/types';
+import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 
 const subNav = [
   { path: '/workforce/employees',  label: 'Employees',  icon: Users,       permission: 'canManageStaff' as const },
@@ -16,7 +16,7 @@ export function WorkforceLayout() {
   const { currentUser } = usePOS();
   if (!currentUser) return null;
 
-  const perms = ROLE_PERMISSIONS[currentUser.role];
+  const perms = permissionsFor(currentUser);
 
   const visibleNav = subNav.filter(item => !!perms[item.permission]);
 

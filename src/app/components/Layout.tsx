@@ -11,7 +11,7 @@ import { usePOS } from '../context/POSContext';
 import { useBranch } from '../context/BranchContext';
 import { useDeviceAuth } from '../context/DeviceAuthContext';
 import { isNativeApp } from '../../lib/platform';
-import { ROLE_PERMISSIONS, BranchFeatureKey } from '../models/types';
+import { ROLE_PERMISSIONS, permissionsFor, BranchFeatureKey } from '../models/types';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
@@ -62,7 +62,7 @@ export function Layout() {
     );
   }
 
-  const permissions = ROLE_PERMISSIONS[currentUser.role];
+  const permissions = permissionsFor(currentUser);
 
   type NavItem = {
     path: string; label: string; icon: any;

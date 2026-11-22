@@ -3,7 +3,7 @@ import { DollarSign, RefreshCw, TrendingUp, Download, CheckCircle } from 'lucide
 import { usePOS } from '../../../context/POSContext';
 import { HRController } from '../../../controllers/HRController';
 import { WorkforceController } from '../../../controllers/WorkforceController';
-import { PayrollSummary, EmployeeWithUser, ROLE_PERMISSIONS } from '../../../models/types';
+import { PayrollSummary, EmployeeWithUser, ROLE_PERMISSIONS, permissionsFor } from '../../../models/types';
 import { downloadCsv } from '../../../../lib/csv';
 import { friendlyError } from '../../../../lib/errors';
 
@@ -63,7 +63,7 @@ export function PayrollView() {
   const approved   = payroll.filter(p => p.status !== 'draft').length;
   const monthName  = new Date(year, month - 1).toLocaleString('en-US', { month: 'long' });
 
-  const canManage  = !!currentUser && !!ROLE_PERMISSIONS[currentUser.role]?.canManagePayroll;
+  const canManage  = !!currentUser && !!permissionsFor(currentUser)?.canManagePayroll;
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">

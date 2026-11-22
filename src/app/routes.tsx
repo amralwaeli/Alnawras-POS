@@ -3,7 +3,7 @@ import { createHashRouter, Navigate, useRouteError } from 'react-router';
 import { Layout } from './components/Layout';
 import { usePOS } from './context/POSContext';
 import { useBranch } from './context/BranchContext';
-import { ROLE_PERMISSIONS, BranchFeatureKey } from './models/types';
+import { ROLE_PERMISSIONS, permissionsFor, BranchFeatureKey } from './models/types';
 
 function ProtectedRoute({ children, permission, adminOnly, feature }: {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ function ProtectedRoute({ children, permission, adminOnly, feature }: {
   const { hasFeature } = useBranch();
   if (!currentUser) return <Navigate to="/" replace />;
   if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
-  if (permission && !ROLE_PERMISSIONS[currentUser.role]?.[permission]) return <Navigate to="/" replace />;
+  if (permission && !permissionsFor(currentUser)?.[permission]) return <Navigate to="/" replace />;
   if (feature && !hasFeature(feature)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

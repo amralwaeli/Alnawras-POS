@@ -12,7 +12,7 @@ import { usePOS } from '../../context/POSContext';
 import { PickupController } from '../../controllers/PickupController';
 import { uploadMerchantQr } from '../../services/PickupService';
 import { validateUpload, IMAGE_TYPES, MB } from '../../../lib/upload';
-import { Order, ROLE_PERMISSIONS } from '../../models/types';
+import { Order, ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -49,7 +49,7 @@ export function PickupBoardView() {
   const isAdmin = currentUser?.role === 'admin';
   // POS-only roles have no sidebar, so give them a way back.
   const noSidebar = ['kitchen', 'cashier', 'waiter', 'swaiter'].includes(currentUser?.role ?? '');
-  const canPay = !!currentUser && !!ROLE_PERMISSIONS[currentUser.role]?.canProcessPayments;
+  const canPay = !!currentUser && !!permissionsFor(currentUser)?.canProcessPayments;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);

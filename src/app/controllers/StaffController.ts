@@ -3,7 +3,7 @@ import { mapStaff } from '../models/mappers';
 import { supabase } from '../../lib/supabase';
 
 /** Every staff column the API may read (migration 0030 hides pin / pin_hash). */
-export const STAFF_COLUMNS = 'id, name, employment_number, role, email, status, branch_id, hire_date, hourly_rate, job_role, created_at';
+export const STAFF_COLUMNS = 'id, name, employment_number, role, extra_roles, email, status, branch_id, hire_date, hourly_rate, job_role, created_at';
 
 /** Staff accounts are created and changed through Workforce (WorkforceController). */
 export class StaffController {

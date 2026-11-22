@@ -17,7 +17,7 @@ import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { DebtController, DebtAccount } from '../../controllers/DebtController';
 import { cachedPrinters } from '../../controllers/PrinterController';
 import type { Customer, DiscountPreset } from '../../models/types';
-import { ROLE_PERMISSIONS } from '../../models/types';
+import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService, cleanPrintText, type PrintLine } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
@@ -725,7 +725,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     );
   }
 
-  const canTakePayment = ROLE_PERMISSIONS[currentUser.role as keyof typeof ROLE_PERMISSIONS]?.canProcessPayments && order.status !== 'completed';
+  const canTakePayment = permissionsFor(currentUser)?.canProcessPayments && order.status !== 'completed';
 
   // ── Payment modal ─────────────────────────────────────────────────────────
   // Header and the Complete Payment button stay put; everything between scrolls,

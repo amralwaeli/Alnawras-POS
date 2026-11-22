@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle, XCircle, UserCog, Camera, ShieldAlert, X, Plus } from 'lucide-react';
 import {
-  Employee, PerformanceObservation, ObservationCategory, ROLE_PERMISSIONS, UserRole,
+  Employee, PerformanceObservation, ObservationCategory, ROLE_PERMISSIONS, UserRole, permissionsFor,
 } from '../../../models/types';
 import {
   CATEGORY_LABELS, isCategoryRelevant, validateObservationDraft,
@@ -38,8 +38,8 @@ export function PeriodPicker({ value, onChange }: { value: PeriodKey; onChange: 
   );
 }
 
-export const canReviewPerformance = (role?: string) =>
-  !!role && !!ROLE_PERMISSIONS[role as UserRole]?.canManageStaff;
+export const canReviewPerformance = (u?: { role: string; extraRoles?: string[] } | null) =>
+  !!u?.role && permissionsFor(u).canManageStaff;
 
 // ─── Advisory notice (shown wherever indicators appear) ────────────────────────
 export function AdvisoryBanner() {
@@ -110,7 +110,7 @@ export function ObservationList({
   const [correcting, setCorrecting] = useState<string | null>(null);
   const [target, setTarget] = useState('');
   const [note, setNote] = useState('');
-  const allowed = canReviewPerformance(reviewer?.role);
+  const allowed = canReviewPerformance(reviewer);
 
   const act = async (o: PerformanceObservation, action: 'verify' | 'correct' | 'dismiss') => {
     if (!reviewer) return;
@@ -231,7 +231,7 @@ export function AddObservationButton({
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  if (!canReviewPerformance(reviewer?.role)) return null;
+  if (!canReviewPerformance(reviewer)) return null;
   return (
     <>
       <button onClick={() => setOpen(true)}

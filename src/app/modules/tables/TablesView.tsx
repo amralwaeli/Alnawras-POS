@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
 import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package, ArrowLeftRight, X, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
-import { ROLE_PERMISSIONS } from '../../models/types';
+import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
 import { TableController } from '../../controllers/TableController';
@@ -152,7 +152,7 @@ export function TablesView() {
   if (!currentUser) return null;
   // Who may take payment is the permission matrix's call, not a role name
   // (admin on the website and managers were locked out of takeaway/pickup).
-  const canPay = ROLE_PERMISSIONS[currentUser.role]?.canProcessPayments;
+  const canPay = permissionsFor(currentUser)?.canProcessPayments;
 
   const getOrder = (tableId: string) => {
     const t = tables.find(t => t.id === tableId);

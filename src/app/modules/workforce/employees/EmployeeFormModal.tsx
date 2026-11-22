@@ -19,6 +19,7 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
     email:         initial?.email     ?? '',
     phone:         initial?.phone     ?? '',
     role:          (initial?.role as Exclude<UserRole, 'admin'>) ?? 'waiter',
+    extraRoles:    (initial?.extraRoles ?? []) as Exclude<UserRole, 'admin'>[],
     pin:           '',
     monthlySalary: initial?.monthlySalary ?? 0,
     shiftStart:    initial?.shiftStart ?? '09:00',
@@ -140,6 +141,25 @@ export function EmployeeFormModal({ initial, branchId, onSave, onClose }: Props)
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Extra roles: the same person can do several jobs; they get every role's access. */}
+            <div className="sm:col-span-2">
+              <p className="block text-xs font-medium text-gray-500 mb-1">Also works as (optional)</p>
+              <div className="flex flex-wrap gap-2">
+                {ASSIGNABLE_ROLES.filter(r => r.value !== form.role).map(r => {
+                  const on = form.extraRoles?.includes(r.value as Exclude<UserRole, 'admin'>) ?? false;
+                  return (
+                    <label key={r.value} className={`min-h-10 inline-flex items-center gap-2 px-3 rounded-xl border text-sm cursor-pointer ${on ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-200 text-gray-600'}`}>
+                      <input type="checkbox" checked={on} className="accent-amber-500"
+                        onChange={() => set('extraRoles', on
+                          ? (form.extraRoles ?? []).filter(x => x !== r.value)
+                          : [...(form.extraRoles ?? []), r.value])} />
+                      {r.label}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             {/* PIN — required on create; on edit, fill it in only to reset it */}

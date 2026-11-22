@@ -221,6 +221,15 @@ export class PrintService {
   /**
    * Formats a kitchen ticket as print lines (draw with PrintService.render)
    */
+  /** "TAKEAWAY #0003", "PICKUP #0007" or "TABLE 5". Takeaway/pickup get their number when
+   *  created (a bill made offline gets it on sync); a dine-in bill only at payment. */
+  static ticketLabel(order: { orderType?: string; tableNumber?: number; billNumber?: string | null }): string {
+    const no = order.billNumber ? ` #${cleanPrintText(order.billNumber)}` : '';
+    if (order.orderType === 'takeaway') return `TAKEAWAY${no}`;
+    if (order.orderType === 'pickup') return `PICKUP${no}`;
+    return `TABLE ${order.tableNumber ?? '?'}${no}`;
+  }
+
   static formatKitchenTicket(order: any, newItems: any[], stationName: string): PrintLine[] {
     const now = new Date().toLocaleTimeString();
     // Map station IDs to friendly names for the header
@@ -232,9 +241,8 @@ export class PrintService {
     const title = stationDisplayNames[stationName] || stationName.toUpperCase();
 
     const lines: PrintLine[] = [
-      { text: `${title} TICKET`, style: 'large', align: 'center' },
-      'rule',
-      { text: `Table: ${order.tableNumber} | Order: ${order.id.split('-').pop()}`, align: 'center' },
+      { text: `${title} TICKET`, style: 'bold', align: 'center' },
+      { text: PrintService.ticketLabel(order), style: 'large', align: 'center' },
       { text: `Time: ${now}`, align: 'center' },
       'rule',
     ];

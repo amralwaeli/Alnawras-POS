@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { supabase } from '../../../lib/supabase';
-import { Product, Category, Table } from '../../models/types';
+import { Product, Category, Table, ModifierGroup, SelectedModifier } from '../../models/types';
+import { ModifierController } from '../../controllers/ModifierController';
+import { ModifierPickerModal } from '../../components/ModifierPickerModal';
 import { OrderController } from '../../controllers/OrderController';
 import { AuthController } from '../../controllers/AuthController';
 import { BranchController } from '../../controllers/BranchController';
@@ -23,6 +25,7 @@ interface CartItem {
   quantity: number;
   station: string;
   notes: string;
+  modifiers?: SelectedModifier[];
 }
 
 interface ExistingItem {
@@ -58,6 +61,13 @@ export function QROrderingView() {
   const [invalidTable, setInvalidTable] = useState(false);
   const [branchClosed, setBranchClosed] = useState(false);
   const [callingWaiter, setCallingWaiter] = useState(false);
+  // Product choices (leg/breast, bread/rice…): products with choices open the picker.
+  const [modifierMap, setModifierMap] = useState<Record<string, ModifierGroup[]>>({});
+  const [picking, setPicking] = useState<Product | null>(null);
+  useEffect(() => {
+    if (!products.length) return;
+    ModifierController.getGroupsForProducts(products.map(p => p.id)).then(setModifierMap).catch(() => {});
+  }, [products]);
   const [mobileView, setMobileView]     = useState<'menu' | 'cart'>('menu');
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [voidTarget, setVoidTarget]     = useState<ExistingItem | null>(null);
@@ -225,14 +235,23 @@ export function QROrderingView() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {
+    if (modifierMap[product.id]?.length) { setPicking(product); return; }
     setCartItems(prev => {
-      const ex = prev.find(i => i.productId === product.id);
+      const ex = prev.find(i => i.productId === product.id && !i.modifiers?.length);
       if (ex) return prev.map(i => i.id === ex.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, {
         id: `new-${Date.now()}`, productId: product.id, productName: product.name,
         price: product.price, quantity: 1, station: product.station || 'kitchen', notes: '',
       }];
     });
+  };
+
+  const addWithModifiers = (product: Product, selected: SelectedModifier[], extra: number) => {
+    setCartItems(prev => [...prev, {
+      id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, productId: product.id, productName: product.name,
+      price: product.price + extra, quantity: 1, station: product.station || 'kitchen', notes: '', modifiers: selected,
+    }]);
+    setPicking(null);
   };
 
   const handleCallWaiter = async () => {
@@ -260,9 +279,11 @@ export function QROrderingView() {
           price: item.price,
           notes: item.notes,
           station: item.station,
+          modifiers: item.modifiers,
         })),
-        addedBy: 'guest',
-        addedByName: 'Guest',
+        // Staff taking the order at the table are recorded by name; a scanning guest as Guest.
+        addedBy: currentUser?.id ?? 'guest',
+        addedByName: currentUser?.name ?? 'Guest',
       });
 
       if (!result.success) {
@@ -383,6 +404,7 @@ export function QROrderingView() {
       <div className="flex items-center gap-2 min-[360px]:gap-3">
         <div className="flex-1 min-w-0">
           <h4 dir="auto" className="font-bold text-gray-800 text-sm leading-tight break-words">{item.productName}</h4>
+          {!!item.modifiers?.length && <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map(m => m.optionName).join(', ')}</p>}
           <p className="text-orange-600 font-black text-xs mt-0.5 whitespace-nowrap">RM {item.price.toFixed(2)}</p>
         </div>
         <div className={`flex items-center shrink-0 bg-white border-2 border-orange-100 shadow-sm p-0.5 gap-0.5 ${compact ? 'rounded-xl' : 'rounded-2xl'}`}>
@@ -746,6 +768,14 @@ export function QROrderingView() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #F97316; border-radius: 10px; }
         .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
       `}</style>
+      {picking && (
+        <ModifierPickerModal
+          productName={picking.name}
+          groups={modifierMap[picking.id] ?? []}
+          onConfirm={(sel, extra) => addWithModifiers(picking, sel, extra)}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   );
 }

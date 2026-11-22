@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '../models/types';
+import { User, rolesOf } from '../models/types';
 import { StaffController } from '../controllers/StaffController';
 import { BranchController } from '../controllers/BranchController';
 import { mapStaff } from '../models/mappers';
@@ -33,10 +33,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 /** Device role locking: waiters only on waiter tablets, cashier roles only on the
  *  cashier device. Admin always passes, so the owner can never be locked out. */
 function stationRefusal(user: User): string | null {
-  if (user.role === 'admin') return null;
+  const roles = rolesOf(user);   // a cashier who also waits tables may use a waiter tablet
+  if (roles.includes('admin')) return null;
   const station = DeviceService.getStationType();
-  if (station === 'waiter' && !['waiter', 'swaiter'].includes(user.role)) return 'This tablet is for Waiters only. Please use the Cashier station.';
-  if (station === 'cashier' && !['cashier', 'manager', 'accounting'].includes(user.role)) return 'This station is for Cashiers only.';
+  if (station === 'waiter' && !roles.some(r => ['waiter', 'swaiter'].includes(r))) return 'This tablet is for Waiters only. Please use the Cashier station.';
+  if (station === 'cashier' && !roles.some(r => ['cashier', 'manager', 'accounting'].includes(r))) return 'This station is for Cashiers only.';
   return null;
 }
 
@@ -98,6 +99,9 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) return { success: false, error: 'Invalid PIN or inactive account' };
       const user = mapStaff(row);
+      // verify_staff_pin returns the main role only; the extra jobs (0044) come from users.
+      const { data: extra } = await supabase.from('users').select('extra_roles').eq('id', user.id).maybeSingle();
+      user.extraRoles = (extra?.extra_roles ?? []) as User['role'][];
 
       // ── BRANCH CONTRACT / SUSPENSION LOCK ─────────────────────────────────
       // Block login the moment a branch's contract lapses or it's suspended by

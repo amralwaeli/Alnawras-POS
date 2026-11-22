@@ -202,6 +202,7 @@ export class OrderController {
         // camelCase copies too, for screens that list the returned items.
         finalOrder = {
           id: orderId, tableNumber: params.table?.number || 0,
+          orderType: params.orderType, billNumber: newOrderRow?.bill_number ?? null,
           items: rows.map(r => ({ ...r, productId: r.product_id, productName: r.product_name })),
         };
         printItems = rows;

@@ -63,6 +63,7 @@ export class WorkforceController {
         name: input.fullName,
         employment_number: empNumber,
         role: input.role,
+        extra_roles: (input.extraRoles ?? []).filter(r => r !== input.role),
         pin: input.pin,
         email: input.email,
         status: 'active',
@@ -86,6 +87,7 @@ export class WorkforceController {
         email: input.email,
         phone: input.phone ?? null,
         role: input.role,
+        extra_roles: (input.extraRoles ?? []).filter(r => r !== input.role),
         hire_date: input.hireDate,
         monthly_salary: input.monthlySalary,
         shift_start: input.shiftStart,
@@ -269,6 +271,10 @@ export class WorkforceController {
       if (updates.email)          { empUpdates.email        = updates.email;        userUpdates.email = updates.email; }
       if (updates.phone !== undefined) empUpdates.phone    = updates.phone;
       if (updates.role)           { empUpdates.role         = updates.role;         userUpdates.role = updates.role; }
+      if (updates.extraRoles) {
+        const extra = updates.extraRoles.filter(r => r !== updates.role);
+        empUpdates.extra_roles = extra; userUpdates.extra_roles = extra;
+      }
       if (updates.department)       empUpdates.department   = updates.department;
       if (updates.hireDate)         empUpdates.hire_date    = updates.hireDate;
       if (updates.monthlySalary !== undefined) empUpdates.monthly_salary = updates.monthlySalary;

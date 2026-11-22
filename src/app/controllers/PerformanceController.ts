@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import {
   Employee, PerformanceObservation, ObservationCategory, ObservationReviewStatus,
-  Result, ROLE_PERMISSIONS, UserRole,
+  Result, ROLE_PERMISSIONS, UserRole, permissionsFor,
 } from '../models/types';
 import { mapEmployee, mapAttendanceLog, mapPerformanceObservation } from '../models/mappers';
 import { localDateStr } from '../../lib/date';
@@ -62,8 +62,8 @@ const toPaymentRow = (r: any): PaymentActivityRow => ({
 });
 
 /** Same permission that already gates the HR (workforce) module. */
-function canReview(role: UserRole | string | undefined): boolean {
-  return !!role && !!ROLE_PERMISSIONS[role as UserRole]?.canManageStaff;
+function canReview(u: { role?: string; extraRoles?: string[] } | undefined): boolean {
+  return !!u?.role && permissionsFor({ role: u.role, extraRoles: u.extraRoles }).canManageStaff;
 }
 
 export interface Reviewer { id: string; role: UserRole | string }
@@ -189,7 +189,7 @@ export class PerformanceController {
     observedAt?: Date;
     reviewer: Reviewer;
   }): Promise<Result<PerformanceObservation>> {
-    if (!canReview(input.reviewer.role)) {
+    if (!canReview(input.reviewer)) {
       return { success: false, error: 'You do not have permission to record performance observations.' };
     }
     const invalid = validateObservationDraft(input);
@@ -275,7 +275,7 @@ export class PerformanceController {
       note?: string;
     },
   ): Promise<Result<PerformanceObservation>> {
-    if (!canReview(review.reviewer.role)) {
+    if (!canReview(review.reviewer)) {
       return { success: false, error: 'You do not have permission to review performance observations.' };
     }
     try {

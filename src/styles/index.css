@@ -19,5 +19,8 @@
 .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
+/* html2canvas (app PDFs) finds the text baseline with this 1x1 test image; Tailwind's
+   `img { display:block }` breaks that measurement and draws all text too low. */
+img[src^="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP"] { display: inline !important; }
 /* viewport-fit=cover: keep every screen clear of a side notch (phone in landscape). */
 body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }

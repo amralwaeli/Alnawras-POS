@@ -1,4 +1,6 @@
-import { supabase } from '../../lib/supabase';
+import { supabase, mainServer, currentServerUrl, clientFor } from '../../lib/supabase';
+import { switchServer } from '../../lib/serverConfig';
+import { projectRef } from '../../lib/license';
 import { isNativeApp } from '../../lib/platform';
 import { clearOfflinePins } from '../../lib/offlinePins';
 
@@ -28,6 +30,20 @@ export class DeviceAuthController {
    *  isn't a registered device login (e.g. a super-admin), signing it back out
    *  so a stray session can't half-unlock the device. */
   static async signIn(email: string, password: string): Promise<{ success: boolean; role?: 'superadmin' | 'branch'; error?: string }> {
+    // A one-time customer's email lives on their own server: sign in there, then switch to it.
+    // (If the lookup can't be made, e.g. offline, sign in on the current server as before.)
+    const { data: found } = await mainServer.rpc('find_server', { p_email: email.trim() }).then(r => r, () => ({ data: null }));
+    const target = Array.isArray(found) ? found[0] : null;
+    if (target?.project_url && target.project_url !== currentServerUrl) {
+      const there = clientFor(target.project_url, target.anon_key);
+      const { error: err } = await there.auth.signInWithPassword({ email: email.trim(), password });
+      if (err) return { success: false, error: err.message };
+      const res = switchServer({ url: target.project_url, key: target.anon_key }, projectRef(target.project_url));
+      if (!res.ok) { await there.auth.signOut({ scope: 'local' }); return { success: false, error: res.error }; }
+      window.location.reload();   // start again on the customer's server, already signed in
+      return { success: true, role: 'branch' };
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return { success: false, error: error.message };
 

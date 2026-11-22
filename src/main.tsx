@@ -1,6 +1,7 @@
 
   import { createRoot } from "react-dom/client";
   import App from "./app/App.tsx";
+  import { LicenseGate } from "./app/components/LicenseGate";
   import "./styles/index.css";
   import { OfflineSyncEngine } from './app/services/OfflineSyncEngine';
   import { initSentry, AppErrorBoundary } from './lib/sentry';
@@ -18,7 +19,7 @@
 
   createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
-      <App />
+      <LicenseGate><App /></LicenseGate>
     </AppErrorBoundary>
   );
 

@@ -16,7 +16,8 @@ const STRAY = '33333333-3333-3333-3333-333333333333';   // e.g. a self-signed-up
 const SA    = '44444444-4444-4444-4444-444444444444';   // super-admin
 
 // Tables anonymous visitors may read (menus + branch registry).
-const PUBLIC_READ = new Set(['products', 'categories', 'modifier_groups', 'modifier_options', 'product_modifier_groups', 'branches']);
+const PUBLIC_READ = new Set(['products', 'categories', 'modifier_groups', 'modifier_options', 'product_modifier_groups', 'branches',
+  'smartpos_license']);   // 0045: a signed licence, not secret
 // Tables with no direct API access at all (functions / service role only).
 const FUNCTIONS_ONLY = new Set(['bill_counters', 'pin_attempts', 'tenant_invites', 'super_admins', 'branch_logins']);
 

@@ -204,7 +204,7 @@ function FieldCopy({ label, value, mono }: { label: string; value: string; mono?
 }
 
 // ─── Add-tenant modal (creates org + branch + admin login, emails the invite) ─
-type InviteResult = { email: string; tempPassword: string; setPasswordUrl: string; emailSent: boolean };
+type InviteResult = { email: string; tempPassword: string | null; setPasswordUrl?: string; emailSent?: boolean; oneTime?: boolean; warnings?: string[] };
 
 function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState('');
@@ -212,10 +212,27 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
   const [contractEnd, setContractEnd] = useState('');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<InviteResult | null>(null);
+  // One-time purchase: the customer runs on their own Supabase project (setup-onetime-tenant).
+  const [plan, setPlan] = useState<'subscription' | 'one-time'>('subscription');
+  const [projectUrl, setProjectUrl] = useState('');
+  const [accessToken, setAccessToken] = useState('');
 
   const create = async () => {
     if (!name.trim()) { toast.error('Tenant name is required'); return; }
     if (!email.trim()) { toast.error('Admin email is required'); return; }
+    if (plan === 'one-time') {
+      if (!/^https:\/\/[a-z0-9]{20}\.supabase\.co\/?$/.test(projectUrl.trim())) { toast.error('Project URL must look like https://<project-id>.supabase.co'); return; }
+      if (accessToken.trim().length < 20) { toast.error('Paste the Supabase access token'); return; }
+      setSaving(true);
+      const res = await SuperAdminController.setupOneTimeTenant({
+        tenantName: name.trim(), email: email.trim(), projectUrl: projectUrl.trim(), accessToken: accessToken.trim(),
+      });
+      setSaving(false);
+      setAccessToken('');   // used once; don't keep it on screen
+      if (res.success && res.data) { setResult({ email: res.data.email, tempPassword: res.data.tempPassword, oneTime: true, warnings: res.data.warnings }); onDone(); }
+      else toast.error(friendlyError(res.error, 'Failed to set up the customer'));
+      return;
+    }
     setSaving(true);
     const res = await SuperAdminController.inviteTenant({
       tenantName: name.trim(), email: email.trim(),
@@ -242,31 +259,63 @@ function AddTenantModal({ onClose, onDone }: { onClose: () => void; onDone: () =
                 className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
               <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Tenant admin email *"
                 className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
-              <div>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Plan">
+                {(['subscription', 'one-time'] as const).map(p => (
+                  <button key={p} type="button" role="radio" aria-checked={plan === p} onClick={() => setPlan(p)}
+                    className={`min-h-11 rounded-xl border text-sm font-semibold ${plan === p ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600'}`}>
+                    {p === 'subscription' ? 'Subscription' : 'One-time purchase'}
+                  </button>
+                ))}
+              </div>
+              {plan === 'one-time' && (
+                <div className="space-y-2 rounded-xl bg-gray-50 p-3">
+                  <input value={projectUrl} onChange={e => setProjectUrl(e.target.value)} placeholder="Customer project URL  https://….supabase.co *" inputMode="url"
+                    className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-indigo-400" />
+                  <input value={accessToken} onChange={e => setAccessToken(e.target.value)} type="password" autoComplete="off" placeholder="Supabase access token *"
+                    className="w-full min-h-11 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-indigo-400" />
+                  <p className="text-[11px] text-gray-500">
+                    The customer creates a free Supabase project and invites you to it. Create an access token at
+                    supabase.com → Account → Access Tokens. It is used once to set up their database and is not saved.
+                    Their system is licensed to that project only.
+                  </p>
+                </div>
+              )}
+              {plan === 'subscription' && <div>
                 <label className="block text-[11px] font-semibold text-gray-500 mb-1">Contract end (optional)</label>
                 <input type="date" value={contractEnd} onChange={e => setContractEnd(e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
-              </div>
-              <p className="text-[11px] text-gray-400">Creates the organization, one branch, and the admin's login, then emails them a link to set their password.</p>
+              </div>}
+              {plan === 'subscription' && <p className="text-[11px] text-gray-400">Creates the organization, one branch, and the admin's login, then emails them a link to set their password.</p>}
             </div>
             <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t">
               <button onClick={onClose} className="min-h-11 px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
               <button onClick={create} disabled={saving} className="min-h-11 px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">
-                {saving ? 'Creating…' : 'Create & Invite'}
+                {saving ? (plan === 'one-time' ? 'Setting up (about a minute)…' : 'Creating…') : plan === 'one-time' ? 'Set up & license' : 'Create & Invite'}
               </button>
             </div>
           </>
         ) : (
+          result.oneTime ? (
+          <div className="p-5 space-y-3">
+            <div className="text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700">✓ Their project is set up and licensed.</div>
+            <FieldCopy label="Branch email" value={result.email} />
+            {result.tempPassword && <FieldCopy label="Temporary password" value={result.tempPassword} mono />}
+            {result.warnings?.map((w, i) => <p key={i} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 break-words">{w}</p>)}
+            <p className="text-[11px] text-gray-400">On every device they sign in with this email and password; the app finds their server by itself.</p>
+            <button onClick={onClose} className="w-full min-h-11 px-4 py-2.5 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Done</button>
+          </div>
+          ) : (
           <div className="p-5 space-y-3">
             <div className={`text-xs font-semibold px-3 py-2 rounded-lg break-words ${result.emailSent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
               {result.emailSent ? `✓ Invite email sent to ${result.email}` : '⚠ Email could not be sent — share the details below with the tenant.'}
             </div>
             <FieldCopy label="Email" value={result.email} />
-            <FieldCopy label="Temporary password" value={result.tempPassword} mono />
-            <FieldCopy label="Set-password link" value={result.setPasswordUrl} mono />
+            <FieldCopy label="Temporary password" value={result.tempPassword ?? ''} mono />
+            <FieldCopy label="Set-password link" value={result.setPasswordUrl ?? ''} mono />
             <p className="text-[11px] text-gray-400">The tenant can click the link to set their own password, or sign in with the temporary password and change it later.</p>
             <button onClick={onClose} className="w-full min-h-11 px-4 py-2.5 text-sm rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Done</button>
           </div>
+          )
         )}
       </div>
     </div>
@@ -280,8 +329,10 @@ export function SuperAdminPanelView() {
   const [loading, setLoading] = useState(true);
   const [showAddTenant, setShowAddTenant] = useState(false);
   const [addingBranchFor, setAddingBranchFor] = useState<string | null>(null);
+  const [oneTime, setOneTime] = useState<{ name: string; email: string; project_ref: string; created_at: string }[]>([]);
 
   const load = useCallback(async () => {
+    SuperAdminController.listOneTimeTenants().then(setOneTime);
     const res = await SuperAdminController.listOrganizations();
     if (res.success) setOrgs(res.data!);
     else toast.error(friendlyError(res.error, 'Failed to load tenants'));
@@ -401,6 +452,26 @@ export function SuperAdminPanelView() {
             </div>
           </div>
         ))}
+
+        {oneTime.length > 0 && (
+          <section className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-4 sm:px-5 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-gray-900">One-time customers</h2>
+              <p className="text-xs text-gray-500">On their own Supabase project, licensed to that project only.</p>
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {oneTime.map(t => (
+                <li key={t.project_ref} className="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p dir="auto" className="font-semibold text-gray-900 truncate">{t.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{t.email} · project {t.project_ref}</p>
+                  </div>
+                  <span className="text-xs text-gray-500 whitespace-nowrap">Licensed {t.created_at.slice(0, 10)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
 
       {showAddTenant && <AddTenantModal onClose={() => setShowAddTenant(false)} onDone={() => { void load(); }} />}

@@ -1,25 +1,20 @@
 #!/usr/bin/env node
 /**
- * Set up or update a ONE-TIME customer's own Supabase project (see CUSTOMER_SETUP.md).
+ * Update a ONE-TIME customer's own Supabase project after a SmartPos update that
+ * changes the database (see CUSTOMER_SETUP.md). First-time setup and the licence are
+ * done from the super-admin panel (Add Tenant → One-time purchase).
  *
  *   node scripts/customer.mjs <project-ref>
  *
- * 1. Applies every database migration the project does not have yet (remembered in
- *    a private schema, so running it again later only applies new ones = updates).
- * 2. The first time: asks for the restaurant name, branch email and password, and
- *    creates the restaurant, its branch and the branch sign-in.
- * 3. Prints the setup code to enter on each device ("Connect to your own server").
- *
- * Runs on YOUR computer with your Supabase CLI login. The project's service-role key
- * is fetched here, used here, and never written to disk or put in the setup code.
+ * Applies every database migration the project does not have yet (remembered in a
+ * private schema, so running it again only applies new ones). Runs on YOUR computer
+ * with your Supabase CLI login.
  */
 import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { createInterface } from 'node:readline';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
 
 // The shell-quoting warning (DEP0190) doesn't apply: every argument here is fixed or validated above.
 process.noDeprecation = true;
@@ -47,14 +42,6 @@ const sqlFile = (file) => {
 const tmp = path.join(mkdtempSync(path.join(tmpdir(), 'smartpos-')), 'q.sql');
 const sql = (query) => { writeFileSync(tmp, query); return sqlFile(tmp); };
 
-function ask(question, { hidden = false } = {}) {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    if (hidden) rl._writeToOutput = (s) => { if (s.includes(question)) rl.output.write(s); };   // don't echo the password
-    rl.question(question, (a) => { rl.close(); if (hidden) process.stdout.write('\n'); resolve(a.trim()); });
-  });
-}
-
 // ── 1. Database ───────────────────────────────────────────────────────────────
 console.log(`\nProject ${ref}: checking the database…`);
 sql(`CREATE SCHEMA IF NOT EXISTS smartpos_admin;
@@ -71,58 +58,11 @@ for (const f of pending) {
 }
 console.log(pending.length ? `Database updated (${pending.length} step(s)).` : 'Database already up to date.');
 
-// ── 2. Keys (kept in memory only) ─────────────────────────────────────────────
-const keys = JSON.parse(cli(['projects', 'api-keys', '--project-ref', ref, '-o', 'json']));
-const anon = keys.find((k) => k.name === 'anon')?.api_key;
-const service = keys.find((k) => k.name === 'service_role')?.api_key;
-if (!anon || !service) { console.error('Could not read the project\'s keys. Are you a member of its Supabase organization?'); process.exit(1); }
-const url = `https://${ref}.supabase.co`;
-
-// ── 3. Restaurant + branch sign-in (first time only) ─────────────────────────
+// ── 2. Restaurant ─────────────────────────────────────────────────────────────
 const branches = sql('SELECT b.name, bl.email FROM branches b LEFT JOIN branch_logins bl ON bl.branch_id = b.id');
 if (branches.length) {
-  console.log(`Restaurant already set up: ${branches.map((b) => `${b.name} (${b.email ?? 'no sign-in'})`).join(', ')}`);
+  console.log(`Restaurant: ${branches.map((b) => `${b.name} (${b.email ?? 'no sign-in'})`).join(', ')}`);
 } else {
-  const name = await ask('Restaurant name: ');
-  const email = (await ask('Branch email (used to sign in devices and the website): ')).toLowerCase();
-  const password = await ask('Branch password (at least 10 characters, not shown): ', { hidden: true });
-  if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || password.length < 10) {
-    console.error('Need a name, a valid email and a password of at least 10 characters.'); process.exit(1);
-  }
-  const admin = createClient(url, service, { auth: { persistSession: false } });
-  const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  if (cErr || !created?.user) { console.error('Could not create the sign-in:', cErr?.message); process.exit(1); }
-  const id = (p) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const orgId = id('org'), branchId = id('branch');
-  const steps = [
-    () => admin.from('organizations').insert({ id: orgId, name, owner_email: email, status: 'active' }),
-    () => admin.from('branches').insert({ id: branchId, org_id: orgId, name, status: 'active', enabled_features: {} }),
-    () => admin.from('branch_logins').insert({ auth_uid: created.user.id, branch_id: branchId, email, label: name }),
-    () => admin.from('branch_settings').upsert({ branch_id: branchId, business_name: name }, { onConflict: 'branch_id' }),
-  ];
-  for (const step of steps) {
-    const { error } = await step();
-    if (error) {
-      console.error('Setup failed, undoing:', error.message);
-      await admin.from('branch_logins').delete().eq('auth_uid', created.user.id);
-      await admin.from('branches').delete().eq('id', branchId);
-      await admin.from('organizations').delete().eq('id', orgId);
-      await admin.auth.admin.deleteUser(created.user.id);
-      process.exit(1);
-    }
-  }
-  console.log(`Created restaurant "${name}" with sign-in ${email}.`);
+  console.log('No restaurant on this project yet. Set the customer up from the super-admin panel');
+  console.log('(Add Tenant → One-time purchase): it creates the restaurant and its licence.');
 }
-
-// ── 4. Setup code ─────────────────────────────────────────────────────────────
-const code = Buffer.from(JSON.stringify({ u: url, k: anon })).toString('base64');
-console.log(`
-Done. On each device (app or website), on the sign-in screen tap
-"Bought SmartPos once? Connect to your own server" and paste this setup code:
-
-${code}
-
-Then sign in with the branch email and password.
-One more step in the Supabase dashboard (see CUSTOMER_SETUP.md): turn OFF
-Authentication → Sign In / Providers → "Allow new users to sign up".
-`);

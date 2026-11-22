@@ -33,12 +33,13 @@ export function getSavedServer(): ServerConfig | null {
 
 /** Switch server (null = back to the default). Forgets the old server's sign-in and
  *  offline data; refused while bills made offline still wait to be sent. */
-export function switchServer(c: ServerConfig | null): { ok: boolean; error?: string } {
+export function switchServer(c: ServerConfig | null, keepSessionForRef?: string): { ok: boolean; error?: string } {
   try {
     if (JSON.parse(localStorage.getItem('alnawras_offline_queue') || '[]').length > 0) {
       return { ok: false, error: 'Bills made offline are still waiting to be sent. Connect to the internet first.' };
     }
     for (const k of Object.keys(localStorage)) {
+      if (keepSessionForRef && k.startsWith(`sb-${keepSessionForRef}-auth-token`)) continue;   // just signed in there
       if (/^sb-.+-auth-token/.test(k) || ['alnawras_device_branch', 'alnawras_offline_pins', 'alnawras_offline_pin_lock'].includes(k)) localStorage.removeItem(k);
     }
     if (c) localStorage.setItem(KEY, JSON.stringify(c)); else localStorage.removeItem(KEY);

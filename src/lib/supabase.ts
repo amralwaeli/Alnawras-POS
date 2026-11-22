@@ -22,8 +22,23 @@ if (webTabOnly) {
   } catch { /* storage blocked: nothing remembered */ }
 }
 
+const authOptions = webTabOnly ? { auth: { storage: window.sessionStorage } } : undefined
+
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder-key',
-  webTabOnly ? { auth: { storage: window.sessionStorage } } : undefined
+  authOptions
 )
+
+/** The project this device talks to (a one-time customer's own, or the main one). */
+export const currentServerUrl: string = supabaseUrl ?? ''
+
+/** A client for another project that keeps its sign-in where `supabase` would (used to sign in
+ *  on a one-time customer's server before switching to it). */
+export const clientFor = (url: string, key: string) => createClient(url, key, authOptions)
+
+/** The main SmartPos project, for the email → server lookup (no sign-in kept). */
+export const mainServer = own
+  ? createClient(import.meta.env.VITE_SUPABASE_URL ?? 'https://placeholder.supabase.co', import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'placeholder-key',
+      { auth: { persistSession: false, autoRefreshToken: false } })
+  : supabase

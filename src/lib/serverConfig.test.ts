@@ -31,9 +31,15 @@ describe('own-server setup code', () => {
     mem.set('sb-old-auth-token', 'x'); mem.set('alnawras_device_branch', 'A'); mem.set('alnawras_offline_pins', 'x');
     expect(switchServer(good).ok).toBe(true);
     expect(getSavedServer()).toEqual(good);
-    expect([...mem.keys()]).toEqual(['smartpos_server']);
+    expect(mem.keys()).toEqual(['smartpos_server']);
     expect(switchServer(null).ok).toBe(true);
     expect(getSavedServer()).toBeNull();
+  });
+
+  it('keeps the sign-in just made on the new server', () => {
+    mem.set('sb-oldoldoldoldoldoldo-auth-token', 'old'); mem.set('sb-abcdefghijklmnopqrst-auth-token', 'new');
+    expect(switchServer(good, 'abcdefghijklmnopqrst').ok).toBe(true);
+    expect(mem.keys().sort()).toEqual(['sb-abcdefghijklmnopqrst-auth-token', 'smartpos_server']);
   });
 
   it('refuses while offline bills wait to be sent', () => {

@@ -54,6 +54,24 @@ export class SuperAdminController {
     return { success: false, error: payload?.error || error?.message || 'Failed to create tenant' };
   }
 
+  // ── One-time customers (Edge Function: sets up THEIR Supabase project + licence) ──
+  static async setupOneTimeTenant(input: {
+    tenantName: string; email: string; projectUrl: string; accessToken: string;
+  }): Promise<{ success: boolean; data?: { email: string; tempPassword: string | null; projectRef: string; warnings: string[] }; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('setup-onetime-tenant', { body: input });
+    let payload: any = data;
+    if (error && (error as any).context instanceof Response) {
+      try { payload = await (error as any).context.json(); } catch { /* keep payload */ }
+    }
+    if (payload?.success) return { success: true, data: payload };
+    return { success: false, error: payload?.error || error?.message || 'Failed to set up the customer' };
+  }
+
+  static async listOneTimeTenants(): Promise<{ name: string; email: string; project_ref: string; created_at: string }[]> {
+    const { data } = await supabase.from('onetime_tenants').select('name, email, project_ref, created_at').order('created_at');
+    return data ?? [];
+  }
+
   // ── Organizations ──────────────────────────────────────────────────────────
   static async listOrganizations(): Promise<{ success: boolean; data?: OrgWithBranches[]; error?: string }> {
     try {

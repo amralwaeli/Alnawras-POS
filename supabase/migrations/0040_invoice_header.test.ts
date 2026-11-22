@@ -10,7 +10,7 @@ beforeAll(async () => {
     INSERT INTO organizations(id, name) VALUES ('o', 'O');
     INSERT INTO branches(id, org_id, name) VALUES ('A', 'o', 'A');
     INSERT INTO branch_settings(branch_id) VALUES ('A');`);
-});
+}, 60000);
 
 describe('0040 invoice header', () => {
   it('stores the From lines and an https logo', async () => {

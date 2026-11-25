@@ -7,7 +7,8 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   X, Clock, CheckCircle, CreditCard, Banknote, QrCode,
   SplitSquareHorizontal, Plus, Minus, Search, UserCheck, Star, Gift,
-  ShieldAlert, Users, Check, HandCoins
+  ShieldAlert, Users, Check, HandCoins,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
@@ -49,6 +50,45 @@ export function getOrderType(order: any) {
 
 function escapeHtml(v: string) {
   return v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/** Receipt lines for the thermal printer. `payment` lines are omitted for a bill printed
+ *  before payment (then the header says NOT PAID). */
+export function buildReceiptLines(o: {
+  businessName: string; billNo: string; order: any; cashier: string;
+  totals: { subtotal: number; tax: number; discount: number; total: number };
+  payment?: PrintLine[];
+}): PrintLine[] {
+  const when = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
+  const where = o.order.orderType === 'takeaway' ? 'Takeaway' : o.order.orderType === 'pickup' ? 'Pickup' : `Table ${cleanPrintText(o.order.tableNumber ?? '')}`;
+  const items = (o.order.items || []).filter((i: any) => i.status !== 'cancelled');
+  return [
+    { text: cleanPrintText(o.businessName).toUpperCase(), style: 'large', align: 'center' },
+    ...(o.payment ? [] : [{ text: 'BILL - NOT PAID', style: 'large' as const, align: 'center' as const }]),
+    'rule',
+    { text: 'Bill #', value: o.billNo || '-' },
+    { text: 'Date', value: when },
+    { text: o.order.orderType === 'takeaway' || o.order.orderType === 'pickup' ? 'Order' : 'Table', value: where },
+    { text: 'Cashier', value: cleanPrintText(o.cashier || 'N/A') },
+    'rule',
+    ...items.flatMap((i: any): PrintLine[] => {
+      const name = cleanPrintText(i.productName || i.product_name || 'Item');
+      const qty = Number(i.quantity ?? i.qty ?? 1);
+      const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
+      const mods = Array.isArray(i.modifiers) && i.modifiers.length
+        ? [{ text: `     + ${i.modifiers.map((m: any) => cleanPrintText(m.optionName || m.option_name || '')).join(', ')}` }]
+        : [];
+      return [{ text: `${qty} x ${name}`, value: fmt(lineTotal) }, ...mods];
+    }),
+    'rule',
+    { text: 'SUBTOTAL', value: fmt(o.totals.subtotal) },
+    { text: 'TAX', value: fmt(o.totals.tax) },
+    { text: 'DISCOUNT', value: fmt(o.totals.discount) },
+    { text: 'TOTAL', value: fmt(o.totals.total), style: 'large' },
+    'rule',
+    ...(o.payment ? [...o.payment, 'rule' as const, { text: 'THANK YOU FOR YOUR VISIT!', align: 'center' as const }]
+                  : [{ text: 'Please check your order before paying.', align: 'center' as const }]),
+  ];
 }
 
 export function printReceipt(order: any, paymentSummary: string, billNo: string) {
@@ -419,6 +459,20 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setAppliedPresetId(preset.id);
   };
 
+  // A bill for the customer to check before paying (current items, discount and total).
+  const printBill = () => {
+    if (!order || !currentUser) return;
+    const billNo = order.billNumber ?? '';
+    const printers = cachedPrinters(currentUser.branchId)
+      .filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
+    if (!printers.length) { printReceipt({ ...order, ...totals }, 'NOT PAID - please check before paying', billNo); return; }
+    const lines = buildReceiptLines({ businessName, billNo, order, cashier: currentUser.name, totals });
+    for (const printer of printers) {
+      void PrintService.sendToPrinter({ printerIp: printer.ipAddress!, printerPort: printer.port || 9100, bytes: PrintService.render(lines, printer.paperWidth) })
+        .then(res => res.success ? toast.success('Bill printed') : toast.error(`Receipt printer ${printer.name || printer.ipAddress}: ${res.error}`));
+    }
+  };
+
   // A one-off discount typed by the cashier (RM amount or %), applied like a preset.
   const [customValue, setCustomValue] = useState('');
   const [customType, setCustomType] = useState<'fixed' | 'percentage'>('fixed');
@@ -610,37 +664,16 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
         if (printers.length) {
           const cashierPrinters = printers.filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
 
-          const receipt: PrintLine[] = [
-            { text: cleanPrintText(businessName).toUpperCase(), style: 'large', align: 'center' },
-            'rule',
-            { text: 'Bill #', value: billNo },
-            { text: 'Date', value: new Date().toLocaleString() },
-            { text: 'Table', value: cleanPrintText(order.tableNumber || 'Takeaway') },
-            { text: 'Cashier', value: cleanPrintText(currentUser?.name || 'N/A') },
-            'rule',
-            ...(order.items || []).flatMap((i: any): PrintLine[] => {
-              const name = cleanPrintText(i.productName || i.product_name || 'Item');
-              const qty = Number(i.quantity ?? i.qty ?? 1);
-              const lineTotal = Number(i.price ?? i.unit_price ?? 0) * qty;
-              const mods = Array.isArray(i.modifiers) && i.modifiers.length
-                ? [{ text: `  ${i.modifiers.map((m: any) => cleanPrintText(m.optionName || m.option_name || '')).join(', ')}` }]
-                : [];
-              return [{ text: `${name} x${qty}`, value: fmt(lineTotal) }, ...mods];
-            }),
-            'rule',
-            { text: 'SUBTOTAL', value: fmt(paid.subtotal) },
-            { text: 'TAX', value: fmt(paid.tax) },
-            { text: 'DISCOUNT', value: fmt(paid.discount) },
-            { text: 'TOTAL', value: fmt(paid.total), style: 'large' },
-            'rule',
-            { text: 'PAYMENT', value: summary },
-            ...(paymentMode === 'cash' && amountReceived.trim() !== '' ? [
-              { text: 'RECEIVED', value: fmt(parseFloat(amountReceived)) },
-              { text: 'CHANGE', value: fmt(Math.max(0, parseFloat(amountReceived) - paid.total)) },
-            ] : []),
-            'rule',
-            { text: 'THANK YOU FOR YOUR VISIT!', align: 'center' },
-          ];
+          const receipt = buildReceiptLines({
+            businessName, billNo, order, cashier: currentUser?.name || '', totals: paid,
+            payment: [
+              { text: 'PAYMENT', value: summary },
+              ...(paymentMode === 'cash' && amountReceived.trim() !== '' ? [
+                { text: 'RECEIVED', value: fmt(parseFloat(amountReceived)) },
+                { text: 'CHANGE', value: fmt(Math.max(0, parseFloat(amountReceived) - paid.total)) },
+              ] : []),
+            ],
+          });
 
           for (const printer of cashierPrinters) {
             // Not awaited: a switched-off printer must not hold up the till.
@@ -1049,7 +1082,11 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
             </div>
 
             {canTakePayment && (
-              <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t bg-white">
+              <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t bg-white flex gap-2">
+                <button type="button" onClick={printBill} disabled={processing}
+                  className="shrink-0 min-h-12 px-4 rounded-2xl border-2 border-gray-200 text-gray-800 font-bold hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50">
+                  <Printer className="size-4" /> <span className="hidden min-[380px]:inline">Print Bill</span>
+                </button>
                 <button
                   onClick={paymentMode === 'split-items' ? handleSplitPay : handlePayment}
                   disabled={
@@ -1057,7 +1094,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                       ? (splitProcessing || splitSelected.size === 0)
                       : (processing || (paymentMode === 'mix' && !splitExact) || (usesAccount && !debtAccountId))
                   }
-                  className="w-full min-h-12 py-3 sm:py-4 px-3 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex flex-wrap items-center justify-center gap-x-2 text-center disabled:opacity-50"
+                  className="flex-1 min-w-0 min-h-12 py-3 sm:py-4 px-3 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-lg shadow-black/10 flex flex-wrap items-center justify-center gap-x-2 text-center disabled:opacity-50"
                 >
                   {paymentMode === 'split-items' ? (
                     splitProcessing ? (

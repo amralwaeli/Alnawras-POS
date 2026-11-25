@@ -6,7 +6,7 @@
  * a staff member taps Acknowledge.
  */
 import { useEffect } from 'react';
-import { Bell, Package, Check, Ban } from 'lucide-react';
+import { Bell, Package, Check, Ban, Printer as PrinterIcon, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { AlertService, useAlerts, startBeeping, stopBeeping, unlockAudio, AppAlert } from '../services/AlertService';
 
@@ -32,6 +32,7 @@ export function AlertOverlay() {
     if (a.kind === 'table' && a.tableId) {
       try { await supabase.from('tables').update({ needs_waiter: false }).eq('id', a.tableId); } catch { /* ignore */ }
     }
+    a.onDismiss?.();
     AlertService.dismiss(a.id);
   };
 
@@ -41,16 +42,33 @@ export function AlertOverlay() {
         {alerts.map(a => (
           <div key={a.id} className="bg-white rounded-3xl shadow-2xl p-5 sm:p-6 text-center border-4 border-orange-400 animate-pulse">
             <div className="mx-auto mb-3 size-16 rounded-full bg-orange-100 flex items-center justify-center animate-bounce">
-              {a.kind === 'table' ? <Bell className="size-8 text-orange-600" /> : a.kind === 'item' ? <Ban className="size-8 text-red-600" /> : <Package className="size-8 text-orange-600" />}
+              {a.kind === 'table' ? <Bell className="size-8 text-orange-600" />
+                : a.kind === 'item' ? <Ban className="size-8 text-red-600" />
+                : a.kind === 'print' ? <PrinterIcon className="size-8 text-red-600" />
+                : <Package className="size-8 text-orange-600" />}
             </div>
             <h2 className="text-2xl font-black text-gray-900 break-words" dir="auto">{a.title}</h2>
             <p className="text-gray-600 mt-1 mb-5 break-words" dir="auto">{a.body}</p>
-            <button
-              onClick={() => acknowledge(a)}
-              className="w-full py-3.5 bg-orange-500 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 hover:bg-orange-600 transition-colors"
-            >
-              <Check className="size-5" /> Acknowledge
-            </button>
+            {a.action ? (
+              <>
+                <button
+                  onClick={a.action.run}
+                  className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-red-700 transition-colors"
+                >
+                  <RotateCcw className="size-6" /> {a.action.label}
+                </button>
+                <button onClick={() => acknowledge(a)} className="w-full min-h-11 mt-2 text-gray-500 font-semibold">
+                  Close
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => acknowledge(a)}
+                className="w-full py-3.5 bg-orange-500 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 hover:bg-orange-600 transition-colors"
+              >
+                <Check className="size-5" /> Acknowledge
+              </button>
+            )}
           </div>
         ))}
       </div>

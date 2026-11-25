@@ -10,6 +10,9 @@ const claim = (dev = DEV_A, branch = 'A') => as(db, 'authenticated', dev, async 
   (await db.query<any>(`SELECT public.claim_print_jobs($1) AS r`, [branch])).rows[0].r);
 const release = (items: string[], cancels: string[] = []) => as(db, 'authenticated', DEV_A, () =>
   db.query(`SELECT public.release_print_jobs('A', $1, $2)`, [items, cancels]));
+// What the station does after a ticket printed (0049).
+const confirm = (items: string[]) => as(db, 'authenticated', DEV_A, () =>
+  db.query(`SELECT public.confirm_print_jobs('A', $1)`, [items]));
 
 beforeAll(async () => {
   db = await makeDb();
@@ -31,6 +34,7 @@ describe('0048 print station', () => {
     expect(r.items.map((i: any) => i.id).sort()).toEqual(['i1', 'i2']);
     expect(r.items[0]).toMatchObject({ table_number: 5, order_type: 'dine-in', add_on: false, added_by_name: 'Ali' });
     expect((await claim()).items).toEqual([]);
+    await confirm(['i1', 'i2']);
   });
 
   it('marks a later round on the same bill as ADD ON', async () => {
@@ -44,6 +48,7 @@ describe('0048 print station', () => {
   it('gives back items a printer refused, so they print next time', async () => {
     await release(['i3']);
     expect((await claim()).items.map((i: any) => i.id)).toEqual(['i3']);
+    await confirm(['i3']);
   });
 
   it('prints a cancel ticket once for a printed item, none for one never printed', async () => {

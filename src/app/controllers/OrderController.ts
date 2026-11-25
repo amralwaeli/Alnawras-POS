@@ -5,6 +5,7 @@ import { PrintService } from '../services/PrintService';
 import { OfflineSyncEngine, isNetworkError } from '../services/OfflineSyncEngine';
 import { toast } from 'sonner';
 import { cachedPrinters } from './PrinterController';
+import { watchPrinting } from '../services/PrintStation';
 
 export interface SubmitOrderItem {
   productId: string;
@@ -215,13 +216,8 @@ export class OrderController {
       const printers = cachedPrinters(branchId).filter((p: any) => p.isActive && p.type === 'network' && p.ipAddress);
       if (sentOnline) {
         // Online, the print station (the cashier tablet on the printers' network, migration 0048)
-        // prints the tickets, so this phone can be on any internet. Warn if nothing printed.
-        if (printers.length) {
-          setTimeout(async () => {
-            const { data } = await supabase.from('order_items').select('id').in('id', lineIds).is('printed_at', null);
-            if (data?.length) toast.warning('The kitchen ticket has not printed yet. Is the cashier tablet on, with Print station switched on?', { duration: 10000 });
-          }, 30_000);
-        }
+        // prints the tickets, so this phone can be on any internet. NOT PRINTED → Send again.
+        if (printers.length) watchPrinting(branchId, printItems.map((i: any) => i.id), PrintService.ticketLabel(finalOrder));
       } else if (printers.length) {
         // Offline: no station can see this order yet, so print straight to the printers when this
         // device can reach them; the queue then tells the server these lines are already printed.

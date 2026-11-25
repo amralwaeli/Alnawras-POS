@@ -10,10 +10,13 @@ import { useEffect, useReducer } from 'react';
 
 export interface AppAlert {
   id: string;                 // stable id, e.g. `table-<id>` — used to de-dupe
-  kind: 'table' | 'pickup' | 'item';
+  kind: 'table' | 'pickup' | 'item' | 'print';
   title: string;
   body: string;
   tableId?: string;           // for table calls — cleared on acknowledge
+  /** A main button instead of Acknowledge (e.g. "Send again"); Close is then shown below it. */
+  action?: { label: string; run: () => void };
+  onDismiss?: () => void;     // Acknowledge / Close pressed
 }
 
 let alerts: AppAlert[] = [];
@@ -26,6 +29,7 @@ export const AlertService = {
     alerts = [...alerts, a];
     emit();
   },
+  isShowing(id: string) { return alerts.some(a => a.id === id); },
   dismiss(id: string) {
     if (!alerts.some(x => x.id === id)) return;
     alerts = alerts.filter(a => a.id !== id);

@@ -41,6 +41,17 @@ export class ReportsController {
     };
   }
 
+  /** Detailed reports for [from, to) in one call (migration 0047): by hour, category, staff,
+   *  cashier, table, discounts and cancellations. Raw JSON; the reports screen reads it. */
+  static async getDetailReport(branchId: string, from: Date, to: Date): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { data, error } = await supabase.rpc('get_detail_report', {
+      p_branch_id: branchId, p_from: from.toISOString(), p_to: to.toISOString(),
+      p_tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  }
+
   /** Bills paid in [from, to), newest first (capped; the summary above has the totals). */
   static async getCompletedOrders(branchId: string, from: Date, to: Date, limit = 300): Promise<{ success: boolean; data?: CompletedOrderRow[]; error?: string }> {
     const { data, error } = await supabase

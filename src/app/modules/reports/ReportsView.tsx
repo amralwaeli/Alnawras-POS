@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { periodRange, usePeriod, PeriodPicker } from './period';
 import { ReportsController as RC, SalesSummary, CompletedOrderRow } from '../../controllers/ReportsController';
 import { friendlyError } from '../../../lib/errors';
+import { CategoriesTab, HoursTab, StaffTab, TablesTab, DiscountsTab, CancellationsTab, Table } from './DetailReports';
 
 type SortKey = 'unitsSold' | 'revenue';
 
@@ -154,13 +155,15 @@ function OverviewTab({ branchId }: { branchId: string }) {
     { label: 'Bills Paid',    value: summary?.orders ?? 0,       icon: ShoppingCart, bg: 'bg-blue-50',    ic: 'bg-blue-100 text-blue-600',       vc: 'text-blue-700' },
     { label: 'Tax Collected', value: fmt(summary?.tax ?? 0),     icon: TrendingUp,   bg: 'bg-purple-50',  ic: 'bg-purple-100 text-purple-600',   vc: 'text-purple-700' },
     { label: 'Items Sold',    value: summary?.items ?? 0,        icon: Package,      bg: 'bg-amber-50',   ic: 'bg-amber-100 text-amber-600',     vc: 'text-amber-700' },
+    { label: 'Average Bill',  value: fmt((summary?.revenue ?? 0) / Math.max(1, summary?.orders ?? 0)), icon: DollarSign, bg: 'bg-teal-50', ic: 'bg-teal-100 text-teal-600', vc: 'text-teal-700' },
+    { label: 'Discounts',     value: fmt(summary?.discount ?? 0), icon: TrendingUp,  bg: 'bg-rose-50',    ic: 'bg-rose-100 text-rose-600',       vc: 'text-rose-700' },
   ];
 
   return (
     <div className="space-y-6">
       <PeriodPicker p={p} />
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${loading ? 'opacity-50' : ''}`}>
+      <div className={`grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 ${loading ? 'opacity-50' : ''}`}>
         {kpis.map(s => (
           <div key={s.label} className={`${s.bg} rounded-2xl p-4 sm:p-5 border border-black/5 min-w-0`}>
             <div className={`inline-flex size-10 items-center justify-center rounded-xl ${s.ic} mb-3`}><s.icon className="size-5" /></div>
@@ -177,6 +180,22 @@ function OverviewTab({ branchId }: { branchId: string }) {
           {summary.discount > 0 && <span className="bg-white border border-gray-100 rounded-xl px-3 py-1.5">Discounts {fmt(summary.discount)}</span>}
         </div>
       )}
+
+      {summary && Object.keys(summary.byType).length > 0 && (
+        <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+          {Object.entries(summary.byType).map(([t, c]) => (
+            <span key={t} className="bg-white border border-gray-100 rounded-xl px-3 py-1.5 capitalize"><b>{t}</b> {Number(c)} bills</span>
+          ))}
+          {summary.expenses > 0 && <span className="bg-white border border-gray-100 rounded-xl px-3 py-1.5">Expenses {fmt(summary.expenses)}</span>}
+        </div>
+      )}
+
+      <Table title="Sales by day" file="sales-by-day" rows={summary?.byDay ?? []} cols={[
+        { label: 'Day', get: (r: any) => r.day },
+        { label: 'Bills', get: (r: any) => r.orders, right: true },
+        { label: 'Revenue', get: (r: any) => fmt(r.revenue), csv: (r: any) => r.revenue, right: true },
+        { label: 'Average bill', get: (r: any) => fmt(r.revenue / Math.max(1, r.orders)), csv: (r: any) => (r.revenue / Math.max(1, r.orders)).toFixed(2), right: true },
+      ]} />
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
@@ -226,10 +245,19 @@ export function ReportsView() {
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="products">Product Performance</TabsTrigger>
-          </TabsList>
+          {/* One tab per report; scrolls sideways on phones. */}
+          <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="products">Products</TabsTrigger>
+              <TabsTrigger value="categories">Categories</TabsTrigger>
+              <TabsTrigger value="hours">Peak Hours</TabsTrigger>
+              <TabsTrigger value="staff">Staff</TabsTrigger>
+              <TabsTrigger value="tables">Tables</TabsTrigger>
+              <TabsTrigger value="discounts">Discounts</TabsTrigger>
+              <TabsTrigger value="cancellations">Cancellations</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="mt-4">
             <OverviewTab branchId={currentUser.branchId} />
@@ -238,6 +266,12 @@ export function ReportsView() {
           <TabsContent value="products" className="mt-4">
             <ProductPerformanceTab branchId={currentUser.branchId} />
           </TabsContent>
+          <TabsContent value="categories" className="mt-4"><CategoriesTab branchId={currentUser.branchId} /></TabsContent>
+          <TabsContent value="hours" className="mt-4"><HoursTab branchId={currentUser.branchId} /></TabsContent>
+          <TabsContent value="staff" className="mt-4"><StaffTab branchId={currentUser.branchId} /></TabsContent>
+          <TabsContent value="tables" className="mt-4"><TablesTab branchId={currentUser.branchId} /></TabsContent>
+          <TabsContent value="discounts" className="mt-4"><DiscountsTab branchId={currentUser.branchId} /></TabsContent>
+          <TabsContent value="cancellations" className="mt-4"><CancellationsTab branchId={currentUser.branchId} /></TabsContent>
         </Tabs>
       </div>
     </div>

@@ -212,46 +212,21 @@ export class OrderController {
 
       if (!finalOrder) return { success: false, error: 'Failed to process order.' };
 
-      // ── AUTOMATED STATION-BASED PRINTING ──
-      // Split items by station and send to respective printers.
-      try {
-        const printers: any[] = cachedPrinters(branchId);
+      const printers = cachedPrinters(branchId).filter((p: any) => p.isActive && p.type === 'network' && p.ipAddress);
+      if (sentOnline) {
+        // Online, the print station (the cashier tablet on the printers' network, migration 0048)
+        // prints the tickets, so this phone can be on any internet. Warn if nothing printed.
         if (printers.length) {
-          const activePrinters = printers.filter((p: any) => p.isActive && p.type === 'network');
-
-          // ADD ON: items for a bill that already had items (online: it has more live items than
-          // this send; offline: we added to an existing bill).
-          const liveItems = (finalOrder.items ?? []).filter((i: any) => i.status !== 'cancelled').length;
-          const addOn = !createdNewOrder && (sentOnline ? liveItems > printItems.length : true);
-          // Group new items by their station.
-          const itemsByStation: Record<string, any[]> = {};
-          printItems.forEach(item => {
-            const station = item.station || 'kitchen';
-            if (!itemsByStation[station]) itemsByStation[station] = [];
-            itemsByStation[station].push(item);
-          });
-
-          // Send to each printer that covers the station.
-          for (const printer of activePrinters) {
-            const printerStations = printer.stations || ['kitchen'];
-            for (const station of printerStations) {
-              const stationItems = itemsByStation[station];
-              if (stationItems && stationItems.length > 0) {
-                const ticket = PrintService.formatKitchenTicket(finalOrder, stationItems, station, addOn);
-                // Not awaited: a switched-off printer must not hold up sending the order.
-                void PrintService.sendToPrinter({
-                  printerIp: printer.ipAddress,
-                  printerPort: printer.port || 9100,
-                  bytes: PrintService.render(ticket, printer.paperWidth)
-                }).then(res => { if (!res.success) toast.error(`Kitchen printer ${printer.name || printer.ipAddress}: ${res.error}`); });
-              }
-            }
-          }
+          setTimeout(async () => {
+            const { data } = await supabase.from('order_items').select('id').in('id', lineIds).is('printed_at', null);
+            if (data?.length) toast.warning('The kitchen ticket has not printed yet. Is the cashier tablet on, with Print station switched on?', { duration: 10000 });
+          }, 30_000);
         }
-      } catch (printErr) {
-        console.warn('[AutoPrint] Failed to dispatch to station printers', printErr);
+      } else if (printers.length) {
+        // Offline: no station can see this order yet, so print straight to the printers when this
+        // device can reach them; the queue then tells the server these lines are already printed.
+        void OrderController.printOffline(orderId, printers, finalOrder, printItems, !createdNewOrder);
       }
-      // -------------------------------
 
       return { success: true, data: finalOrder };
     } catch (err: any) {
@@ -281,30 +256,28 @@ export class OrderController {
       p_reason: reason ?? null, p_actor_id: actor.id, p_actor_name: actor.name,
     });
     if (error) return { success: false, error: error.message };
-    void OrderController.printCancelTicket(itemId, orderId, branchId, actor.name, reason);
+    // The print station prints the CANCELLED ticket at the item's station (migration 0048).
     return { success: true, data: undefined };
   }
 
-  /** Tells the item's station (its printer) that the item was cancelled. Best effort: the
-   *  kitchen screen also shows the cancellation, so a printer problem only shows a warning. */
-  private static async printCancelTicket(itemId: string, orderId: string, branchId: string, by: string, reason?: string) {
-    try {
-      const [{ data: item }, { data: order }] = await Promise.all([
-        supabase.from('order_items').select('product_name, quantity, station, modifiers').eq('id', itemId).single(),
-        supabase.from('orders').select('order_type, table_number, bill_number').eq('id', orderId).single(),
-      ]);
-      if (!item || !order) return;
-      const station = item.station || 'kitchen';
-      const label = { orderType: order.order_type, tableNumber: order.table_number, billNumber: order.bill_number };
-      for (const printer of cachedPrinters(branchId).filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes(station))) {
-        void PrintService.sendToPrinter({
-          printerIp: printer.ipAddress!, printerPort: printer.port || 9100,
-          bytes: PrintService.render(PrintService.formatCancelTicket(label, item, by, reason), printer.paperWidth),
-        }).then(res => { if (!res.success) toast.error(`Cancel ticket not printed on ${printer.name || printer.ipAddress}: ${res.error}`); });
+  /** Offline order: kitchen tickets straight from this device (only works on the printers'
+   *  network). Lines whose station printed are marked in the offline queue as printed. */
+  private static async printOffline(orderId: string, printers: any[], order: any, items: any[], addOn: boolean) {
+    const byStation: Record<string, any[]> = {};
+    for (const it of items) (byStation[it.station || 'kitchen'] ??= []).push(it);
+    const printed: string[] = [];
+    await Promise.all(Object.entries(byStation).map(async ([station, stationItems]) => {
+      let ok = false;
+      for (const p of printers.filter(p => (p.stations?.length ? p.stations : ['kitchen']).includes(station))) {
+        const res = await PrintService.sendToPrinter({
+          printerIp: p.ipAddress, printerPort: p.port || 9100,
+          bytes: PrintService.render(PrintService.formatKitchenTicket(order, stationItems, station, addOn), p.paperWidth),
+        });
+        ok ||= res.success;
       }
-    } catch (err) {
-      console.warn('[OrderController] cancel ticket not printed', err);
-    }
+      if (ok) printed.push(...stationItems.map(i => i.id));
+    }));
+    if (printed.length) OfflineSyncEngine.markPrinted(orderId, printed);
   }
 
   /** Next zero-padded bill number for a branch, per order type. Uses the atomic

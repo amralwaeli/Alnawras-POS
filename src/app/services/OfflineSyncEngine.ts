@@ -23,7 +23,7 @@ interface QueuedItems {
   branchId: string;
   addedBy: string;
   addedByName: string;
-  items: { product_id: string; quantity: number; notes: string | null; option_ids: string[]; client_id?: string }[];
+  items: { product_id: string; quantity: number; notes: string | null; option_ids: string[]; client_id?: string; printed?: boolean }[];
   /** The orders row to create first, when the bill itself was started offline. */
   newOrder?: Record<string, any>;
 }
@@ -52,6 +52,14 @@ export class OfflineSyncEngine {
     const q = readQueue();
     q.push({ ...entry, id: crypto.randomUUID(), type: 'order_items', timestamp: new Date().toISOString() });
     writeQueue(q);
+  }
+
+  /** Lines this device printed itself while offline: the server marks them printed on replay,
+   *  so the print station doesn't print them again (migration 0048). */
+  static markPrinted(orderId: string, clientIds: string[]) {
+    const ids = new Set(clientIds);
+    writeQueue(readQueue().map(q => q.orderId !== orderId ? q
+      : { ...q, items: q.items.map(i => (i.client_id && ids.has(i.client_id) ? { ...i, printed: true } : i)) }));
   }
 
   static pendingCount(): number { return readQueue().length; }

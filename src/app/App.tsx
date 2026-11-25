@@ -6,6 +6,7 @@ import { router } from './routes';
 import { LoginView, DeviceLoginView } from './modules/auth';
 import { AlertOverlay } from './components/AlertOverlay';
 import { isNativeApp } from '../lib/platform';
+import { startPrintStation, stopPrintStation } from './services/PrintStation';
 import { User } from './models/types';
 import { Toaster } from 'sonner';
 
@@ -65,6 +66,14 @@ function AppContent() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  // The cashier tablet with "Print station" on prints every order, also while
+  // the PIN pad is showing (it only needs the branch sign-in).
+  useEffect(() => {
+    if (!deviceUnlocked || !deviceBranchId) return;
+    startPrintStation(deviceBranchId);
+    return stopPrintStation;
+  }, [deviceUnlocked, deviceBranchId]);
 
   // WEB: the branch email+password is the tenant admin — once the branch session
   // is present, log straight in as admin (the website never shows the PIN pad),

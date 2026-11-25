@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { usePOS } from '../../context/POSContext';
 import { PrintService, findPrinters, type FoundPrinter } from '../../services/PrintService';
 import { isNativeApp } from '../../../lib/platform';
+import { isPrintStation, setPrintStation } from '../../services/PrintStation';
 import { PrinterController, cachedPrinters } from '../../controllers/PrinterController';
 import { friendlyError } from '../../../lib/errors';
 import { loadStations, saveStations } from '../../models/types';
@@ -330,6 +331,7 @@ export function PrinterManagementView() {
   const { currentUser } = usePOS();
   const branchId = currentUser?.branchId ?? 'branch-1';
 
+  const [station, setStation] = useState(isPrintStation);
   const [stations, setStations] = useState<Station[]>(() => loadStations());
   const [printers, setPrinters] = useState<PrinterType[]>(() => cachedPrinters(branchId));
 
@@ -416,6 +418,29 @@ export function PrinterManagementView() {
         <h1 className="text-2xl font-bold">Printers</h1>
         <p className="text-gray-600">Manage preparation stations and assign printers to them</p>
       </div>
+
+      {/* The one device on the printers' network prints every order, from phones on any internet. */}
+      {isNativeApp() && (
+        <Card className={station ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}>
+          <CardContent className="py-4 px-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">Print station: {station ? 'ON' : 'OFF'}</p>
+              <p className="text-sm text-gray-600">
+                Switch this on for the cashier tablet connected to the printers. It prints every kitchen, drinks and
+                cancel ticket, from waiters and customers on any internet. Keep the app open on this tablet.
+              </p>
+            </div>
+            <Button
+              role="switch" aria-checked={station}
+              variant={station ? 'outline' : 'default'}
+              className="min-h-11"
+              onClick={() => { setPrintStation(!station, branchId); setStation(!station); toast.success(station ? 'Print station off' : 'This device now prints all orders'); }}
+            >
+              {station ? 'Turn off' : 'Turn on'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Stations ───────────────────────────────────────────────────────── */}
       <section>

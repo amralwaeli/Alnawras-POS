@@ -390,6 +390,14 @@ export function TablesView() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3 items-stretch">
+            {(currentUser.role === 'waiter' || currentUser.role === 'swaiter') && (
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full sm:w-auto justify-center min-h-11 flex items-center gap-2 bg-orange-500 text-white rounded-xl px-4 sm:px-5 font-semibold text-sm whitespace-nowrap shadow-sm active:bg-orange-600 transition-colors"
+              >
+                <UtensilsCrossed className="size-4" /> Menu
+              </button>
+            )}
             {(currentUser.role === 'cashier' || currentUser.role === 'admin') && (
               <button
                 onClick={() => navigate('/takeaway')}

@@ -75,6 +75,13 @@ export function rasterToEscPos(pixels: Uint8Array, width: number, height: number
 }
 
 /** Greedy word wrap; keeps leading spaces (indents). shortcut: a single word wider than the paper is clipped, fine for menu names. */
+/** Right-to-left only when the FIRST letter is Arabic/Hebrew (the usual rule for mixed text):
+ *  "2 x Grilled Fish سمك مشوي" reads left to right; an Arabic-only line right to left. */
+export function startsRtl(text: string): boolean {
+  const first = /[A-Za-z\u00C0-\u024F\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/.exec(text);
+  return !!first && RTL_CHARS.test(first[0]);
+}
+
 function wrap(ctx: CanvasRenderingContext2D, text: string, max: number): string[] {
   const out: string[] = [];
   let cur = '';
@@ -160,7 +167,7 @@ export class PrintService {
       if (l === 'rule') { rows.push('rule'); height += ruleH; continue; }
       const px = l.style === 'large' ? largePx : normalPx;
       const font = `${l.style ? 'bold ' : ''}${px}px sans-serif`;
-      const rtl = RTL_CHARS.test(l.text);
+      const rtl = startsRtl(l.text);
       // Arabic lines read right-to-left from the right edge unless explicitly centered.
       const align = l.align === 'center' ? 'center' : rtl ? 'right' : (l.align ?? 'left');
       ctx.font = font;
@@ -180,14 +187,14 @@ export class PrintService {
     ctx.textBaseline = 'middle';
     let y = pad;
     for (const r of rows) {
-      if (r === 'rule') { ctx.fillRect(pad, y + ruleH / 2 - 1, max, 2); y += ruleH; continue; }
+      if (r === 'rule') { for (let x = pad; x < width - pad; x += 10) ctx.fillRect(x, y + ruleH / 2 - 1, 6, 2); y += ruleH; continue; }   // dashed
       ctx.font = r.font;
       ctx.direction = r.rtl ? 'rtl' : 'ltr';
       ctx.textAlign = r.align;
       ctx.fillText(r.text, r.align === 'center' ? width / 2 : r.align === 'right' ? width - pad : pad, y + r.h / 2);
       if (r.value) {
         const onLeft = r.align === 'right';
-        ctx.direction = RTL_CHARS.test(r.value) ? 'rtl' : 'ltr';
+        ctx.direction = startsRtl(r.value) ? 'rtl' : 'ltr';
         ctx.textAlign = onLeft ? 'left' : 'right';
         ctx.fillText(r.value, onLeft ? pad : width - pad, y + r.h / 2);
       }
@@ -231,36 +238,35 @@ export class PrintService {
   }
 
   static formatKitchenTicket(order: any, newItems: any[], stationName: string): PrintLine[] {
-    const now = new Date().toLocaleTimeString();
-    // Map station IDs to friendly names for the header
-    const stationDisplayNames: Record<string, string> = {
-      kitchen: 'KITCHEN',
-      juice: 'BEVERAGE',
-      shawarma: 'SHAWARMA',
-    };
+    // English date/time whatever the tablet's language (an Arabic tablet printed "٧:٤٦ م").
+    const when = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
+    const stationDisplayNames: Record<string, string> = { kitchen: 'KITCHEN', juice: 'DRINKS', shawarma: 'SHAWARMA' };
     const title = stationDisplayNames[stationName] || stationName.toUpperCase();
+    const type = order.orderType === 'takeaway' ? 'Takeaway' : order.orderType === 'pickup' ? 'Pickup' : 'Dine in';
+    // Strip control characters from untrusted values (names, notes, choices).
+    const clean = cleanPrintText;
+    const staff = [...new Set(newItems.map(i => clean(i.added_by_name || i.addedByName || '')).filter(Boolean))].join(', ');
 
     const lines: PrintLine[] = [
-      { text: `${title} TICKET`, style: 'bold', align: 'center' },
+      { text: `${title} TICKET`, align: 'center' },
       { text: PrintService.ticketLabel(order), style: 'large', align: 'center' },
-      { text: `Time: ${now}`, align: 'center' },
+      { text: when, align: 'left' },
+      ...(staff ? [{ text: staff, align: 'left' as const }] : []),
+      'rule',
+      { text: type, style: 'bold', align: 'center' },
       'rule',
     ];
 
-    // Strip ASCII control characters from untrusted values (product names, notes,
-    // modifier labels). The ticket is drawn as an image now, so this only keeps
-    // stray tabs/newlines from garbling a line.
-    const clean = cleanPrintText;
-
     newItems.forEach(item => {
       const name = clean(item.productName || item.product_name || 'Item');
-      lines.push({ text: `${clean(item.quantity)}x ${name}`, style: 'large' });
+      lines.push({ text: `${clean(item.quantity)} x ${name}`, style: 'large' });
       const mods = item.modifiers || item.modifiers_json || [];
       if (Array.isArray(mods)) {
-        mods.forEach((m: any) => { lines.push({ text: `  - ${clean(m.optionName || m.option_name || '')}` }); });
+        mods.forEach((m: any) => { lines.push({ text: `     + ${clean(m.optionName || m.option_name || '')}`, style: 'bold' }); });
       }
-      if (item.notes) lines.push({ text: `  * NOTE: ${clean(item.notes)}`, style: 'bold' });
+      if (item.notes) lines.push({ text: `     *** ${clean(item.notes)}`, style: 'bold' });
     });
+    lines.push('rule');
 
     return lines;
   }

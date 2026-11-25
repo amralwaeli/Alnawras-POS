@@ -13,3 +13,14 @@ describe('kitchen ticket label', () => {
     expect(PrintService.ticketLabel({ orderType: 'dine-in', tableNumber: 5 })).toBe('TABLE 5');
   });
 });
+
+import { startsRtl } from './PrintService';
+describe('print direction for mixed English/Arabic lines', () => {
+  it('reads a line that starts in English left to right, an Arabic line right to left', () => {
+    expect(startsRtl('2 x Grilled Fish سمك مشوي')).toBe(false);
+    expect(startsRtl('     + Bread خبز')).toBe(false);
+    expect(startsRtl('سمك مشوي')).toBe(true);
+    expect(startsRtl('اختبار الطباعة 123')).toBe(true);
+    expect(startsRtl('RM 28.00')).toBe(false);
+  });
+});

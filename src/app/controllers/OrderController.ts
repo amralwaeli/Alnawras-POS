@@ -216,8 +216,16 @@ export class OrderController {
       const printers = cachedPrinters(branchId).filter((p: any) => p.isActive && p.type === 'network' && p.ipAddress);
       if (sentOnline) {
         // Online, the print station (the cashier tablet on the printers' network, migration 0048)
-        // prints the tickets, so this phone can be on any internet. NOT PRINTED → Send again.
-        if (printers.length) watchPrinting(branchId, printItems.map((i: any) => i.id), PrintService.ticketLabel(finalOrder));
+        // prints the tickets, so this phone can be on any internet. Items that do not print are
+        // taken off the bill; Send again sends them again (on the same bill if it is still there).
+        if (printers.length) watchPrinting({
+          branchId, orderId: orderId!, ids: lineIds, label: PrintService.ticketLabel(finalOrder), dropEmptyBill: createdNewOrder,
+          resend: (removed, billDropped) => OrderController.submitOrder({
+            ...params,
+            items: params.items.filter((_, i) => removed.includes(lineIds[i])),
+            existingOrderId: billDropped ? null : orderId,
+          }),
+        });
       } else if (printers.length) {
         // Offline: no station can see this order yet, so print straight to the printers when this
         // device can reach them; the queue then tells the server these lines are already printed.

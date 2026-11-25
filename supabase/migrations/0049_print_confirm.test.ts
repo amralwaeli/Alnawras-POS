@@ -31,12 +31,14 @@ describe('0049 print confirm', () => {
     expect((await row('i1')).printed_at).not.toBeNull();
   });
 
-  it('records why a ticket did not print, and Send again retries it at once', async () => {
+  it('records why a ticket did not print, and a release without error retries it at once', async () => {
     await call(`SELECT public.release_print_jobs('A', '{i2}', '{}', 'Kitchen printer not reachable')`);
-    expect(await row('i2')).toMatchObject({ printed_at: null, print_error: 'Kitchen printer not reachable', print_claimed_at: null });
+    expect(await row('i2')).toMatchObject({ printed_at: null, print_error: 'Kitchen printer not reachable' });
+    expect((await claim()).items).toEqual([]);                            // 0050: failed → wait 15 s
+    await db.exec(`UPDATE order_items SET print_claimed_at = now() - interval '20 seconds' WHERE id = 'i2'`);
     expect((await claim()).items.map((i: any) => i.id)).toEqual(['i2']);   // the error stays until it prints
     expect((await row('i2')).print_error).toBe('Kitchen printer not reachable');
-    await call(`SELECT public.release_print_jobs('A', '{i2}', '{}')`);    // the waiter's Send again
+    await call(`SELECT public.release_print_jobs('A', '{i2}', '{}')`);
     expect((await row('i2')).print_error).toBeNull();
     expect((await claim()).items.map((i: any) => i.id)).toEqual(['i2']);
     await call(`SELECT public.confirm_print_jobs('A', '{i2}')`);
@@ -48,6 +50,7 @@ describe('0049 print confirm', () => {
                    VALUES ('i3', 'o1', 'fish', 'Fish', 1, 20, 20, 'w1', 'Ali', 'A', 'kitchen', 'pending')`);
     await claim();
     await call(`SELECT public.release_print_jobs('A', '{i3}', '{}', 'off')`);
+    await db.exec(`UPDATE order_items SET print_claimed_at = now() - interval '20 seconds' WHERE id = 'i3'`);
     await db.exec(`UPDATE order_items SET status = 'cancelled', cancelled_at = now() WHERE id = 'i3'`);
     expect(await claim()).toEqual({ items: [], cancels: [] });
     expect((await row('i3')).printed_at).not.toBeNull();     // closed, nothing left to print

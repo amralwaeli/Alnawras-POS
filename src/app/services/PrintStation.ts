@@ -124,42 +124,58 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
 }
 
 /**
- * On the phone that sent the order: checks that the kitchen tickets really printed. If a
- * printer refused them, or nothing printed them in 20 seconds (cashier tablet off), a beeping
- * full-screen alert says NOT PRINTED with a Send again button. It closes itself once printed.
+ * On the phone that sent the order: checks that its kitchen tickets really printed. Items
+ * whose ticket did not print (a printer refused it, or nothing printed it in 25 seconds,
+ * e.g. the cashier tablet is off) are taken off the bill (migration 0050), and a beeping
+ * full-screen alert says NOT PRINTED with Send again (adds them back as a new send).
+ * Items a station is printing right now are left alone and checked again.
  */
-export function watchPrinting(branchId: string, ids: string[], label: string) {
-  const alertId = `print-${ids[0]}`;
-  let since = Date.now();
-  let stopped = false;
+export function watchPrinting(o: {
+  branchId: string; orderId: string; ids: string[]; label: string; dropEmptyBill: boolean;
+  resend: (removedIds: string[], billDropped: boolean) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const started = Date.now();
+  let pending = [...o.ids];
   const check = async () => {
-    if (stopped) return;
-    const { data, error } = await supabase.from('order_items').select('id, printed_at, print_error').in('id', ids);
-    const waiting = (data ?? []).filter((r: any) => !r.printed_at);
-    if (!error && !waiting.length) {
-      if (AlertService.isShowing(alertId)) { AlertService.dismiss(alertId); toast.success(`${label}: printed in the kitchen`); }
-      return;
+    const { data, error } = await supabase.from('order_items')
+      .select('id, printed_at, print_error, product_name, quantity').in('id', pending);
+    if (!error) {
+      const unprinted = (data ?? []).filter((r: any) => !r.printed_at);
+      pending = unprinted.map((r: any) => r.id);
+      if (!pending.length) return;                       // all printed
+      if (unprinted.some((r: any) => r.print_error) || Date.now() - started > 25_000) {
+        const { data: w, error: wErr } = await supabase.rpc('withdraw_unprinted_items', {
+          p_branch_id: o.branchId, p_order_id: o.orderId, p_item_ids: pending, p_drop_empty_bill: o.dropEmptyBill,
+        });
+        const removed: string[] = wErr ? [] : (w?.removed ?? []);
+        if (removed.length) {
+          const gone = unprinted.filter((r: any) => removed.includes(r.id));
+          showNotPrinted(o, removed, !!w?.bill_dropped,
+            gone.map((r: any) => `${r.quantity} x ${r.product_name}`), gone.find((r: any) => r.print_error)?.print_error);
+          pending = pending.filter(id => !removed.includes(id));
+        }
+      }
     }
-    const reason = waiting.find((r: any) => r.print_error)?.print_error;
-    if (!error && (reason || Date.now() - since > 20_000)) {
-      AlertService.push({
-        id: alertId, kind: 'print', title: `${label} — NOT PRINTED`,
-        body: reason
-          ? `${reason}. The kitchen does not have this order yet. Check the printer is on, then press Send again.`
-          : 'The cashier tablet has not printed it. Check the tablet is on with Print station switched on, then press Send again.',
-        action: {
-          label: 'Send again',
-          run: async () => {
-            AlertService.dismiss(alertId);
-            since = Date.now();
-            await supabase.rpc('release_print_jobs', { p_branch_id: branchId, p_item_ids: waiting.map((r: any) => r.id), p_cancel_ids: [] });
-          },
-        },
-        onDismiss: () => { stopped = true; },   // "Close": the waiter told the kitchen another way
-      });
-    }
-    // Keep checking until it prints (the station also retries on its own), at most 30 minutes.
-    if (Date.now() - since < 30 * 60_000) setTimeout(check, error ? 5000 : 3000);
+    if (pending.length && Date.now() - started < 30 * 60_000) setTimeout(check, error ? 5000 : 3000);
   };
   setTimeout(check, 2500);
+}
+
+function showNotPrinted(o: Parameters<typeof watchPrinting>[0], removed: string[], billDropped: boolean, names: string[], reason?: string) {
+  const id = `print-${removed[0]}`;
+  AlertService.push({
+    id, kind: 'print', title: `${o.label} — NOT PRINTED`,
+    body: `${reason ? `${reason}.` : 'The cashier tablet did not print it.'} The kitchen does not have it, so it was taken off the bill:\n`
+      + `${names.join('\n')}\nCheck the ${reason ? 'printer' : 'cashier tablet (Print station on)'}, then press Send again.`,
+    action: {
+      label: 'Send again',
+      run: async () => {
+        AlertService.dismiss(id);
+        const res = await o.resend(removed, billDropped);
+        if (res.success) toast.success('Sent again');
+        else { toast.error(`Not sent: ${res.error}`); showNotPrinted(o, removed, billDropped, names, reason); }
+      },
+    },
+    dismissLabel: "Don't send",
+  });
 }

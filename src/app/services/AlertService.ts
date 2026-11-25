@@ -16,7 +16,7 @@ export interface AppAlert {
   tableId?: string;           // for table calls — cleared on acknowledge
   /** A main button instead of Acknowledge (e.g. "Send again"); Close is then shown below it. */
   action?: { label: string; run: () => void };
-  onDismiss?: () => void;     // Acknowledge / Close pressed
+  dismissLabel?: string;      // the button under the action (default "Close")
 }
 
 let alerts: AppAlert[] = [];

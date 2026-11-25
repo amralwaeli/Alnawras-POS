@@ -32,7 +32,6 @@ export function AlertOverlay() {
     if (a.kind === 'table' && a.tableId) {
       try { await supabase.from('tables').update({ needs_waiter: false }).eq('id', a.tableId); } catch { /* ignore */ }
     }
-    a.onDismiss?.();
     AlertService.dismiss(a.id);
   };
 
@@ -48,7 +47,7 @@ export function AlertOverlay() {
                 : <Package className="size-8 text-orange-600" />}
             </div>
             <h2 className="text-2xl font-black text-gray-900 break-words" dir="auto">{a.title}</h2>
-            <p className="text-gray-600 mt-1 mb-5 break-words" dir="auto">{a.body}</p>
+            <p className="text-gray-600 mt-1 mb-5 break-words whitespace-pre-line" dir="auto">{a.body}</p>
             {a.action ? (
               <>
                 <button
@@ -58,7 +57,7 @@ export function AlertOverlay() {
                   <RotateCcw className="size-6" /> {a.action.label}
                 </button>
                 <button onClick={() => acknowledge(a)} className="w-full min-h-11 mt-2 text-gray-500 font-semibold">
-                  Close
+                  {a.dismissLabel ?? 'Close'}
                 </button>
               </>
             ) : (

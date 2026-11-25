@@ -10,7 +10,7 @@ import { useEffect, useReducer } from 'react';
 
 export interface AppAlert {
   id: string;                 // stable id, e.g. `table-<id>` — used to de-dupe
-  kind: 'table' | 'pickup';
+  kind: 'table' | 'pickup' | 'item';
   title: string;
   body: string;
   tableId?: string;           // for table calls — cleared on acknowledge

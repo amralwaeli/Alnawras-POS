@@ -12,6 +12,7 @@ import { useBranch } from '../context/BranchContext';
 import { useDeviceAuth } from '../context/DeviceAuthContext';
 import { isNativeApp } from '../../lib/platform';
 import { ROLE_PERMISSIONS, permissionsFor, BranchFeatureKey } from '../models/types';
+import { RoleSwitcher } from './RoleSwitcher';
 
 export function Layout() {
   const { currentUser, logout } = usePOS();
@@ -55,12 +56,15 @@ export function Layout() {
               ))}
             </nav>
           )}
-          <button
-            onClick={logout}
-            className="shrink-0 min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold whitespace-nowrap"
-          >
-            Switch user
-          </button>
+          <div className="shrink-0 flex items-center gap-2">
+            <RoleSwitcher className="bg-white/10 hover:bg-white/20 text-white" />
+            <button
+              onClick={logout}
+              className="shrink-0 min-h-11 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold whitespace-nowrap"
+            >
+              Switch user
+            </button>
+          </div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto bg-background"><Outlet /></div>
       </div>
@@ -310,7 +314,9 @@ export function Layout() {
             </div>
             <div className={`flex-1 min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
               <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
-              <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>
+              {(currentUser.allRoles?.length ?? 0) > 1
+                ? <RoleSwitcher className="mt-0.5 min-h-9 w-full bg-white/10 text-white text-xs" />
+                : <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>}
             </div>
             <button
               onClick={handleLogout}

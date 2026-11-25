@@ -11,6 +11,7 @@ import { ProductController, CategoryController } from '../controllers/ProductCon
 import { TableController } from '../controllers/TableController';
 import { mapOrder, mapOrderItem, mapProduct, mapTable } from '../models/mappers';
 import { AlertService } from '../services/AlertService';
+import { rolesOf } from '../models/types';
 import { useAuth } from './AuthContext';
 import { useOrders } from './OrdersContext';
 import { useTables } from './TablesContext';
@@ -136,11 +137,18 @@ export function RealtimeSyncEngine() {
           return;
         }
         const mapped = mapProduct(row);
-        setProducts(prev =>
-          prev.some(prod => prod.id === mapped.id)
-            ? prev.map(prod => prod.id === mapped.id ? mapped : prod)
-            : [...prev, mapped]
-        );
+        const available = (x: any) => (x.kitchenStatus || 'available') === 'available' && (x.availabilityStatus || 'available') === 'available';
+        // The kitchen just marked an item finished: tell the floor (like a table call); clear it when it's back.
+        const toldFloor = rolesOf(currentUser).some(r => ['waiter', 'swaiter', 'cashier', 'manager', 'admin'].includes(r));
+        setProducts(prev => {
+          const before = prev.find(prod => prod.id === mapped.id);
+          if (toldFloor && before && available(before) && !available(mapped)) {
+            AlertService.push({ id: `item-${mapped.id}`, kind: 'item', title: 'Item Finished', body: `${mapped.name} is not available now (kitchen)` });
+          } else if (available(mapped)) {
+            AlertService.dismiss(`item-${mapped.id}`);
+          }
+          return before ? prev.map(prod => prod.id === mapped.id ? mapped : prod) : [...prev, mapped];
+        });
       })
       // Orders
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, async (payload) => {

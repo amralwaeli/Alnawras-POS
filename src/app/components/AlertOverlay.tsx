@@ -6,7 +6,7 @@
  * a staff member taps Acknowledge.
  */
 import { useEffect } from 'react';
-import { Bell, Package, Check } from 'lucide-react';
+import { Bell, Package, Check, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { AlertService, useAlerts, startBeeping, stopBeeping, unlockAudio, AppAlert } from '../services/AlertService';
 
@@ -41,7 +41,7 @@ export function AlertOverlay() {
         {alerts.map(a => (
           <div key={a.id} className="bg-white rounded-3xl shadow-2xl p-5 sm:p-6 text-center border-4 border-orange-400 animate-pulse">
             <div className="mx-auto mb-3 size-16 rounded-full bg-orange-100 flex items-center justify-center animate-bounce">
-              {a.kind === 'table' ? <Bell className="size-8 text-orange-600" /> : <Package className="size-8 text-orange-600" />}
+              {a.kind === 'table' ? <Bell className="size-8 text-orange-600" /> : a.kind === 'item' ? <Ban className="size-8 text-red-600" /> : <Package className="size-8 text-orange-600" />}
             </div>
             <h2 className="text-2xl font-black text-gray-900 break-words" dir="auto">{a.title}</h2>
             <p className="text-gray-600 mt-1 mb-5 break-words" dir="auto">{a.body}</p>

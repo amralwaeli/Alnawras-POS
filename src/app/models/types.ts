@@ -16,6 +16,9 @@ export interface User {
   role: UserRole;
   /** Other jobs this person also does (0044); permissions are combined. */
   extraRoles?: UserRole[];
+  /** Every role this person works as, fixed at sign-in. `role` is the one whose screens are
+   *  showing now (RoleSwitcher); permissions always come from all of them. */
+  allRoles?: UserRole[];
   pin: string;
   email: string;
   status: 'active' | 'inactive';
@@ -620,11 +623,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
 };
 
 /** All roles a person works as: their main role plus any extra roles (0044). */
-export const rolesOf = (u: { role: string; extraRoles?: string[] }): UserRole[] =>
-  [u.role, ...(u.extraRoles ?? [])].filter((r, i, all) => all.indexOf(r) === i) as UserRole[];
+export const rolesOf = (u: { role: string; extraRoles?: string[]; allRoles?: string[] }): UserRole[] =>
+  (u.allRoles?.length ? u.allRoles : [u.role, ...(u.extraRoles ?? [])]).filter((r, i, all) => all.indexOf(r) === i) as UserRole[];
 
 /** Permissions for everything a person works as: each one is granted if ANY of their roles has it. */
-export function permissionsFor(u: { role: string; extraRoles?: string[] }): RolePermissions {
+export function permissionsFor(u: { role: string; extraRoles?: string[]; allRoles?: string[] }): RolePermissions {
   const sets = rolesOf(u).map(r => ROLE_PERMISSIONS[r]).filter(Boolean);
   const base = { ...(ROLE_PERMISSIONS[u.role as UserRole] ?? ROLE_PERMISSIONS.staff) };
   for (const k of Object.keys(base) as (keyof RolePermissions)[]) (base as any)[k] = sets.some(p => p[k]);

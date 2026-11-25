@@ -32,7 +32,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /** Device role locking: waiters only on waiter tablets, cashier roles only on the
  *  cashier device. Admin always passes, so the owner can never be locked out. */
-function stationRefusal(user: User): string | null {
+export function stationRefusal(user: User): string | null {
   const roles = rolesOf(user);   // a cashier who also waits tables may use a waiter tablet
   if (roles.includes('admin')) return null;
   const station = DeviceService.getStationType();
@@ -102,6 +102,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
       // verify_staff_pin returns the main role only; the extra jobs (0044) come from users.
       const { data: extra } = await supabase.from('users').select('extra_roles').eq('id', user.id).maybeSingle();
       user.extraRoles = (extra?.extra_roles ?? []) as User['role'][];
+      user.allRoles = rolesOf(user);   // fixed for this sign-in; RoleSwitcher only changes `role`
 
       // ── BRANCH CONTRACT / SUSPENSION LOCK ─────────────────────────────────
       // Block login the moment a branch's contract lapses or it's suspended by

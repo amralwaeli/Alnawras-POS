@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import {
   Plus, Minus, ShoppingCart, X, Search,
-  CheckCircle2, ShoppingBag, Bell, ChevronDown, ChevronLeft, UtensilsCrossed, Ban,
+  CheckCircle2, ShoppingBag, Bell, ChevronDown, ChevronLeft, UtensilsCrossed, Ban, Trash2,
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { friendlyError } from '../../../lib/errors';
@@ -408,6 +408,7 @@ export function QROrderingView() {
           {!!item.modifiers?.length && <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map(m => m.optionName).join(', ')}</p>}
           <p className="text-orange-600 font-black text-xs mt-0.5 whitespace-nowrap">RM {item.price.toFixed(2)}</p>
         </div>
+        <button onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} aria-label="Remove item" title="Remove (not sent)" className="size-11 shrink-0 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="size-4" /></button>
         <div className={`flex items-center shrink-0 bg-white border-2 border-orange-100 shadow-sm p-0.5 gap-0.5 ${compact ? 'rounded-xl' : 'rounded-2xl'}`}>
           <button
             onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0))}

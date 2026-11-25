@@ -153,6 +153,7 @@ export function TablesView() {
   // Who may take payment is the permission matrix's call, not a role name
   // (admin on the website and managers were locked out of takeaway/pickup).
   const canPay = permissionsFor(currentUser)?.canProcessPayments;
+  const canCancelItems = permissionsFor(currentUser)?.canVoidSentItems;
 
   const getOrder = (tableId: string) => {
     const t = tables.find(t => t.id === tableId);
@@ -629,6 +630,11 @@ export function TablesView() {
                     {currentUser.role === 'admin' && (
                       <button onClick={() => navigate(`/table/${table.id}`)} className="w-full min-h-11 py-2 bg-gray-700 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors">
                         View Menu
+                      </button>
+                    )}
+                    {canCancelItems && !['waiter', 'swaiter', 'admin'].includes(currentUser.role) && (
+                      <button onClick={() => navigate(`/table/${table.id}`)} className="w-full min-h-11 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-colors">
+                        Cancel Items
                       </button>
                     )}
                     {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && table.currentOrderId && (

@@ -7,7 +7,7 @@ export type Result<T> = { success: true; data: T; error?: undefined } | { succes
 
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'swaiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'swaiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor' | 'cancellation';
 
 export interface User {
   id: string;
@@ -445,8 +445,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   // Super Waiter — a normal waiter that can ALSO manage invoices & quotations.
   swaiter: {
-    // The "special waiter account" the void-item feature is gated on.
-    canVoidSentItems: true,
+    // Cancelling sent items needs the Cancellation role (as main or extra role).
+    canVoidSentItems: false,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: false,
@@ -522,7 +522,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewOwnAttendance: true,
   },
   manager: {
-    canVoidSentItems: true,
+    canVoidSentItems: false,
     canViewTables: true,
     canAddOrders: true,
     canProcessPayments: true,
@@ -574,6 +574,26 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAttendance: false,
     canCheckIn: true,
     canManageInvoicesQuotations: true,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
+  },
+  // Cancels items customers no longer want (only role besides admin that may).
+  cancellation: {
+    canVoidSentItems: true,
+    canViewTables: true,
+    canAddOrders: false,
+    canProcessPayments: false,
+    canManageInventory: false,
+    canViewReports: false,
+    canViewOrderingDashboard: false,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+    canManageInvoicesQuotations: false,
     canManagePayroll: false,
     canManageLeave: false,
     canViewOwnAttendance: true,
@@ -637,6 +657,7 @@ export const ROLE_META: RoleMeta[] = [
   { value: 'accounting', label: 'Accountant',   badgeClass: 'bg-indigo-100 text-indigo-700',  assignable: true },
   { value: 'hr',         label: 'HR',           badgeClass: 'bg-pink-100 text-pink-700',      assignable: true },
   { value: 'staff',      label: 'Staff',        badgeClass: 'bg-teal-100 text-teal-700',      assignable: true },
+  { value: 'cancellation', label: 'Cancellation', badgeClass: 'bg-red-100 text-red-700',   assignable: true },
 ];
 
 /** Roles that can be picked when creating/editing an employee (everything but admin). */

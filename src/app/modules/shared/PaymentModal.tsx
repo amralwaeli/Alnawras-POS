@@ -418,6 +418,16 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setPresetDiscount(presetDiscountAmount(baseTotals.subtotal, preset));
     setAppliedPresetId(preset.id);
   };
+
+  // A one-off discount typed by the cashier (RM amount or %), applied like a preset.
+  const [customValue, setCustomValue] = useState('');
+  const [customType, setCustomType] = useState<'fixed' | 'percentage'>('fixed');
+  const applyCustom = () => {
+    const value = Math.min(Number(customValue) || 0, customType === 'percentage' ? 100 : Infinity);
+    if (!(value > 0)) { toast.error('Enter a discount above 0'); return; }
+    setPresetDiscount(presetDiscountAmount(baseTotals.subtotal, { id: 'custom', label: 'Discount', type: customType, value }));
+    setAppliedPresetId('custom');
+  };
   
   // Once any split-by-item payment has landed on this order, whole-order
   // payment modes are no longer safe to use — they'd re-charge the full
@@ -830,6 +840,33 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {paymentMode !== 'split-items' && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-1.5">Discount</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input value={customValue} onChange={e => setCustomValue(e.target.value)} inputMode="decimal" placeholder="0"
+                        aria-label="Discount amount" disabled={appliedPresetId === 'custom'}
+                        className="w-24 min-h-10 px-3 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-emerald-500 disabled:bg-gray-50" />
+                      <div className="flex rounded-xl border-2 border-gray-200 overflow-hidden" role="radiogroup" aria-label="Discount type">
+                        {(['fixed', 'percentage'] as const).map(t => (
+                          <button key={t} type="button" role="radio" aria-checked={customType === t} disabled={appliedPresetId === 'custom'}
+                            onClick={() => setCustomType(t)}
+                            className={`min-h-10 px-3 text-xs font-bold ${customType === t ? 'bg-gray-900 text-white' : 'text-gray-600'}`}>
+                            {t === 'fixed' ? CURRENCY : '%'}
+                          </button>
+                        ))}
+                      </div>
+                      {appliedPresetId === 'custom' ? (
+                        <button type="button" onClick={() => { setPresetDiscount(0); setAppliedPresetId(null); }}
+                          className="min-h-10 px-3 rounded-xl border-2 border-red-200 text-xs font-bold text-red-600">Remove</button>
+                      ) : (
+                        <button type="button" onClick={applyCustom}
+                          className="min-h-10 px-3 rounded-xl border-2 border-emerald-500 text-xs font-bold text-emerald-700">Apply</button>
+                      )}
                     </div>
                   </div>
                 )}

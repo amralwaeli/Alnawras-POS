@@ -101,6 +101,7 @@ function LandingPage() {
     case 'waiter':     return <Navigate to="/dashboard" replace />;   // ordering menu
     case 'swaiter':    return <Navigate to="/dashboard" replace />;   // super waiter — same landing as waiter
     case 'kitchen':    return <Navigate to="/kitchen" replace />;
+    case 'cancellation': return <Navigate to="/tables" replace />;   // opens a table to cancel items
     case 'juice':      return <Navigate to="/kitchen" replace />;
 
     // ── Management roles ───────────────────────────────────────────────────

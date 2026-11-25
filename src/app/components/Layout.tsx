@@ -28,7 +28,12 @@ export function Layout() {
 
   // Roles that run full-screen with no sidebar. Super Waiter is included: it
   // reaches Invoices/Quotations through the in-screen "Options" menu instead.
-  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter', 'swaiter'].includes(currentUser.role);
+  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter', 'swaiter', 'cancellation'].includes(currentUser.role);
+  // Full-screen roles move between their screens with these links (waiters: back to the menu from Tables).
+  const posLinks: [string, string][] =
+    currentUser.role === 'cashier' ? [['/tables', 'Tables'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']]
+    : ['waiter', 'swaiter'].includes(currentUser.role) ? [['/dashboard', 'Menu'], ['/tables', 'Tables']]
+    : [];
   if (isPOSOnlyRole) {
     // These roles only exist in the installed app, where logout just drops the
     // staff PIN (the device stays bound) — so the next person can PIN in.
@@ -40,9 +45,9 @@ export function Layout() {
             <span className="font-semibold" dir="auto">{currentUser.name}</span>
             <span className="text-gray-400 capitalize"> · {currentUser.role}</span>
           </p>
-          {currentUser.role === 'cashier' && (
+          {posLinks.length > 0 && (
             <nav className="order-last sm:order-none w-full sm:w-auto min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar">
-              {[['/tables', 'Tables'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']].map(([to, label]) => (
+              {posLinks.map(([to, label]) => (
                 <NavLink key={to} to={to}
                   className={({ isActive }) => `min-h-11 px-3 flex items-center rounded-lg text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white text-gray-900' : 'hover:bg-white/10'}`}>
                   {label}

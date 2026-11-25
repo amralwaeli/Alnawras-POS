@@ -237,7 +237,25 @@ export class PrintService {
     return `TABLE ${order.tableNumber ?? '?'}${no}`;
   }
 
-  static formatKitchenTicket(order: any, newItems: any[], stationName: string): PrintLine[] {
+  /** Printed at the item's station when an item is cancelled after it was sent. */
+  static formatCancelTicket(order: any, item: any, by: string, reason?: string): PrintLine[] {
+    const when = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
+    const clean = cleanPrintText;
+    const lines: PrintLine[] = [
+      { text: '*** CANCELLED ***', style: 'large', align: 'center' },
+      { text: PrintService.ticketLabel(order), style: 'large', align: 'center' },
+      { text: when, align: 'left' },
+      { text: `By: ${clean(by)}`, align: 'left' },
+      'rule',
+      { text: `${clean(item.quantity)} x ${clean(item.product_name || item.productName || 'Item')}`, style: 'large' },
+    ];
+    for (const m of (Array.isArray(item.modifiers) ? item.modifiers : [])) lines.push({ text: `     + ${clean(m.optionName || m.option_name || '')}`, style: 'bold' });
+    if (reason) lines.push({ text: `Reason: ${clean(reason)}`, style: 'bold' });
+    lines.push({ text: 'DO NOT PREPARE', style: 'large', align: 'center' }, 'rule');
+    return lines;
+  }
+
+  static formatKitchenTicket(order: any, newItems: any[], stationName: string, addOn = false): PrintLine[] {
     // English date/time whatever the tablet's language (an Arabic tablet printed "٧:٤٦ م").
     const when = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
     const stationDisplayNames: Record<string, string> = { kitchen: 'KITCHEN', juice: 'DRINKS', shawarma: 'SHAWARMA' };
@@ -250,6 +268,8 @@ export class PrintService {
     const lines: PrintLine[] = [
       { text: `${title} TICKET`, align: 'center' },
       { text: PrintService.ticketLabel(order), style: 'large', align: 'center' },
+      // More items for a table that already ordered: the kitchen adds them to that table's food.
+      ...(addOn ? [{ text: '*** ADD ON ***', style: 'large' as const, align: 'center' as const }] : []),
       { text: when, align: 'left' },
       ...(staff ? [{ text: staff, align: 'left' as const }] : []),
       'rule',

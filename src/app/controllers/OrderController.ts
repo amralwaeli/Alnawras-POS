@@ -155,6 +155,7 @@ export class OrderController {
       const createdNewOrder = !params.existingOrderId;
       let finalOrder: any = null;
       let printItems: any[] = rows;
+      let sentOnline = false;
       try {
         // A bill not on the server yet cannot take items directly: straight to the queue.
         if (newOrderRow || billIsQueued) throw new TypeError('Bill is queued offline');
@@ -169,6 +170,7 @@ export class OrderController {
 
         // Print the SERVER-priced items (product_name → productName for the ticket).
         printItems = (priced ?? []).map((r: any) => ({ ...r, productName: r.product_name }));
+        sentOnline = true;
 
         // A dine-in table only becomes "occupied" once real items are sent — this
         // covers group orders, whose shared order is created empty on scan.
@@ -217,6 +219,10 @@ export class OrderController {
         if (printers.length) {
           const activePrinters = printers.filter((p: any) => p.isActive && p.type === 'network');
 
+          // ADD ON: items for a bill that already had items (online: it has more live items than
+          // this send; offline: we added to an existing bill).
+          const liveItems = (finalOrder.items ?? []).filter((i: any) => i.status !== 'cancelled').length;
+          const addOn = !createdNewOrder && (sentOnline ? liveItems > printItems.length : true);
           // Group new items by their station.
           const itemsByStation: Record<string, any[]> = {};
           printItems.forEach(item => {
@@ -231,7 +237,7 @@ export class OrderController {
             for (const station of printerStations) {
               const stationItems = itemsByStation[station];
               if (stationItems && stationItems.length > 0) {
-                const ticket = PrintService.formatKitchenTicket(finalOrder, stationItems, station);
+                const ticket = PrintService.formatKitchenTicket(finalOrder, stationItems, station, addOn);
                 // Not awaited: a switched-off printer must not hold up sending the order.
                 void PrintService.sendToPrinter({
                   printerIp: printer.ipAddress,
@@ -275,7 +281,30 @@ export class OrderController {
       p_reason: reason ?? null, p_actor_id: actor.id, p_actor_name: actor.name,
     });
     if (error) return { success: false, error: error.message };
+    void OrderController.printCancelTicket(itemId, orderId, branchId, actor.name, reason);
     return { success: true, data: undefined };
+  }
+
+  /** Tells the item's station (its printer) that the item was cancelled. Best effort: the
+   *  kitchen screen also shows the cancellation, so a printer problem only shows a warning. */
+  private static async printCancelTicket(itemId: string, orderId: string, branchId: string, by: string, reason?: string) {
+    try {
+      const [{ data: item }, { data: order }] = await Promise.all([
+        supabase.from('order_items').select('product_name, quantity, station, modifiers').eq('id', itemId).single(),
+        supabase.from('orders').select('order_type, table_number, bill_number').eq('id', orderId).single(),
+      ]);
+      if (!item || !order) return;
+      const station = item.station || 'kitchen';
+      const label = { orderType: order.order_type, tableNumber: order.table_number, billNumber: order.bill_number };
+      for (const printer of cachedPrinters(branchId).filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes(station))) {
+        void PrintService.sendToPrinter({
+          printerIp: printer.ipAddress!, printerPort: printer.port || 9100,
+          bytes: PrintService.render(PrintService.formatCancelTicket(label, item, by, reason), printer.paperWidth),
+        }).then(res => { if (!res.success) toast.error(`Cancel ticket not printed on ${printer.name || printer.ipAddress}: ${res.error}`); });
+      }
+    } catch (err) {
+      console.warn('[OrderController] cancel ticket not printed', err);
+    }
   }
 
   /** Next zero-padded bill number for a branch, per order type. Uses the atomic

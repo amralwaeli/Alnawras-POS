@@ -5,7 +5,7 @@ import { OrderController } from '../../controllers/OrderController';
 import {
   Plus, Minus, ShoppingCart, Layers, X,
   Search, CheckCircle2, ShoppingBag, Utensils, ArrowLeft,
-  FileText, Receipt, ChevronDown, Package, Copy, Check, LayoutGrid
+  FileText, Receipt, ChevronDown, Package, Copy, Check, LayoutGrid, Trash2
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { createPickupToken } from '../../services/PickupService';
@@ -441,6 +441,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                   <div key={item.id} className="bg-orange-50/50 rounded-2xl p-3 min-[360px]:p-4 border border-orange-100 shadow-sm space-y-2">
                     <div className="flex items-center gap-2 min-[360px]:gap-3">
                       <div className="flex-1 min-w-0"><h4 dir="auto" className="font-bold text-gray-800 text-sm leading-tight break-words">{item.productName}</h4>{!!item.modifiers?.length && <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-0.5 whitespace-nowrap">RM {item.price.toFixed(2)}</p></div>
+                      <button onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} aria-label="Remove item" title="Remove (not sent)" className="size-11 shrink-0 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="size-4" /></button>
                       <div className="flex items-center shrink-0 bg-white rounded-xl border-2 border-orange-100 p-0.5 gap-0.5 shadow-sm">
                         <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} aria-label="Decrease quantity" className="size-11 flex items-center justify-center text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                         <span className="font-black text-gray-900 min-w-5 text-center text-sm">{item.quantity}</span>
@@ -589,6 +590,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
                   <div key={item.id} className="bg-orange-50/50 rounded-3xl p-4 xl:p-5 border border-orange-100 animate-in slide-in-from-right-4 shadow-sm space-y-2">
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0"><h4 dir="auto" className="font-bold text-gray-800 text-sm leading-tight break-words">{item.productName}</h4>{!!item.modifiers?.length && <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map(m => m.optionName).join(', ')}</p>}<p className="text-orange-600 font-black text-xs mt-1 whitespace-nowrap">RM {item.price.toFixed(2)}</p></div>
+                      <button onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} aria-label="Remove item" title="Remove (not sent)" className="size-11 shrink-0 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="size-4" /></button>
                       <div className="flex items-center shrink-0 bg-white rounded-2xl border-2 border-orange-100 p-0.5 gap-1 shadow-sm">
                         <button onClick={() => setCartItems(prev => prev.map(i => i.id === item.id ? {...i, quantity: Math.max(0, i.quantity - 1)} : i).filter(i => i.quantity > 0))} aria-label="Decrease quantity" className="size-11 flex items-center justify-center text-orange-500 hover:bg-orange-50 rounded-lg"><Minus className="size-4" strokeWidth={3} /></button>
                         <span className="font-black text-gray-900 min-w-5 text-center text-sm">{item.quantity}</span>

@@ -45,6 +45,7 @@ export function ProductManagementView() {
     reorderPoint: '',
     trackStock: false,
     station: 'kitchen' as string,
+    alsoStations: [] as string[],
     image: '',
   });
 
@@ -74,6 +75,7 @@ export function ProductManagementView() {
       reorderPoint: '',
       trackStock: false,
       station: 'kitchen',
+      alsoStations: [],
       image: '',
     });
     setImageBlob(null);
@@ -170,6 +172,7 @@ export function ProductManagementView() {
       trackStock: productFormData.trackStock,
       branchId,
       station: productFormData.station,
+      alsoStations: productFormData.alsoStations.filter(s => s !== productFormData.station),
       image: imageUrl,
       kitchenStatus: 'available' as const,
       isActive: true,
@@ -264,6 +267,7 @@ export function ProductManagementView() {
       reorderPoint: product.reorderPoint.toString(),
       trackStock: product.trackStock,
       station: product.station || 'kitchen',
+      alsoStations: product.alsoStations ?? [],
       image: product.image || '',
     });
     setImageBlob(null);
@@ -755,6 +759,23 @@ export function ProductManagementView() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500 mt-1">Where orders for this product are sent for preparation</p>
+              {/* e.g. a shawarma plate: shawarma makes the meat, the kitchen the rice */}
+              <p className="text-sm font-medium mt-3">Also print at</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                {[['kitchen', 'Kitchen'], ['juice', 'Drinks'], ['shawarma', 'Shawarma']]
+                  .filter(([id]) => id !== productFormData.station)
+                  .map(([id, label]) => (
+                    <label key={id} className="flex items-center gap-2 min-h-9 text-sm">
+                      <input type="checkbox" className="size-4 accent-orange-500"
+                        checked={productFormData.alsoStations.includes(id)}
+                        onChange={e => setProductFormData(prev => ({
+                          ...prev,
+                          alsoStations: e.target.checked ? [...prev.alsoStations, id] : prev.alsoStations.filter(s => s !== id),
+                        }))} />
+                      {label}
+                    </label>
+                  ))}
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

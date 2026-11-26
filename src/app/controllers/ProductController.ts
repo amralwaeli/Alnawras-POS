@@ -68,6 +68,7 @@ export class ProductController {
           track_stock: productData.trackStock ?? false,
           branch_id: productData.branchId,
           station: productData.station || 'kitchen',
+          also_stations: productData.alsoStations ?? [],
           availability_status: productData.availabilityStatus || 'available',
           kitchen_status: productData.availabilityStatus || 'available',
           is_active: true,
@@ -122,6 +123,7 @@ export class ProductController {
       if (updates.isActive !== undefined)            payload.is_active = updates.isActive;
       if (updates.menuRow !== undefined)             payload.menu_row = updates.menuRow;
       if (updates.menuPos !== undefined)             payload.menu_pos = updates.menuPos;
+      if (updates.alsoStations !== undefined)        payload.also_stations = updates.alsoStations;
 
       const { error } = await supabase
         .from('products')

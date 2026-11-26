@@ -16,6 +16,8 @@ export interface ModifierOptionInput {
   name: string;
   addOnPrice: number;
   isDefault: boolean;
+  /** Prints at this station instead of with the item (migration 0053); null = with the item. */
+  station?: string | null;
 }
 
 export interface ModifierGroupInput {
@@ -155,6 +157,7 @@ export class ModifierController {
       name: o.name.trim(),
       add_on_price: Number.isFinite(o.addOnPrice) ? o.addOnPrice : 0,
       is_default: !!o.isDefault,
+      station: o.station || null,
       display_order: i,
     }));
     const { error } = await supabase.from('modifier_options').insert(rows);

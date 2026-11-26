@@ -87,6 +87,7 @@ export const mapProduct = (row: any): Product => ({
   createdAt: row.created_at ? new Date(row.created_at) : new Date(),
   menuRow: row.menu_row ?? 0,
   menuPos: row.menu_pos ?? 0,
+  alsoStations: row.also_stations ?? [],
 });
 
 export const mapCategory = (row: any): Category => ({
@@ -150,6 +151,7 @@ export const mapModifierOption = (row: any): ModifierOption => ({
   addOnPrice: Number(row.add_on_price ?? 0),
   isDefault: row.is_default ?? false,
   displayOrder: row.display_order ?? 0,
+  station: row.station ?? null,
 });
 
 export const mapModifierGroup = (row: any): ModifierGroup => ({

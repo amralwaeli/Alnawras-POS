@@ -13,9 +13,9 @@ import { ModifierController } from '../../controllers/ModifierController';
 import type { ModifierGroup } from '../../models/types';
 import { friendlyError } from '../../../lib/errors';
 
-interface OptionRow { name: string; addOnPrice: string; isDefault: boolean }
+interface OptionRow { name: string; addOnPrice: string; isDefault: boolean; station: string }
 
-const emptyOption = (): OptionRow => ({ name: '', addOnPrice: '0', isDefault: false });
+const emptyOption = (): OptionRow => ({ name: '', addOnPrice: '0', isDefault: false, station: '' });
 
 export function ModifierManagementView() {
   const { products, currentUser } = usePOS();
@@ -62,7 +62,7 @@ export function ModifierManagementView() {
     setName(g.name);
     setType(g.type);
     setOptions(g.options.length
-      ? g.options.map(o => ({ name: o.name, addOnPrice: String(o.addOnPrice), isDefault: o.isDefault }))
+      ? g.options.map(o => ({ name: o.name, addOnPrice: String(o.addOnPrice), isDefault: o.isDefault, station: o.station ?? '' }))
       : [emptyOption()]);
     setLinkedIds(new Set(g.productIds ?? []));
     setProductSearch('');
@@ -109,6 +109,7 @@ export function ModifierManagementView() {
         name: o.name.trim(),
         addOnPrice: parseFloat(o.addOnPrice) || 0,
         isDefault: o.isDefault,
+        station: o.station || null,
       })),
       productIds: Array.from(linkedIds) as string[],
     };
@@ -265,6 +266,15 @@ export function ModifierManagementView() {
                       <Button type="button" size="sm" variant="ghost" className="text-red-500 px-0" onClick={() => removeOption(i)} aria-label="Remove option">
                         <Trash2 className="size-4" />
                       </Button>
+                      {/* e.g. the free juice of a family meal prints on the drinks ticket */}
+                      <select value={o.station} onChange={e => setOption(i, { station: e.target.value })}
+                        aria-label="Where this choice prints"
+                        className="col-span-full -mt-1 mb-1 min-h-9 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-600">
+                        <option value="">Prints with the item</option>
+                        <option value="kitchen">Also prints at: Kitchen</option>
+                        <option value="juice">Also prints at: Drinks</option>
+                        <option value="shawarma">Also prints at: Shawarma</option>
+                      </select>
                     </div>
                   ))}
                 </div>

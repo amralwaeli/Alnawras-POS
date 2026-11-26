@@ -135,6 +135,8 @@ export interface Product {
   /** Cell in its category's menu grid (Manage Menu → Arrange, migration 0051). */
   menuRow?: number;
   menuPos?: number;
+  /** Also prints at these stations, e.g. a shawarma plate at the kitchen for the rice (0053). */
+  alsoStations?: string[];
 }
 
 // ── Modifiers ──────────────────────────────────────────────────────────────
@@ -145,6 +147,8 @@ export interface ModifierOption {
   addOnPrice: number;
   isDefault: boolean;
   displayOrder: number;
+  /** Station that makes this choice when it isn't the item's own (e.g. a free juice → drinks). */
+  station?: string | null;
 }
 
 export interface ModifierGroup {

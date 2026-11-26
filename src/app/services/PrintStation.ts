@@ -75,27 +75,47 @@ async function runOnce(branchId: string) {
   }
 }
 
+/**
+ * The ticket lines each station gets for one send: an item at its own station and at every
+ * "also print at" station; a choice with its own station (e.g. the free juice of a family
+ * meal) as a line of its own there, saying which item it is for (migration 0053).
+ */
+export function routeItems(items: any[]): Map<string, any[]> {
+  const out = new Map<string, any[]>();
+  const add = (station: string, line: any) => out.set(station, [...(out.get(station) ?? []), line]);
+  for (const it of items) {
+    const main = it.station || 'kitchen';
+    const here = new Set([main, ...(it.also ?? [])]);
+    for (const s of here) add(s, it);
+    for (const m of Array.isArray(it.modifiers) ? it.modifiers : []) {
+      const s = it.option_stations?.[m.optionId];
+      if (s && !here.has(s)) {
+        add(s, { id: it.id, product_name: m.optionName, quantity: it.quantity, modifiers: [],
+                 notes: `for ${it.product_name}`, added_by_name: it.added_by_name });
+      }
+    }
+  }
+  return out;
+}
+
 type Job = { ids: string[]; cancel: boolean; station: string; lines: (paper?: 58 | 80) => ReturnType<typeof PrintService.render> };
 
 async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   if (!items.length && !cancels.length) return;
   const label = (r: any) => ({ orderType: r.order_type, tableNumber: r.table_number, billNumber: r.bill_number });
 
-  // One ticket per send (same bill, same moment) per station; one per cancelled item.
-  const groups = new Map<string, any[]>();
-  for (const it of items) {
-    const k = `${it.order_id}|${it.created_at}|${it.station || 'kitchen'}`;
-    groups.set(k, [...(groups.get(k) ?? []), it]);
-  }
+  // One ticket per send (same bill, same moment) per station; one per cancelled item and station.
+  const sends = new Map<string, any[]>();
+  for (const it of items) sends.set(`${it.order_id}|${it.created_at}`, [...(sends.get(`${it.order_id}|${it.created_at}`) ?? []), it]);
   const jobs: Job[] = [
-    ...[...groups.values()].map(g => ({
-      ids: g.map(i => i.id), cancel: false, station: g[0].station || 'kitchen',
-      lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatKitchenTicket(label(g[0]), g, g[0].station || 'kitchen', g[0].add_on), paper),
-    })),
-    ...cancels.map(c => ({
-      ids: [c.id], cancel: true, station: c.station || 'kitchen',
+    ...[...sends.values()].flatMap(g => [...routeItems(g)].map(([station, lines]) => ({
+      ids: [...new Set(lines.map(l => l.id))], cancel: false, station,
+      lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatKitchenTicket(label(g[0]), lines, station, g[0].add_on), paper),
+    }))),
+    ...cancels.flatMap(c => [...new Set([c.station || 'kitchen', ...(c.also ?? [])])].map(station => ({
+      ids: [c.id], cancel: true, station,
       lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatCancelTicket(label(c), c, c.by || '', c.reason || undefined), paper),
-    })),
+    }))),
   ];
 
   const printers = cachedPrinters(branchId).filter(p => p.isActive && p.type === 'network' && p.ipAddress);
@@ -116,14 +136,16 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   // A ticket counts as printed when any printer of its station took it; a station with no
   // printer has nothing to print (e.g. a kitchen screen). The rest go back, with the reason
   // the waiter sees, and are tried again on the next round.
+  // An item printed on several tickets is printed only when all of them printed.
   const covered = (j: Job) => printers.some(p => (p.stations?.length ? p.stations : ['kitchen']).includes(j.station));
-  const done = jobs.filter(j => !j.cancel && (printedOk.has(j) || !covered(j))).flatMap(j => j.ids);
   const failed = jobs.filter(j => covered(j) && !printedOk.has(j));
+  const failedItems = new Set(failed.filter(j => !j.cancel).flatMap(j => j.ids));
+  const done = [...new Set(jobs.filter(j => !j.cancel).flatMap(j => j.ids))].filter(id => !failedItems.has(id));
   if (done.length) await supabase.rpc('confirm_print_jobs', { p_branch_id: branchId, p_item_ids: done });
   if (failed.length) {
     await supabase.rpc('release_print_jobs', {
       p_branch_id: branchId,
-      p_item_ids: failed.filter(j => !j.cancel).flatMap(j => j.ids),
+      p_item_ids: [...failedItems],
       p_cancel_ids: failed.filter(j => j.cancel).flatMap(j => j.ids),
       p_error: errors.get(failed.find(j => !j.cancel) ?? failed[0]) ?? 'Printer did not print',
     });

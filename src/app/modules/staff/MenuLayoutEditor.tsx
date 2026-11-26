@@ -13,7 +13,8 @@ import { MENU_COLS, placeItems, dropOn, type Cell } from '../../components/MenuR
  */
 export function MenuLayoutEditor({ products }: { products: Product[] }) {
   const { updateProduct } = usePOS();
-  const [cells, setCells] = useState(() => placeItems(products));
+  const [start, setStart] = useState(() => placeItems(products));
+  const [cells, setCells] = useState(start);
   const [drag, setDrag] = useState<{ id: string; x0: number; y0: number; dx: number; dy: number } | null>(null);
   const [over, setOver] = useState<Cell | null>(null);
   const [saving, setSaving] = useState(false);
@@ -21,6 +22,10 @@ export function MenuLayoutEditor({ products }: { products: Product[] }) {
   const rows = Math.max(-1, ...[...cells.values()].map(c => c.row)) + 2;   // one spare row to drop into
   const at = new Map([...cells].map(([id, c]) => [`${c.row},${c.col}`, id]));
   const byId = new Map(products.map(p => [p.id, p]));
+  // Moved by the admin since the editor opened (enables Save)…
+  const moved = products.some(p => { const a = cells.get(p.id), b = start.get(p.id); return a && b && (a.row !== b.row || a.col !== b.col); });
+  // …and every item whose square differs from the database, so the whole grid gets fixed on save
+  // (a never-arranged menu has all items saved at the first square).
   const changed = products.filter(p => {
     const c = cells.get(p.id);
     return c && (c.row !== (p.menuRow ?? 0) || c.col !== (p.menuPos ?? 0));
@@ -60,7 +65,7 @@ export function MenuLayoutEditor({ products }: { products: Product[] }) {
     setSaving(false);
     const failed = results.filter(r => !r?.success).length;
     if (failed) toast.error(`${failed} item(s) could not be saved — try again`);
-    else toast.success('Menu layout saved');
+    else { setStart(cells); toast.success('Menu layout saved'); }
   };
 
   if (!products.length) return <p className="py-10 text-center text-gray-500">No products in this tab yet.</p>;
@@ -69,9 +74,9 @@ export function MenuLayoutEditor({ products }: { products: Product[] }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-500">Drag an item to any square. Drop it on another item to swap them.</p>
-        <Button onClick={save} disabled={!changed.length || saving}>
+        <Button onClick={save} disabled={!moved || saving}>
           {saving ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Save className="size-4 mr-2" />}
-          Save layout{changed.length ? ` (${changed.length})` : ''}
+          Save layout
         </Button>
       </div>
       <div className="grid gap-2 select-none" style={{ gridTemplateColumns: `repeat(${MENU_COLS}, minmax(0, 1fr))` }}>

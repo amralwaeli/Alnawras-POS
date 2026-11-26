@@ -58,6 +58,7 @@ export const ROLE_METRICS: Record<string, MetricKey[]> = {
   cashier: ['attendance', 'paymentsProcessed', 'customerFeedback', 'managerEvaluation'],
   kitchen: ['attendance', 'customerFeedback', 'managerEvaluation'],
   juice: ['attendance', 'customerFeedback', 'managerEvaluation'],
+  shawarma: ['attendance', 'customerFeedback', 'managerEvaluation'],
   manager: ['attendance', 'customerFeedback', 'managerEvaluation'],
   supervisor: ['attendance', 'customerFeedback', 'managerEvaluation'],
   hr: ['attendance', 'managerEvaluation'],

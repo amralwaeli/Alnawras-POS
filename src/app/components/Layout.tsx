@@ -29,7 +29,7 @@ export function Layout() {
 
   // Roles that run full-screen with no sidebar. Super Waiter is included: it
   // reaches Invoices/Quotations through the in-screen "Options" menu instead.
-  const isPOSOnlyRole = ['kitchen', 'cashier', 'waiter', 'swaiter', 'cancellation'].includes(currentUser.role);
+  const isPOSOnlyRole = ['kitchen', 'juice', 'shawarma', 'cashier', 'waiter', 'swaiter', 'cancellation'].includes(currentUser.role);
   // Full-screen roles move between their screens with these links (waiters: back to the menu from Tables).
   const posLinks: [string, string][] =
     // Waiters move between Menu and Tables with the buttons on those screens.
@@ -138,6 +138,7 @@ export function Layout() {
     kitchen:    'from-orange-500 to-amber-600',
     hr:         'from-pink-500 to-rose-600',
     juice:      'from-yellow-500 to-amber-500',
+    shawarma:   'from-amber-500 to-orange-600',
     staff:      'from-teal-500 to-cyan-600',
     accounting: 'from-indigo-500 to-blue-600',
   };

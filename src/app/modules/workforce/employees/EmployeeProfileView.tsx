@@ -29,7 +29,7 @@ const cur  = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2
 
 const ROLE_COLORS: Record<string, string> = {
   cashier: 'bg-blue-100 text-blue-700', waiter: 'bg-emerald-100 text-emerald-700',
-  kitchen: 'bg-orange-100 text-orange-700', juice: 'bg-yellow-100 text-yellow-700',
+  kitchen: 'bg-orange-100 text-orange-700', juice: 'bg-yellow-100 text-yellow-700', shawarma: 'bg-amber-100 text-amber-800',
   hr: 'bg-pink-100 text-pink-700', accounting: 'bg-indigo-100 text-indigo-700',
   manager: 'bg-violet-100 text-violet-700', supervisor: 'bg-cyan-100 text-cyan-700',
   staff: 'bg-teal-100 text-teal-700',

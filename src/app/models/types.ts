@@ -7,7 +7,7 @@ export type Result<T> = { success: true; data: T; error?: undefined } | { succes
 
 // ==================== User & Authentication ====================
 
-export type UserRole = 'admin' | 'cashier' | 'waiter' | 'swaiter' | 'kitchen' | 'hr' | 'juice' | 'staff' | 'accounting' | 'manager' | 'supervisor' | 'cancellation';
+export type UserRole = 'admin' | 'cashier' | 'waiter' | 'swaiter' | 'kitchen' | 'hr' | 'juice' | 'shawarma' | 'staff' | 'accounting' | 'manager' | 'supervisor' | 'cancellation';
 
 export interface User {
   id: string;
@@ -508,6 +508,25 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageLeave: false,
     canViewOwnAttendance: true,
   },
+  shawarma: {
+    canVoidSentItems: false,
+    canViewTables: false,
+    canAddOrders: false,
+    canProcessPayments: false,
+    canManageInventory: true,
+    canViewReports: false,
+    canViewOrderingDashboard: false,
+    canManageStaff: false,
+    canManageAccounting: false,
+    canExportReports: false,
+    canImportProducts: false,
+    canViewAttendance: false,
+    canCheckIn: true,
+    canManageInvoicesQuotations: false,
+    canManagePayroll: false,
+    canManageLeave: false,
+    canViewOwnAttendance: true,
+  },
   hr: {
     canVoidSentItems: false,
     canViewTables: false,
@@ -660,6 +679,7 @@ export const ROLE_META: RoleMeta[] = [
   { value: 'swaiter',    label: 'Super Waiter', badgeClass: 'bg-emerald-200 text-emerald-900', assignable: true },
   { value: 'kitchen',    label: 'Kitchen',      badgeClass: 'bg-orange-100 text-orange-700',  assignable: true },
   { value: 'juice',      label: 'Juice Bar',    badgeClass: 'bg-yellow-100 text-yellow-700',  assignable: true },
+  { value: 'shawarma',   label: 'Shawarma',     badgeClass: 'bg-amber-100 text-amber-800',    assignable: true },
   { value: 'accounting', label: 'Accountant',   badgeClass: 'bg-indigo-100 text-indigo-700',  assignable: true },
   { value: 'hr',         label: 'HR',           badgeClass: 'bg-pink-100 text-pink-700',      assignable: true },
   { value: 'staff',      label: 'Staff',        badgeClass: 'bg-teal-100 text-teal-700',      assignable: true },

@@ -27,10 +27,13 @@ const STATUS_STYLE: Record<string, { badge: string; btn: string; label: string }
 
 export function KitchenView() {
   const { products, currentUser, updateProduct, setProducts, orders, setOrders } = usePOS();
-  const [tab, setTab]             = useState<'orders' | 'products' | 'order-request'>('orders');
+  // Kitchen / Juice Bar / Shawarma staff: only their station's inventory (their tickets print).
+  const myStation = ({ kitchen: 'kitchen', juice: 'juice', shawarma: 'shawarma' } as Record<string, string>)[currentUser?.role ?? ''];
+  const [tab, setTab]             = useState<'orders' | 'products' | 'order-request'>(myStation ? 'products' : 'orders');
   const [newAlert, setNewAlert]   = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
-  const [station, setStation] = useState(savedStation);
+  const [pickedStation, setStation] = useState(savedStation);
+  const station = myStation ?? pickedStation;
   const stations = useMemo(() => loadStations().filter(s => s.id !== 'cashier'), []);
   const chooseStation = (id: string) => { setStation(id); try { localStorage.setItem(STATION_KEY, id); } catch { /* ignore */ } };
   const forHere = (i: { station?: string }) => station === 'all' || (i.station || 'kitchen') === station;
@@ -83,7 +86,7 @@ export function KitchenView() {
         });
       }
     }
-    if (added) {
+    if (added && !myStation) {   // station staff get printed tickets, no screen beep
       setNewAlert(true);
       new Audio('/notification.mp3').play().catch(() => {});
       setTimeout(() => setNewAlert(false), 5000);
@@ -114,10 +117,11 @@ export function KitchenView() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (!inventorySearch.trim()) return products;
+    const mine = products.filter(forHere);
+    if (!inventorySearch.trim()) return mine;
     const q = inventorySearch.toLowerCase();
-    return products.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
-  }, [products, inventorySearch]);
+    return mine.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+  }, [products, inventorySearch, station]);
 
   const counts = {
     available:   filteredProducts.filter(p => (p.kitchenStatus || 'available') === 'available').length,
@@ -135,7 +139,9 @@ export function KitchenView() {
             <ChefHat className="size-7 text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic truncate">Kitchen Display</h1>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic truncate">
+              {myStation ? (stations.find(s => s.id === myStation)?.name ?? myStation) : 'Kitchen Display'}
+            </h1>
             <div className="flex flex-wrap items-center gap-x-2 mt-0.5">
               <p className="text-orange-500 text-[10px] font-bold uppercase tracking-[0.2em]">Live Monitoring</p>
               <span className={`flex items-center gap-1 text-[10px] font-bold ${connected ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -145,24 +151,24 @@ export function KitchenView() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 max-w-full">
-          {newAlert && (
+          {newAlert && !myStation && (
             <div className="flex items-center gap-2 bg-orange-500 text-white px-4 sm:px-6 py-2.5 rounded-full font-black text-sm whitespace-nowrap animate-bounce shadow-lg shadow-orange-500/30">
               <Bell className="size-4" /> NEW ORDER
             </div>
           )}
-          <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+          {!myStation && <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
             Station
             <select value={station} onChange={e => chooseStation(e.target.value)} aria-label="Station shown on this screen"
               className="min-h-11 bg-[#0B0E14] border border-white/[0.1] rounded-xl px-3 text-xs font-bold text-white normal-case tracking-normal">
               {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               <option value="all">All stations</option>
             </select>
-          </label>
+          </label>}
           <div className="flex max-w-full overflow-x-auto no-scrollbar bg-[#0B0E14] rounded-2xl p-1.5 border border-white/[0.06]">
-            <button onClick={() => setTab('orders')}
+            {!myStation && <button onClick={() => setTab('orders')}
               className={`min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
               Tickets ({tickets.length})
-            </button>
+            </button>}
             <button onClick={() => setTab('products')}
               className={`min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === 'products' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}>
               Inventory

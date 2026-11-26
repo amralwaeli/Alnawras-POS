@@ -103,6 +103,7 @@ function LandingPage() {
     case 'kitchen':    return <Navigate to="/kitchen" replace />;
     case 'cancellation': return <Navigate to="/tables" replace />;   // opens a table to cancel items
     case 'juice':      return <Navigate to="/kitchen" replace />;
+    case 'shawarma':   return <Navigate to="/kitchen" replace />;
 
     // ── Management roles ───────────────────────────────────────────────────
     case 'manager':    return <Navigate to="/admin-dashboard" replace />;

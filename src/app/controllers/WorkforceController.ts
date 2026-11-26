@@ -13,7 +13,7 @@ const uid = (prefix: string) =>
 // ─── Department default by role ───────────────────────────────────────────────
 const defaultDepartment = (role: string): string => {
   const map: Record<string, string> = {
-    kitchen: 'Kitchen', juice: 'Kitchen',
+    kitchen: 'Kitchen', juice: 'Kitchen', shawarma: 'Kitchen',
     cashier: 'Cashier',
     waiter: 'Service', swaiter: 'Service',
     hr: 'HR',

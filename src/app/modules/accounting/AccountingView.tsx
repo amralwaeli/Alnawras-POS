@@ -1,3 +1,4 @@
+import { addExpense } from '../../controllers/ExpenseController';
 import { useEffect, useState } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { TrendingUp, TrendingDown, DollarSign, Download, Plus, X } from 'lucide-react';
@@ -88,33 +89,13 @@ export function AccountingView() {
     const amount = parseFloat(form.amount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     setSaving(true);
-    const id = `exp-${crypto.randomUUID()}`;
-    const { error } = await supabase.from('expenses').insert([{
-      id,
-      branch_id:        currentUser.branchId,
-      category:         form.category,
-      description,
-      amount,
-      date:             form.date,
-      created_by:       currentUser.id,
-      created_by_name:  currentUser.name,
-      status:           'approved',
-      employee_id:      employee?.id ?? null,
-      employee_name:    employee?.name ?? null,
-      from_drawer:      form.fromDrawer,
-    }]);
-    if (error) {
+    const res = await addExpense({ category: form.category, description, amount, date: form.date, employee, fromDrawer: form.fromDrawer }, currentUser);
+    if (!res.success) {
       toast.error('Failed to save expense');
       setSaving(false);
       return;
     }
-    setExpenses(prev => [{
-      id, branchId: currentUser.branchId, category: form.category,
-      description, amount,
-      date: new Date(form.date), createdBy: currentUser.id,
-      createdByName: currentUser.name, status: 'approved',
-      employeeId: employee?.id, employeeName: employee?.name, fromDrawer: form.fromDrawer,
-    }, ...prev]);
+    setExpenses(prev => [res.expense!, ...prev]);
     toast.success('Expense added');
     setShowModal(false);
     setForm(defaultForm());

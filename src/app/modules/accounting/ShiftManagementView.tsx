@@ -7,6 +7,8 @@ import { ReportsController } from '../../controllers/ReportsController';
 import { Clock, Banknote, CheckCircle, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 import { friendlyError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { localDateStr } from '../../../lib/date';
+import { addExpense } from '../../controllers/ExpenseController';
 import { useBranch } from '../../context/BranchContext';
 import { cachedPrinters } from '../../controllers/PrinterController';
 import { PrintService, cleanPrintText, type PrintLine } from '../../services/PrintService';
@@ -226,6 +228,8 @@ export function ShiftManagementView() {
             </div>
           </div>
 
+          <PayOutCard shift={currentShift} />
+
           <div className="bg-white rounded-[32px] border border-gray-100 p-5 sm:p-8 shadow-sm space-y-6">
             <div className="flex items-center gap-3 mb-2">
               <AlertCircle className="size-5 text-amber-500" />
@@ -252,6 +256,91 @@ export function ShiftManagementView() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Cash taken out of the drawer during the shift: salary advances (by employee) and small
+ *  purchases. Saved as expenses paid from the drawer; the shift report subtracts them. */
+function PayOutCard({ shift }: { shift: Shift }) {
+  const { currentUser, users } = usePOS();
+  const staff = users.filter(u => u.status === 'active' && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name));
+  const [list, setList] = useState<{ id: string; category: string; description: string; amount: number; employee_name?: string | null }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ category: 'salary', employeeId: '', amount: '', note: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from('expenses').select('id, category, description, amount, employee_name')
+      .eq('branch_id', shift.branch_id).eq('from_drawer', true).gte('created_at', shift.opened_at).order('created_at')
+      .then(({ data }) => setList((data ?? []).map((e: any) => ({ ...e, amount: Number(e.amount) }))));
+  }, [shift.id]);
+
+  const save = async () => {
+    const employee = form.category === 'salary' ? staff.find(u => u.id === form.employeeId) : undefined;
+    if (form.category === 'salary' && !employee) return toast.error('Choose the employee');
+    const amount = parseFloat(form.amount);
+    if (!(amount > 0)) return toast.error('Enter a valid amount');
+    const description = form.note.trim() || (employee ? 'Salary / advance' : '');
+    if (!description) return toast.error('Write what the money was for');
+    setSaving(true);
+    const res = await addExpense({
+      category: form.category, description, amount, date: localDateStr(new Date()),
+      employee: employee && { id: employee.id, name: employee.name }, fromDrawer: true,
+    }, currentUser!);
+    setSaving(false);
+    if (!res.success) return toast.error(friendlyError(res.error));
+    setList(l => [...l, { id: res.expense!.id, category: form.category, description, amount, employee_name: employee?.name }]);
+    setForm({ category: 'salary', employeeId: '', amount: '', note: '' });
+    setOpen(false);
+    toast.success('Paid out recorded');
+  };
+
+  const input = 'w-full min-h-11 px-3 border border-gray-200 rounded-xl text-sm bg-white';
+  return (
+    <div className="bg-white rounded-[32px] border border-gray-100 p-5 sm:p-8 shadow-sm space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-bold text-gray-900">Paid out from drawer</h3>
+        <button onClick={() => setOpen(o => !o)} className="min-h-11 px-4 rounded-xl bg-gray-900 text-white text-sm font-bold">
+          {open ? 'Cancel' : 'Pay out'}
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-3">
+          <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={input} aria-label="Type">
+            <option value="salary">Salary / advance</option>
+            <option value="supplies">Supplies</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="other">Other</option>
+          </select>
+          {form.category === 'salary' && (
+            <select value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} className={input} aria-label="Employee">
+              <option value="">Choose the employee…</option>
+              {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+          <input type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="Amount (RM)" value={form.amount}
+            onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={input} />
+          <input type="text" placeholder={form.category === 'salary' ? 'Note (optional)' : 'What was it for?'} value={form.note}
+            onChange={e => setForm(f => ({ ...f, note: e.target.value }))} className={input} />
+          <button onClick={save} disabled={saving} className="w-full min-h-11 rounded-xl bg-emerald-600 text-white font-bold disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      )}
+      {list.length === 0 ? <p className="text-sm text-gray-400">Nothing paid out this shift.</p> : (
+        <div className="divide-y divide-gray-100">
+          {list.map(e => (
+            <div key={e.id} className="py-2 flex justify-between gap-3 text-sm">
+              <span className="min-w-0 break-words" dir="auto">
+                <b className="capitalize">{e.category}</b>{e.employee_name ? `: ${e.employee_name}` : ''}
+                {e.description !== 'Salary / advance' && <span className="text-gray-500"> — {e.description}</span>}
+              </span>
+              <span className="shrink-0 font-bold">{fmt(e.amount)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

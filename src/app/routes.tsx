@@ -7,7 +7,7 @@ import { ROLE_PERMISSIONS, permissionsFor, BranchFeatureKey } from './models/typ
 
 function ProtectedRoute({ children, permission, adminOnly, feature }: {
   children: React.ReactNode;
-  permission?: keyof typeof ROLE_PERMISSIONS['admin'];
+  permission?: keyof typeof ROLE_PERMISSIONS['admin'] | (keyof typeof ROLE_PERMISSIONS['admin'])[];   // array: any of them
   adminOnly?: boolean;
   /** Redirect home if the branch's super-admin has this module disabled —
    *  blocks direct-URL access to a hidden feature, not just the nav link. */
@@ -17,7 +17,7 @@ function ProtectedRoute({ children, permission, adminOnly, feature }: {
   const { hasFeature } = useBranch();
   if (!currentUser) return <Navigate to="/" replace />;
   if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
-  if (permission && !permissionsFor(currentUser)?.[permission]) return <Navigate to="/" replace />;
+  if (permission && ![permission].flat().some(p => permissionsFor(currentUser)?.[p])) return <Navigate to="/" replace />;
   if (feature && !hasFeature(feature)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -175,7 +175,7 @@ export const router = createHashRouter([
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><AccountingView /></ProtectedRoute></Lazy> },
       { path: 'bill-format',         element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><BillFormatView /></ProtectedRoute></Lazy> },
-      { path: 'shifts',              element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><ShiftManagementView /></ProtectedRoute></Lazy> },
+      { path: 'shifts',              element: <Lazy><ProtectedRoute permission={['canManageAccounting', 'canProcessPayments']} feature="accounting"><ShiftManagementView /></ProtectedRoute></Lazy> },
       { path: 'quotations', element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" feature="invoices"><QuotationsView /></ProtectedRoute></Lazy> },
       { path: 'invoices',   element: <Lazy><ProtectedRoute permission="canManageInvoicesQuotations" feature="invoices"><InvoicesView /></ProtectedRoute></Lazy> },
 

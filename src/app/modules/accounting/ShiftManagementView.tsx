@@ -1,3 +1,4 @@
+import { isNativeApp } from '../../../lib/platform';
 import { useState, useEffect } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { ShiftController, Shift } from '../../controllers/ShiftController';
@@ -154,10 +155,12 @@ export function ShiftManagementView() {
           : `<div class="r${l.align === 'center' ? ' c' : ''}${l.style ? ' b' : ''}"><span>${esc(l.text)}</span>${l.value ? `<span>${esc(l.value)}</span>` : ''}</div>`).join('')}</body></html>`);
       win.document.close();
     };
-    if (!printers.length) return browserPrint();
+    // In the app a browser page opens Chrome on top of SmartPos: only the receipt printer there.
+    if (!isNativeApp()) return browserPrint();
+    if (!printers.length) return toast.error('No receipt printer set up — add one in Printers (station: Receipts)');
     for (const p of printers) {
       void PrintService.sendToPrinter({ printerIp: p.ipAddress!, printerPort: p.port || 9100, bytes: PrintService.render(lines, p.paperWidth) })
-        .then(r => { if (r.success) toast.success('Shift report printed'); else { toast.error(`Receipt printer ${p.name || p.ipAddress}: ${r.error}`); browserPrint(); } });
+        .then(r => r.success ? toast.success('Shift report printed') : toast.error(`Receipt printer ${p.name || p.ipAddress}: ${r.error}`));
     }
   };
 

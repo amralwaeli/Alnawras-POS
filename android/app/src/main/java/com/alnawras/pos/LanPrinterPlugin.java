@@ -35,6 +35,29 @@ public class LanPrinterPlugin extends Plugin {
     private static final int TIMEOUT_MS = 4000;
     private static final int MAX_BYTES = 2 * 1024 * 1024;
 
+    /** Print station on: keep the app running in the background (PrintStationService). */
+    @PluginMethod
+    public void startStation(PluginCall call) {
+        android.webkit.WebView w = getBridge().getWebView();
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            // The page's process keeps its priority while the app is behind another app.
+            w.setRendererPriorityPolicy(android.webkit.WebView.RENDERER_PRIORITY_IMPORTANT, false);
+        }
+        // Android 13+: ask once to show the "print station is on" notification (the service runs either way).
+        if (android.os.Build.VERSION.SDK_INT >= 33 && getContext().checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            getActivity().requestPermissions(new String[] { android.Manifest.permission.POST_NOTIFICATIONS }, 7101);
+        }
+        PrintStationService.start(getContext(), w);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopStation(PluginCall call) {
+        PrintStationService.stop(getContext());
+        call.resolve();
+    }
+
     @PluginMethod
     public void print(PluginCall call) {
         String host = call.getString("host");

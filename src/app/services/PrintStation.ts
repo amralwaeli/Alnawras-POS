@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { isNativeApp } from '../../lib/platform';
-import { PrintService } from './PrintService';
+import { PrintService, keepStationRunning } from './PrintService';
 import { cachedPrinters } from '../controllers/PrinterController';
 import { AlertService } from './AlertService';
 
@@ -40,9 +40,16 @@ export function startPrintStation(branchId: string) {
     .subscribe();
   const timer = setInterval(() => void runOnce(branchId), POLL_MS);
   window.addEventListener('online', soon);
+  // In the background Android pauses this page's timers: the app's service calls this every 5 s.
+  (window as any).__smartposStationTick = () => void runOnce(branchId);
+  void keepStationRunning(true);
   running = {
     branchId,
-    stop: () => { clearTimeout(debounce); clearInterval(timer); window.removeEventListener('online', soon); void supabase.removeChannel(channel); },
+    stop: () => {
+      clearTimeout(debounce); clearInterval(timer); window.removeEventListener('online', soon); void supabase.removeChannel(channel);
+      delete (window as any).__smartposStationTick;
+      void keepStationRunning(false);
+    },
   };
   void runOnce(branchId);
 }

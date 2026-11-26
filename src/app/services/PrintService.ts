@@ -15,7 +15,14 @@ export interface FoundPrinter { ip: string; port: number }
 const LanPrinter = registerPlugin<{
   print(o: { host: string; port: number; data: string }): Promise<void>;
   discover(): Promise<{ printers: FoundPrinter[]; networks: string[] }>;
+  startStation(): Promise<void>;
+  stopStation(): Promise<void>;
 }>('LanPrinter');
+
+/** Android app 1.4+: keep the print station running in the background (PrintStationService.java).
+ *  An older app has no such method: the station then only works while the app is on screen. */
+export const keepStationRunning = (on: boolean) =>
+  (on ? LanPrinter.startStation() : LanPrinter.stopStation()).catch(() => {});
 
 /** Android app only: printers answering on port 9100 on the tablet's own network. */
 export const findPrinters = () => LanPrinter.discover();

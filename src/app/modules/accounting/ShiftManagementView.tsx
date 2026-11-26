@@ -7,9 +7,61 @@ import { ReportsController } from '../../controllers/ReportsController';
 import { Clock, Banknote, CheckCircle, AlertCircle, FileText, ArrowRight } from 'lucide-react';
 import { friendlyError } from '../../../lib/errors';
 import { supabase } from '../../../lib/supabase';
+import { useBranch } from '../../context/BranchContext';
+import { cachedPrinters } from '../../controllers/PrinterController';
+import { PrintService, cleanPrintText, type PrintLine } from '../../services/PrintService';
+
+/** The printed shift report: sales by payment method, the cash drawer count, and every payment
+ *  out of the drawer during the shift (salary advances by employee, purchases). */
+export function shiftReportLines(r: {
+  businessName: string; cashier: string; openedAt: Date; closedAt: Date;
+  openingCash: number; countedCash: number; debtCash: number;
+  sales: { revenue: number; discount: number; orders: number; byMethod: Record<string, number> };
+  paidOut: { category: string; description: string; amount: number; employee_name?: string | null }[];
+}): PrintLine[] {
+  const when = (d: Date) => d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  const cashSales = r.sales.byMethod.cash ?? 0;
+  const paidOutTotal = r.paidOut.reduce((s, e) => s + e.amount, 0);
+  const expected = r.openingCash + cashSales + r.debtCash - paidOutTotal;
+  const lines: PrintLine[] = [
+    { text: cleanPrintText(r.businessName).toUpperCase(), style: 'large', align: 'center' },
+    { text: 'SHIFT REPORT', style: 'bold', align: 'center' },
+    { text: `Cashier: ${cleanPrintText(r.cashier)}` },
+    { text: `Open:  ${when(r.openedAt)}` },
+    { text: `Close: ${when(r.closedAt)}` },
+    'rule',
+    { text: 'SALES', style: 'bold' },
+    { text: 'Bills paid', value: String(r.sales.orders) },
+    { text: 'Total sales', value: fmt(r.sales.revenue), style: 'bold' },
+    ...Object.entries(r.sales.byMethod).map(([m, v]) => ({ text: `  ${cap(m)}`, value: fmt(v) })),
+    { text: 'Discounts given', value: fmt(r.sales.discount) },
+    'rule',
+    { text: 'CASH DRAWER', style: 'bold' },
+    { text: 'Opening cash', value: fmt(r.openingCash) },
+    { text: '+ Cash sales', value: fmt(cashSales) },
+    { text: '+ Debt paid in cash', value: fmt(r.debtCash) },
+    { text: '- Paid out', value: fmt(paidOutTotal) },
+    { text: 'Expected cash', value: fmt(expected), style: 'bold' },
+    { text: 'Counted cash', value: fmt(r.countedCash), style: 'bold' },
+    { text: 'Difference', value: fmt(r.countedCash - expected), style: 'large' },
+  ];
+  if (r.paidOut.length) {
+    lines.push('rule', { text: 'PAID OUT FROM DRAWER', style: 'bold' });
+    for (const e of r.paidOut) {
+      const who = e.employee_name ? `${cap(e.category)}: ${cleanPrintText(e.employee_name)}` : cap(e.category);
+      lines.push({ text: who, value: fmt(e.amount) });
+      if (e.description && e.description !== 'Salary / advance') lines.push({ text: `  ${cleanPrintText(e.description)}` });
+    }
+  }
+  lines.push('rule');
+  return lines;
+}
 
 export function ShiftManagementView() {
   const { currentUser } = usePOS();
+  const { businessName } = useBranch();
+
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
   const [cashInput, setCashInput] = useState('');
@@ -49,22 +101,24 @@ export function ShiftManagementView() {
   const handleEndShift = async () => {
     const cash = parseFloat(cashInput);
     if (isNaN(cash)) return toast.error('Enter valid closing cash');
-    
+
     // Sales paid during this shift, from the database (the screen's own list only
     // held today's orders). Expected cash counts CASH payments only — card and QR
     // money never enters the drawer.
     setLoading(true);
     const summary = await ReportsController.getSalesSummary(currentUser!.branchId, new Date(currentShift!.opened_at), new Date());
     if (!summary.success) { setLoading(false); return toast.error(`Could not total the shift: ${summary.error}`); }
-    const shiftSales = summary.data!.revenue;
-    const cashSales = summary.data!.byMethod.cash ?? 0;
     // Cash a customer paid towards their debt is in the drawer but is not a sale.
     const { data: debtRows, error: debtErr } = await supabase.from('debt_entries').select('amount')
       .eq('kind', 'payment').eq('method', 'cash').gte('created_at', currentShift!.opened_at);
-    if (debtErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr)}`); }
-    const debtCash = (debtRows ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
+    // Money paid out of the drawer during the shift (salary advances, small purchases).
+    const { data: paidOut, error: expErr } = await supabase.from('expenses')
+      .select('category, description, amount, employee_name')
+      .eq('branch_id', currentUser!.branchId).eq('from_drawer', true).gte('created_at', currentShift!.opened_at)
+      .order('created_at');
+    if (debtErr || expErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr ?? expErr)}`); }
 
-    const res = await ShiftController.endShift(currentShift!.id, cash, shiftSales);
+    const res = await ShiftController.endShift(currentShift!.id, cash, summary.data!.revenue);
     setLoading(false);
 
     if (res.success) {
@@ -72,43 +126,37 @@ export function ShiftManagementView() {
       setCurrentShift(null);
       setCashInput('');
       toast.success('Shift ended successfully');
-      generateShiftReport(endedShift, cashSales, debtCash);
+      printShiftReport(shiftReportLines({
+        businessName, cashier: endedShift.user_name, openedAt: new Date(endedShift.opened_at),
+        closedAt: new Date(endedShift.closed_at ?? Date.now()), openingCash: Number(endedShift.opening_cash),
+        countedCash: Number(endedShift.closing_cash ?? cash), sales: summary.data!,
+        debtCash: (debtRows ?? []).reduce((s, r: any) => s + Number(r.amount), 0),
+        paidOut: (paidOut ?? []).map((e: any) => ({ ...e, amount: Number(e.amount) })),
+      }));
     } else {
       toast.error(friendlyError(res.error));
     }
   };
 
-  const generateShiftReport = (shift: Shift, cashSales: number, debtCash: number) => {
-    const expected = shift.opening_cash + cashSales + debtCash;
-    const win = window.open('', '', 'width=400,height=600');
-    if (!win) return;
-    win.document.write(`
-      <html><head><title>Shift Report</title><style>
-        body { font-family: monospace; padding: 20px; }
-        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; margin: 10px 0; }
-        .total { font-weight: bold; border-top: 1px solid #000; padding-top: 10px; }
-      </style></head>
-      <body onload="window.print()">
-        <div class="header">
-          <h2>SHIFT REPORT</h2>
-          <p>Cashier: ${String(shift.user_name ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)}</p>
-          <p>Open: ${new Date(shift.opened_at).toLocaleString()}</p>
-          <p>Close: ${new Date(shift.closed_at!).toLocaleString()}</p>
-        </div>
-        <div class="row"><span>Opening Cash:</span><span>${fmt(shift.opening_cash)}</span></div>
-        <div class="row"><span>Total Sales:</span><span>${fmt(shift.total_sales || 0)}</span></div>
-        <div class="row"><span>Cash Sales:</span><span>${fmt(cashSales)}</span></div>
-        <div class="row"><span>Debt Collected (cash):</span><span>${fmt(debtCash)}</span></div>
-        <div class="row"><span>Expected Cash:</span><span>${fmt(expected)}</span></div>
-        <div class="row"><span>Actual Cash:</span><span>${fmt(shift.closing_cash || 0)}</span></div>
-        <div class="total row">
-          <span>Difference:</span>
-          <span>${fmt((shift.closing_cash || 0) - expected)}</span>
-        </div>
-      </body></html>
-    `);
-    win.document.close();
+  /** On the receipt (cashier) printers; on the website or with none set up, the browser's print. */
+  const printShiftReport = (lines: PrintLine[]) => {
+    const printers = cachedPrinters(currentUser!.branchId)
+      .filter(p => p.isActive && p.type === 'network' && p.ipAddress && (p.stations || []).includes('cashier'));
+    const browserPrint = () => {
+      const win = window.open('', '', 'width=400,height=600');
+      if (!win) return;
+      const esc = (t: string) => t.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+      win.document.write(`<html><head><title>Shift Report</title><style>body{font-family:monospace;padding:16px;max-width:360px}
+        .r{display:flex;justify-content:space-between;gap:8px;margin:4px 0}.c{justify-content:center}.b{font-weight:bold}hr{border:0;border-top:1px dashed #000}</style></head>
+        <body onload="window.print()">${lines.map(l => l === 'rule' ? '<hr>'
+          : `<div class="r${l.align === 'center' ? ' c' : ''}${l.style ? ' b' : ''}"><span>${esc(l.text)}</span>${l.value ? `<span>${esc(l.value)}</span>` : ''}</div>`).join('')}</body></html>`);
+      win.document.close();
+    };
+    if (!printers.length) return browserPrint();
+    for (const p of printers) {
+      void PrintService.sendToPrinter({ printerIp: p.ipAddress!, printerPort: p.port || 9100, bytes: PrintService.render(lines, p.paperWidth) })
+        .then(r => { if (r.success) toast.success('Shift report printed'); else { toast.error(`Receipt printer ${p.name || p.ipAddress}: ${r.error}`); browserPrint(); } });
+    }
   };
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading shift data...</div>;

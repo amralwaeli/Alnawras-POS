@@ -19,10 +19,13 @@ const defaultForm = () => ({
   category: 'utilities',
   amount: '',
   date: new Date().toISOString().split('T')[0],
+  employeeId: '',
+  fromDrawer: true,
 });
 
 export function AccountingView() {
-  const { expenses, currentUser, setExpenses } = usePOS();
+  const { expenses, currentUser, setExpenses, users } = usePOS();
+  const staff = users.filter(u => u.status === 'active' && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name));
   // Revenue and expenses for the SAME chosen period (revenue used to be today's,
   // expenses all-time). Revenue comes from the database by date paid (0033).
   const p = usePeriod('month');
@@ -60,6 +63,9 @@ export function AccountingView() {
           createdByName: e.created_by_name,
           status: e.status ?? 'approved',
           receipt: e.receipt,
+          employeeId: e.employee_id ?? undefined,
+          employeeName: e.employee_name ?? undefined,
+          fromDrawer: !!e.from_drawer,
         })));
       });
   }, [currentUser?.branchId]);
@@ -74,7 +80,11 @@ export function AccountingView() {
 
   // ── Save new expense ──────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.description.trim() || !form.amount) { toast.error('Fill in all fields'); return; }
+    const employee = form.category === 'salary' ? staff.find(u => u.id === form.employeeId) : undefined;
+    if (form.category === 'salary' && !employee) { toast.error('Choose the employee'); return; }
+    // A salary / advance needs no description: the employee's name says who it was for.
+    const description = form.description.trim() || (employee ? 'Salary / advance' : '');
+    if (!description || !form.amount) { toast.error('Fill in all fields'); return; }
     const amount = parseFloat(form.amount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     setSaving(true);
@@ -83,12 +93,15 @@ export function AccountingView() {
       id,
       branch_id:        currentUser.branchId,
       category:         form.category,
-      description:      form.description.trim(),
+      description,
       amount,
       date:             form.date,
       created_by:       currentUser.id,
       created_by_name:  currentUser.name,
       status:           'approved',
+      employee_id:      employee?.id ?? null,
+      employee_name:    employee?.name ?? null,
+      from_drawer:      form.fromDrawer,
     }]);
     if (error) {
       toast.error('Failed to save expense');
@@ -97,9 +110,10 @@ export function AccountingView() {
     }
     setExpenses(prev => [{
       id, branchId: currentUser.branchId, category: form.category,
-      description: form.description.trim(), amount,
+      description, amount,
       date: new Date(form.date), createdBy: currentUser.id,
       createdByName: currentUser.name, status: 'approved',
+      employeeId: employee?.id, employeeName: employee?.name, fromDrawer: form.fromDrawer,
     }, ...prev]);
     toast.success('Expense added');
     setShowModal(false);
@@ -125,7 +139,7 @@ export function AccountingView() {
     ]));
     [...periodExpenses]
       .sort((x, y) => new Date(x.date).getTime() - new Date(y.date).getTime())
-      .forEach(e => rows.push([new Date(e.date).toLocaleDateString('en-GB'), 'Expense', e.description, e.category, `-${e.amount.toFixed(2)}`]));
+      .forEach(e => rows.push([new Date(e.date).toLocaleDateString('en-GB'), 'Expense', e.employeeName ? `${e.employeeName} — ${e.description}` : e.description, e.category, `-${e.amount.toFixed(2)}`]));
     const day = (d: Date) => d.toISOString().split('T')[0];
     downloadCsv(`smartpos-${day(from)}-to-${day(new Date(to.getTime() - 1))}.csv`, rows);
     toast.success(res.data!.length >= 5000 ? 'Report downloaded (first 5000 bills)' : 'Report downloaded');
@@ -175,7 +189,9 @@ export function AccountingView() {
               {periodExpenses.slice(0, 10).map(e => (
                 <div key={e.id} className="px-4 sm:px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 break-words" dir="auto">{e.description}</p>
+                    <p className="text-sm font-medium text-gray-900 break-words" dir="auto">
+                      {e.employeeName ? `${e.employeeName} — ` : ''}{e.description}
+                    </p>
                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <span className={`inline-block size-2 rounded-full ${catColors[e.category] ?? 'bg-gray-400'}`} />
                       <span className="text-xs text-gray-400 capitalize">{e.category}</span>
@@ -273,6 +289,19 @@ export function AccountingView() {
                   ))}
                 </select>
               </div>
+              {form.category === 'salary' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee *</label>
+                  <select
+                    value={form.employeeId}
+                    onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                  >
+                    <option value="">Choose the employee…</option>
+                    {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (RM) *</label>
@@ -297,6 +326,11 @@ export function AccountingView() {
                   />
                 </div>
               </div>
+              <label className="flex items-center gap-2 min-h-11 text-sm text-gray-700">
+                <input type="checkbox" className="size-4 accent-gray-900" checked={form.fromDrawer}
+                  onChange={e => setForm(f => ({ ...f, fromDrawer: e.target.checked }))} />
+                Paid from the cash drawer (shown on the shift report)
+              </label>
             </div>
 
             <div className="flex gap-3 mt-6">

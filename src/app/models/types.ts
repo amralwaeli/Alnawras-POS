@@ -223,6 +223,11 @@ export interface Expense {
   createdByName: string;
   receipt?: string;
   status: 'pending' | 'approved' | 'rejected';
+  /** Salary / cash advance paid to this employee (migration 0054). */
+  employeeId?: string;
+  employeeName?: string;
+  /** Paid out of the cash drawer: the shift report takes it off the expected cash. */
+  fromDrawer?: boolean;
 }
 
 // ==================== Multi-tenant: Organizations & Branches ====================

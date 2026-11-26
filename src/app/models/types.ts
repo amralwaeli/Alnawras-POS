@@ -132,6 +132,9 @@ export interface Product {
   availabilityStatus: 'available' | 'out-of-stock' | 'finished';
   isActive: boolean;
   createdAt: Date;
+  /** Cell in its category's menu grid (Manage Menu → Arrange, migration 0051). */
+  menuRow?: number;
+  menuPos?: number;
 }
 
 // ── Modifiers ──────────────────────────────────────────────────────────────

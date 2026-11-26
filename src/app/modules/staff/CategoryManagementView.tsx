@@ -11,6 +11,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Checkbox } from '../../components/ui/checkbox';
 import { toast } from 'sonner';
 import { friendlyError } from '../../../lib/errors';
+import { MenuLayoutEditor } from './MenuLayoutEditor';
 
 export function CategoryManagementView() {
   const { categories, products, addCategory, updateCategory, deleteCategory, updateProduct } = usePOS();
@@ -21,6 +22,7 @@ export function CategoryManagementView() {
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+  const [mode, setMode] = useState<'products' | 'arrange'>('products');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -438,11 +440,21 @@ export function CategoryManagementView() {
               <h2 className="text-lg font-semibold text-gray-900">Tab Products</h2>
               <p className="text-sm text-gray-500">
                 {selectedCategory
-                  ? 'Choose which products appear under the selected waiter tab.'
+                  ? 'Choose which products appear under the selected waiter tab, or arrange where they sit.'
                   : 'Select a category from the left to manage its products.'}
               </p>
             </div>
             {selectedCategory && (
+              <div className="flex rounded-xl border border-gray-200 p-1 text-sm font-semibold">
+                {(['products', 'arrange'] as const).map(m => (
+                  <button key={m} type="button" onClick={() => setMode(m)}
+                    className={`min-h-9 px-3 rounded-lg ${mode === m ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+                    {m === 'products' ? 'Choose products' : 'Arrange layout'}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedCategory && mode === 'products' && (
               <Button onClick={handleSaveAssignments}>
                 <Save className="size-4 mr-2" />
                 Save Assignments
@@ -450,7 +462,12 @@ export function CategoryManagementView() {
             )}
           </div>
 
-          {selectedCategory ? (
+          {selectedCategory && mode === 'arrange' ? (
+            // keyed: switching tabs starts the editor fresh
+            <div key={selectedCategory}>
+              <MenuLayoutEditor products={products.filter(p => categoryProducts.has(p.id))} />
+            </div>
+          ) : selectedCategory ? (
             <>
               {/* Search + Select All toolbar */}
               <div className="flex flex-wrap items-center gap-3 mb-3">

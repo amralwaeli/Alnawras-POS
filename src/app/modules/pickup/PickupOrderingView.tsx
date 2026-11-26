@@ -1,3 +1,4 @@
+import { arrange, MENU_GRID } from '../../components/MenuRows';
 /**
  * PickupOrderingView.tsx
  *
@@ -121,7 +122,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
         taxRate: Number(p.tax_rate ?? 0), reorderPoint: p.reorder_point ?? 0, branchId: p.branch_id,
         station: p.station ?? 'kitchen', kitchenStatus: p.kitchen_status ?? 'available',
         availabilityStatus: p.availability_status ?? 'available', isActive: p.is_active ?? true,
-        createdAt: new Date(p.created_at),
+        createdAt: new Date(p.created_at), menuRow: p.menu_row ?? 0, menuPos: p.menu_pos ?? 0,
       })));
       const cats: Category[] = (categoriesRes.data ?? []).map((c: any) => ({
         id: c.id, name: c.name, description: c.description, color: c.color ?? '#f97316', icon: c.icon,
@@ -144,6 +145,7 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
       return selectedCategory ? p.categoryId === selectedCategory || (!!active && p.category?.toLowerCase() === active.name.toLowerCase()) : false;
     });
   }, [products, categories, selectedCategory, searchQuery]);
+  const menu = useMemo(() => arrange(filtered, !!searchQuery.trim()), [filtered, searchQuery]);
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   // Same tax the till charges: the branch setting. (The per-product tax_rate is
@@ -279,11 +281,11 @@ function PickupFlow({ token, branchId, taxSettings }: { token: string; branchId:
             </div>
           )}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {filtered.map(p => {
+            <div className={`grid ${MENU_GRID} gap-3`}>
+              {menu.items.map(p => {
                 const ok = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
                 return (
-                  <div key={p.id} onClick={() => ok && addToCart(p)}
+                  <div key={p.id} style={menu.style(p.id)} onClick={() => ok && addToCart(p)}
                     className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-w-0 min-h-[100px] transition-all ${ok ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 opacity-60'}`}>
                     {p.image && <ProductImage src={p.image} name={p.name} className="w-full aspect-[4/3] rounded-t-[18px]" />}
                     <div className="p-3 flex flex-col flex-1 justify-between gap-2 relative">

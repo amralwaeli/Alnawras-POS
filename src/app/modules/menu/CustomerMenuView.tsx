@@ -1,3 +1,4 @@
+import { arrange, MENU_GRID } from '../../components/MenuRows';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { usePOS } from '../../context/POSContext';
@@ -210,6 +211,7 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
         : false;
     });
   }, [products, sortedCategories, selectedCategory, searchQuery]);
+  const menu = useMemo(() => arrange(filteredProducts, !!searchQuery.trim()), [filteredProducts, searchQuery]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   // Waiters have no sidebar here, so this is their only way to the real Tables screen (QR toggle, move, void).
@@ -343,12 +345,13 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
 
         {/* Products grid (bottom padding keeps the last row clear of the cart button) */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-24 custom-scrollbar">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-            {filteredProducts.map(p => {
+          <div className={`grid ${MENU_GRID} gap-2.5`}>
+            {menu.items.map(p => {
               const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
               return (
                 <div
                   key={p.id}
+                  style={menu.style(p.id)}
                   onClick={() => { if (isAvailable) { addToCart(p); } }}
                   className={`rounded-[20px] shadow-sm transition-all border-2 active:scale-95 flex flex-col min-w-0 min-h-[100px] ${
                     isAvailable ? 'bg-white border-transparent cursor-pointer' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
@@ -509,12 +512,13 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
-          <div className="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6 gap-3">
-            {filteredProducts.map(p => {
+          <div className={`grid ${MENU_GRID} gap-3`}>
+            {menu.items.map(p => {
               const isAvailable = (p.kitchenStatus || 'available') === 'available' && (p.availabilityStatus || 'available') === 'available';
               return (
                 <div
                   key={p.id}
+                  style={menu.style(p.id)}
                   onClick={() => isAvailable && addToCart(p)}
                   className={`rounded-[24px] shadow-sm transition-all border-2 active:scale-95 group flex flex-col min-w-0 min-h-[120px] ${
                     isAvailable ? 'bg-white border-transparent hover:shadow-md cursor-pointer' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'

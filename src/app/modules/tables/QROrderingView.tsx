@@ -1,3 +1,4 @@
+import { arrange, MENU_GRID } from '../../components/MenuRows';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
@@ -139,6 +140,7 @@ export function QROrderingView() {
         kitchenStatus: p.kitchen_status ?? 'available',
         availabilityStatus: p.availability_status ?? 'available',
         isActive: p.is_active ?? true, createdAt: new Date(p.created_at),
+        menuRow: p.menu_row ?? 0, menuPos: p.menu_pos ?? 0,
       }));
       setProducts(prods);
 
@@ -229,6 +231,7 @@ export function QROrderingView() {
         : false;
     });
   }, [products, categories, selectedCategory, searchQuery]);
+  const menu = useMemo(() => arrange(filteredProducts, !!searchQuery.trim()), [filteredProducts, searchQuery]);
 
   const totalItems    = cartItems.reduce((s, i) => s + i.quantity, 0);
   const cartTotal     = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -377,6 +380,7 @@ export function QROrderingView() {
     return (
       <div
         key={p.id}
+        style={menu.style(p.id)}
         onClick={() => isAvailable && addToCart(p)}
         className={`rounded-[20px] shadow-sm transition-all border-2 active:scale-95 flex flex-col min-w-0 ${compact ? 'min-h-[100px]' : 'min-h-[120px]'} ${
           isAvailable ? 'bg-white border-transparent cursor-pointer hover:shadow-md' : 'bg-red-50 border-red-200 cursor-not-allowed opacity-60'
@@ -536,8 +540,8 @@ export function QROrderingView() {
               <span className="text-xs font-black uppercase tracking-widest opacity-40">No items found</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-              {filteredProducts.map(p => productCard(p, true))}
+            <div className={`grid ${MENU_GRID} gap-2.5`}>
+              {menu.items.map(p => productCard(p, true))}
             </div>
           )}
         </div>
@@ -695,8 +699,8 @@ export function QROrderingView() {
               <span className="text-sm font-black uppercase tracking-widest opacity-40">No items found</span>
             </div>
           ) : (
-            <div className="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6 gap-3">
-              {filteredProducts.map(p => productCard(p))}
+            <div className={`grid ${MENU_GRID} gap-3`}>
+              {menu.items.map(p => productCard(p))}
             </div>
           )}
         </div>

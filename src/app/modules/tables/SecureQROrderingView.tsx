@@ -1,3 +1,4 @@
+import { arrange, MENU_GRID } from '../../components/MenuRows';
 /**
  * SecureQROrderingView.tsx
  *
@@ -116,6 +117,7 @@ export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
         kitchenStatus: p.kitchen_status ?? 'available',
         availabilityStatus: p.availability_status ?? 'available',
         isActive: p.is_active ?? true, createdAt: new Date(p.created_at),
+        menuRow: p.menu_row ?? 0, menuPos: p.menu_pos ?? 0,
       }));
       setProducts(prods);
       setModifierMap(await ModifierController.getGroupsForProducts(prods.map(p => p.id)));
@@ -162,6 +164,7 @@ export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
         : false;
     });
   }, [products, categories, selectedCategory, searchQuery]);
+  const menu = useMemo(() => arrange(filteredProducts, !!searchQuery.trim()), [filteredProducts, searchQuery]);
 
   const totalItems    = cartItems.reduce((s, i) => s + i.quantity, 0);
   const cartTotal     = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -380,14 +383,15 @@ export function SecureOrderingUI({ sessionToken }: { sessionToken: string }) {
                 <p className="text-sm text-gray-400 font-medium">No items found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6 gap-3">
-                {filteredProducts.map(p => {
+              <div className={`grid ${MENU_GRID} gap-3`}>
+                {menu.items.map(p => {
                   const isAvailable =
                     (p.kitchenStatus || 'available') === 'available' &&
                     (p.availabilityStatus || 'available') === 'available';
                   return (
                     <div
                       key={p.id}
+                      style={menu.style(p.id)}
                       onClick={() => isAvailable && addToCart(p)}
                       className={`rounded-[20px] shadow-sm border-2 active:scale-95 flex flex-col min-w-0 min-h-[100px] transition-all ${
                         isAvailable

@@ -86,13 +86,14 @@ export function routeItems(items: any[]): Map<string, any[]> {
   for (const it of items) {
     const main = it.station || 'kitchen';
     const here = new Set([main, ...(it.also ?? [])]);
-    for (const s of here) add(s, it);
-    for (const m of Array.isArray(it.modifiers) ? it.modifiers : []) {
-      const s = it.option_stations?.[m.optionId];
-      if (s && !here.has(s)) {
-        add(s, { id: it.id, product_name: m.optionName, quantity: it.quantity, modifiers: [],
-                 notes: `for ${it.product_name}`, added_by_name: it.added_by_name });
-      }
+    const mods: any[] = Array.isArray(it.modifiers) ? it.modifiers : [];
+    const elsewhere = (m: any) => { const s = it.option_stations?.[m.optionId]; return s && !here.has(s) ? s : null; };
+    // A choice made at another station is left off this item's ticket (saves paper; staff match by bill number).
+    const own = { ...it, modifiers: mods.filter(m => !elsewhere(m)) };
+    for (const s of here) add(s, own);
+    for (const m of mods) {
+      const s = elsewhere(m);
+      if (s) add(s, { id: it.id, product_name: m.optionName, quantity: it.quantity, modifiers: [], added_by_name: it.added_by_name });
     }
   }
   return out;

@@ -8,8 +8,9 @@ describe('routeItems', () => {
       id: 'i1', product_name: 'Family Lamb Maqluba', quantity: 1, station: 'kitchen', also: [],
       modifiers: [{ optionId: 'lemon', optionName: 'Lemon Juice' }], option_stations: { lemon: 'juice' },
     }]);
-    expect(r.get('kitchen')!.map(l => l.product_name)).toEqual(['Family Lamb Maqluba']);
-    expect(r.get('juice')).toEqual([expect.objectContaining({ id: 'i1', product_name: 'Lemon Juice', quantity: 1, notes: 'for Family Lamb Maqluba' })]);
+    expect(r.get('kitchen')).toEqual([expect.objectContaining({ product_name: 'Family Lamb Maqluba', modifiers: [] })]);
+    expect(r.get('juice')).toEqual([expect.objectContaining({ id: 'i1', product_name: 'Lemon Juice', quantity: 1 })]);
+    expect(r.get('juice')![0].notes).toBeUndefined();
   });
 
   it('prints a shawarma plate at shawarma and the kitchen', () => {

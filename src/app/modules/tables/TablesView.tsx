@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { usePOS } from '../../context/POSContext';
+import { useBranch } from '../../context/BranchContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
@@ -82,6 +83,7 @@ function getOrderType(order: any) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function TablesView() {
   const { tables, orders, currentUser, setOrders, setTables } = usePOS();
+  const { hasFeature } = useBranch();
   const navigate = useNavigate();
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -597,7 +599,8 @@ export function TablesView() {
                 <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                   <Users className="size-3" /> {table.capacity} seats
                 </p>
-                {['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && (
+                {/* Hidden when QR ordering is switched off for this restaurant (super-admin). */}
+                {hasFeature('groupOrdering') && ['cashier', 'waiter', 'swaiter', 'admin'].includes(currentUser.role) && (
                   <button
                     onClick={() => void handleToggleOrdering(table)}
                     className={`w-full mb-3 flex items-center justify-center gap-1.5 min-h-11 py-1.5 rounded-lg text-xs font-bold transition-colors ${

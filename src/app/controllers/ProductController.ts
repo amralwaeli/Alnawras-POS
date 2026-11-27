@@ -8,10 +8,9 @@ export class ProductController {
    * Get all products from database
    */
   static async getProducts(user: User): Promise<Result<Product[]>> {
-    // Kitchen needs canManageInventory, others need canViewTables
-    const canView = user.role === 'kitchen'
-      ? AuthController.hasPermission(user, 'canManageInventory')
-      : AuthController.hasPermission(user, 'canViewTables');
+    // Station screens (kitchen/juice/shawarma) have canManageInventory; front of house has canViewTables
+    const canView = AuthController.hasPermission(user, 'canManageInventory')
+      || AuthController.hasPermission(user, 'canViewTables');
 
     if (!canView) {
       return { success: false, error: 'Unauthorized: Cannot view products' };

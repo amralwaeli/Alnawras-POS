@@ -81,10 +81,11 @@ export function preloadPrintLogo(url: string | null | undefined) {
     try {
       // Throws on an image served without CORS; a tainted logo would make every receipt fail.
       const px = ctx.getImageData(0, 0, c.width, c.height);
-      // Greyscale, so render's red-channel threshold also prints red/colour logos.
+      // Black and white for thermal paper: any ink (dark red text AND light gold stars) prints
+      // black, only the (near-)white background stays white. A plain grey threshold dropped gold.
       for (let i = 0; i < px.data.length; i += 4) {
         const l = (px.data[i] * 299 + px.data[i + 1] * 587 + px.data[i + 2] * 114) / 1000;
-        px.data[i] = px.data[i + 1] = px.data[i + 2] = l;
+        px.data[i] = px.data[i + 1] = px.data[i + 2] = l < 225 ? 0 : 255;
       }
       ctx.putImageData(px, 0, 0);
       printLogo = c;

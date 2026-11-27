@@ -54,6 +54,48 @@ export type PrintLine = 'rule' | {
   align?: 'left' | 'center' | 'right';
 };
 
+/** The restaurant logo, greyscale and safe to read back (never a tainted canvas). */
+let printLogo: HTMLCanvasElement | null = null;
+let printLogoUrl = '';
+
+/** Loads the logo for 'logo' lines ahead of printing (render is synchronous). Empty url clears it. */
+export function preloadPrintLogo(url: string | null | undefined) {
+  printLogoUrl = url || '';
+  printLogo = null;
+  if (!printLogoUrl || typeof Image === 'undefined') return;
+  const want = printLogoUrl;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    if (want !== printLogoUrl || !img.naturalWidth) return;
+    const box = 260;   // ~45% of 80 mm paper (576 dots)
+    const s = Math.min(1, box / img.naturalWidth, box / img.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s);
+    c.height = Math.round(img.naturalHeight * s);
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#fff';   // transparent areas print white
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    try {
+      // Throws on an image served without CORS; a tainted logo would make every receipt fail.
+      const px = ctx.getImageData(0, 0, c.width, c.height);
+      // Greyscale, so render's red-channel threshold also prints red/colour logos.
+      for (let i = 0; i < px.data.length; i += 4) {
+        const l = (px.data[i] * 299 + px.data[i + 1] * 587 + px.data[i + 2] * 114) / 1000;
+        px.data[i] = px.data[i + 1] = px.data[i + 2] = l;
+      }
+      ctx.putImageData(px, 0, 0);
+      printLogo = c;
+    } catch { /* no logo */ }
+  };
+  img.src = want;
+}
+
+/** Receipt line: also 'logo', the restaurant logo (see preloadPrintLogo), skipped when none is loaded. */
+export type ReceiptLine = PrintLine | 'logo';
+
 const RTL_CHARS = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
 
 /**
@@ -156,7 +198,7 @@ export class PrintService {
    * returns ESC/POS raster bytes. The browser shapes Arabic and lays out right-to-left
    * text, which the printer's own text mode can't. Browser/WebView only (needs a DOM).
    */
-  static render(lines: PrintLine[], paperWidth: 58 | 80 = 80): Uint8Array {
+  static render(lines: ReceiptLine[], paperWidth: 58 | 80 = 80): Uint8Array {
     const width = paperWidth === 58 ? 384 : 576;
     // 58 mm stays at 20 px, not 16: smaller Arabic is hard to read on thermal paper.
     const [normalPx, largePx] = paperWidth === 58 ? [20, 30] : [24, 36];
@@ -168,10 +210,14 @@ export class PrintService {
 
     // Layout pass: wrap every line to the paper width and total the height.
     type Row = { text: string; value?: string; font: string; h: number; align: 'left' | 'center' | 'right'; rtl: boolean };
-    const rows: (Row | 'rule')[] = [];
+    const rows: (Row | 'rule' | 'logo')[] = [];
+    const logo = printLogo;
+    const logoS = logo ? Math.min(1, (width * 0.45) / logo.width) : 0;
+    const logoH = logo ? Math.round(logo.height * logoS) + gap : 0;
     let height = pad * 2;
     for (const l of lines) {
       if (l === 'rule') { rows.push('rule'); height += ruleH; continue; }
+      if (l === 'logo') { if (logo) { rows.push('logo'); height += logoH; } continue; }
       const px = l.style === 'large' ? largePx : normalPx;
       const font = `${l.style ? 'bold ' : ''}${px}px sans-serif`;
       const rtl = startsRtl(l.text);
@@ -194,6 +240,11 @@ export class PrintService {
     ctx.textBaseline = 'middle';
     let y = pad;
     for (const r of rows) {
+      if (r === 'logo') {
+        const w = Math.round(logo!.width * logoS);
+        ctx.drawImage(logo!, Math.round((width - w) / 2), y, w, logoH - gap);
+        y += logoH; continue;
+      }
       if (r === 'rule') { for (let x = pad; x < width - pad; x += 10) ctx.fillRect(x, y + ruleH / 2 - 1, 6, 2); y += ruleH; continue; }   // dashed
       ctx.font = r.font;
       ctx.direction = r.rtl ? 'rtl' : 'ltr';

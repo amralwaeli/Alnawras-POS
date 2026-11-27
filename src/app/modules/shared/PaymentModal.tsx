@@ -14,13 +14,14 @@ import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase';
 import { CURRENCY, fmt, orderTotal } from '../../../lib/currency';
 import { loadBillFormatSettings } from '../../../lib/billFormat';
+import { INVOICE_FROM } from '../../../lib/branding';
 import { LoyaltyController } from '../../controllers/LoyaltyController';
 import { DebtController, DebtAccount } from '../../controllers/DebtController';
 import { cachedPrinters } from '../../controllers/PrinterController';
 import type { Customer, DiscountPreset } from '../../models/types';
 import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
-import { PrintService, cleanPrintText, type PrintLine } from '../../services/PrintService';
+import { PrintService, cleanPrintText, type PrintLine, type ReceiptLine } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 import QRCode from 'qrcode';
@@ -61,12 +62,18 @@ export function buildReceiptLines(o: {
   businessName: string; billNo: string; order: any; cashier: string;
   totals: { subtotal: number; tax: number; discount: number; total: number };
   payment?: PrintLine[];
-}): PrintLine[] {
+}): ReceiptLine[] {
   const when = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
   const where = o.order.orderType === 'takeaway' ? 'Takeaway' : o.order.orderType === 'pickup' ? 'Pickup' : `Table ${cleanPrintText(o.order.tableNumber ?? '')}`;
   const items = (o.order.items || []).filter((i: any) => i.status !== 'cancelled');
+  const name = cleanPrintText(o.businessName);
+  // Address / phone lines from Business Settings' invoice "From" text (its first line is often the name again).
+  const from = INVOICE_FROM.split('\n').map(l => cleanPrintText(l).trim()).filter(Boolean);
+  if (from[0]?.toLowerCase() === name.trim().toLowerCase()) from.shift();
   return [
-    { text: cleanPrintText(o.businessName).toUpperCase(), style: 'large', align: 'center' },
+    'logo',
+    { text: name.toUpperCase(), style: 'large', align: 'center' },
+    ...from.map(text => ({ text, align: 'center' as const })),
     ...(o.payment ? [] : [{ text: 'BILL - NOT PAID', style: 'large' as const, align: 'center' as const }]),
     'rule',
     { text: 'Bill #', value: o.billNo || '-' },
@@ -364,7 +371,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // Own copy of the paid order: the parent drops it from the open-orders list while the print prompt is still showing.
   const [receiptOrder, setReceiptOrder] = useState<any>(null);
   const [lanPrinted, setLanPrinted] = useState(false);
-  const [lastReceiptLines, setLastReceiptLines] = useState<PrintLine[] | null>(null);
+  const [lastReceiptLines, setLastReceiptLines] = useState<ReceiptLine[] | null>(null);
   
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);

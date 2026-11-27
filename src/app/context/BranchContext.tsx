@@ -4,6 +4,7 @@ import { BranchController, BranchAccess } from '../controllers/BranchController'
 import { SettingsController } from '../controllers/SettingsController';
 import { setCurrency } from '../../lib/currency';
 import { setBranding } from '../../lib/branding';
+import { preloadPrintLogo } from '../services/PrintService';
 
 interface BranchContextType {
   branch: Branch | null;
@@ -69,6 +70,7 @@ export function BranchProvider({ children, currentUser }: { children: ReactNode;
     setCurrency(settings.currency);
     setBranding({ businessName, payTo: settings.payTo, invoiceFrom: settings.invoiceFrom, logoUrl: settings.logoUrl });
   }, [settings.currency, settings.payTo, settings.invoiceFrom, settings.logoUrl, businessName]);
+  useEffect(() => { preloadPrintLogo(settings.logoUrl); }, [settings.logoUrl]);
 
   const value: BranchContextType = {
     branch: access.branch,

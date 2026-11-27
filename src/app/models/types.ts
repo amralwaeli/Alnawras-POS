@@ -836,6 +836,7 @@ export interface PayrollSummary {
   totalOvertimeMinutes: number;
   lateDeduction: number;
   overtimeBonus: number;
+  salaryAdvances: number;
   netSalary: number;
   status: 'draft' | 'approved' | 'paid';
   approvedBy?: string;

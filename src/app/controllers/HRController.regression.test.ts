@@ -52,6 +52,26 @@ describe('payroll is unchanged and independent of performance data', () => {
     });
   });
 
+  it('deducts salary advances dated 8th of the month to 7th of the next, by login user id', async () => {
+    db.tables.expenses = [
+      { id: 'x1', category: 'salary', employee_id: 'u-alice', amount: 200, date: '2026-11-08' },
+      { id: 'x2', category: 'salary', employee_id: 'u-alice', amount: 100.5, date: '2026-12-07' },
+      { id: 'x3', category: 'salary', employee_id: 'u-alice', amount: 999, date: '2026-11-07' },   // previous period
+      { id: 'x4', category: 'salary', employee_id: 'u-alice', amount: 999, date: '2026-12-08' },   // next period
+      { id: 'x5', category: 'supplies', employee_id: 'u-alice', amount: 999, date: '2026-11-20' },
+      { id: 'x6', category: 'salary', employee_id: 'EMP-001', amount: 999, date: '2026-11-20' },   // not the login id
+    ];
+    const r: any = await HRController.computePayroll('EMP-001', 11, 2026, 'u-hr');
+    expect(r.data).toMatchObject({ salaryAdvances: 300.5, netSalary: 2712 });
+    expect(db.tables.payroll_summary[0]).toMatchObject({ salary_advances: 300.5, net_salary: 2712 });
+  });
+
+  it('lets advances push net pay below zero (the employee owes)', async () => {
+    db.tables.expenses = [{ id: 'x1', category: 'salary', employee_id: 'u-alice', amount: 3500, date: '2026-11-20' }];
+    const r: any = await HRController.computePayroll('EMP-001', 11, 2026, 'u-hr');
+    expect(r.data.netSalary).toBe(-487.5);
+  });
+
   it('never reads the observations table', async () => {
     await HRController.computePayroll('EMP-001', 11, 2026, 'u-hr');
     expect(db.log.map(l => l.table)).not.toContain('employee_performance_observations');

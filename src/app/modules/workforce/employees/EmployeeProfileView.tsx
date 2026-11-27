@@ -21,6 +21,8 @@ import {
   AlertDialogCancel,
 } from '../../../components/ui/alert-dialog';
 import { friendlyError } from '../../../../lib/errors';
+import { currentPayPeriod } from '../../../../lib/payPeriod';
+import { CURRENCY } from '../../../../lib/currency';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt  = (d?: Date | string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -74,6 +76,10 @@ export function EmployeeProfileView() {
   const [payrolls, setPayrolls]     = useState<PayrollSummary[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
 
+  // Salary advances for the current pay period (read-only)
+  const [advances, setAdvances]     = useState<{ date: string; amount: number; createdByName?: string; description?: string }[]>([]);
+  const payPeriod = currentPayPeriod(new Date());
+
   // Action state
   const [acting, setActing]         = useState(false);
 
@@ -90,6 +96,12 @@ export function EmployeeProfileView() {
   };
 
   useEffect(() => { loadEmployee(); }, [employeeId]);
+
+  useEffect(() => {
+    if (!employee?.userId) { setAdvances([]); return; }
+    HRController.getSalaryAdvances(employee.userId, payPeriod.from, payPeriod.to)
+      .then(r => setAdvances(r.success ? r.data ?? [] : []));
+  }, [employee?.userId, payPeriod.from]);
 
   // ── Load tab data ──
   useEffect(() => {
@@ -297,6 +309,39 @@ export function EmployeeProfileView() {
           )}
         </div>
       </div>
+
+      {/* ── Salary advances ── */}
+      {employee.userId && (() => {
+        const taken = advances.reduce((s, a) => s + a.amount, 0);
+        const left = employee.monthlySalary - taken;
+        return (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
+            <h2 className="text-base font-semibold text-gray-900">Salary advances</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Salary {CURRENCY} {cur(employee.monthlySalary)} · Taken {CURRENCY} {cur(taken)} ·{' '}
+              {left < 0
+                ? <span className="font-medium text-red-600">Owes {CURRENCY} {cur(-left)}</span>
+                : <span className="font-medium text-gray-900">Left {CURRENCY} {cur(left)}</span>}
+              {' '}(paid on {payPeriod.payday.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})
+            </p>
+            {advances.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-400">No advances this pay period.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-gray-50">
+                {advances.map((a, i) => (
+                  <li key={i} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="text-gray-900">{fmt(`${a.date}T00:00:00`)}{a.createdByName && <span className="text-gray-500"> · by {a.createdByName}</span>}</p>
+                      {a.description && <p dir="auto" className="text-gray-500 break-words">{a.description}</p>}
+                    </div>
+                    <span className="font-medium text-gray-900 whitespace-nowrap">{CURRENCY} {cur(a.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Tabs ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

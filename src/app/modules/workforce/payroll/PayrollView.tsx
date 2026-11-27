@@ -49,11 +49,11 @@ export function PayrollView() {
   };
 
   const exportCSV = () => {
-    const headers = ['Employee', 'Base Salary', 'Present', 'Absent', 'Late (min)', 'OT (min)', 'Deduction', 'OT Bonus', 'Net Salary', 'Status'];
+    const headers = ['Employee', 'Base Salary', 'Present', 'Absent', 'Late (min)', 'OT (min)', 'Deduction', 'Advances', 'OT Bonus', 'Net Salary', 'Status'];
     const rows = payroll.map(p => [
       p.fullName, p.monthlySalary, p.presentDays, p.absentDays,
       p.totalLateMinutes, p.totalOvertimeMinutes,
-      p.lateDeduction, p.overtimeBonus, p.netSalary, p.status,
+      p.lateDeduction, p.salaryAdvances, p.overtimeBonus, p.netSalary, p.status,
     ]);
     downloadCsv(`payroll-${year}-${String(month).padStart(2, '0')}.csv`, [headers, ...rows]);
   };
@@ -146,10 +146,10 @@ export function PayrollView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[60rem]">
+            <table className="w-full min-w-[66rem]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Employee', 'Base', 'Present', 'Absent', 'Late (m)', 'OT (m)', 'Deduction', 'OT Bonus', 'Net Pay', 'Status', ''].map(h => (
+                  {['Employee', 'Base', 'Present', 'Absent', 'Late (m)', 'OT (m)', 'Deduction', 'Advances', 'OT Bonus', 'Net Pay', 'Status', ''].map(h => (
                     <th key={h} className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -164,8 +164,9 @@ export function PayrollView() {
                     <td className="px-4 py-3.5 text-sm text-amber-600">{p.totalLateMinutes}</td>
                     <td className="px-4 py-3.5 text-sm text-blue-600">{p.totalOvertimeMinutes}</td>
                     <td className="px-4 py-3.5 text-sm text-red-600 whitespace-nowrap">-{cur(p.lateDeduction)}</td>
+                    <td className="px-4 py-3.5 text-sm text-red-600 whitespace-nowrap">-{cur(p.salaryAdvances)}</td>
                     <td className="px-4 py-3.5 text-sm text-emerald-600 whitespace-nowrap">+{cur(p.overtimeBonus)}</td>
-                    <td className="px-4 py-3.5 text-sm font-bold text-gray-900 whitespace-nowrap">{cur(p.netSalary)}</td>
+                    <td className="px-4 py-3.5 text-sm font-bold text-gray-900 whitespace-nowrap"><span className={p.netSalary < 0 ? 'text-red-600' : undefined}>{cur(p.netSalary)}</span></td>
                     <td className="px-4 py-3.5">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         p.status === 'paid'     ? 'bg-emerald-100 text-emerald-700' :
@@ -190,7 +191,7 @@ export function PayrollView() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50">
-                  <td colSpan={8} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">Total Net Payroll:</td>
+                  <td colSpan={9} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">Total Net Payroll:</td>
                   <td className="px-4 py-3 text-base font-bold text-gray-900 whitespace-nowrap">{cur(totalNet)}</td>
                   <td colSpan={2} />
                 </tr>

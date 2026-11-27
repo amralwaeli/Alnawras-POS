@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { Employee, AttendanceLog, PayrollSummary } from '../models/types';
 import { mapEmployee, mapFingerprint, mapAttendanceLog, mapPayroll } from '../models/mappers';
 import { localDateStr, monthDateRange } from '../../lib/date';
+import { payPeriodForPayroll } from '../../lib/payPeriod';
 import { checkInRule, checkOutRule, stillOpen } from './attendanceRules';
 
 // ─────────────────────────────────────────────
@@ -492,7 +493,17 @@ export class HRController {
       const overtimeBonus = Math.round(totalOvertimeMinutes * minuteRate * 1.5 * 100) / 100;
       const absentDeduction = Math.round(absentDays * dailyRate * 100) / 100;
       
-      const netSalary = Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus);
+      // Salary advances are expenses keyed by the LOGIN user id, paid back out of this payroll.
+      let salaryAdvances = 0;
+      if (employee.userId) {
+        const { from, to } = payPeriodForPayroll(year, month);
+        const adv = await HRController.getSalaryAdvances(employee.userId, from, to);
+        if (!adv.success) throw new Error(adv.error);
+        salaryAdvances = Math.round((adv.data ?? []).reduce((s, a) => s + a.amount, 0) * 100) / 100;
+      }
+
+      // Advances are not clamped: a negative net means the employee owes.
+      const netSalary = Math.round((Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus) - salaryAdvances) * 100) / 100;
 
       // One row per employee per month: a stable id (a new one on every recompute
       // broke the Approve button), and never overwrite an approved/paid month.
@@ -518,6 +529,7 @@ export class HRController {
           total_overtime_minutes: totalOvertimeMinutes,
           late_deduction: lateDeduction,
           overtime_bonus: overtimeBonus,
+          salary_advances: salaryAdvances,
           net_salary: netSalary,
           status: 'draft',
           branch_id: employee.branchId,
@@ -530,6 +542,31 @@ export class HRController {
     } catch (err: any) {
       return { success: false, error: err.message };
     }
+  }
+
+  /** Salary advances (expenses, category 'salary') for a login user id, dates inclusive, newest first. */
+  static async getSalaryAdvances(
+    userId: string,
+    from: string,
+    to: string
+  ): Promise<{ success: boolean; data?: { date: string; amount: number; createdByName?: string; description?: string }[]; error?: string }> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('date, amount, created_by_name, description')
+      .eq('category', 'salary')
+      .eq('employee_id', userId)
+      .gte('date', from)
+      .lte('date', to)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) return { success: false, error: error.message };
+    return {
+      success: true,
+      data: (data || []).map(r => ({
+        date: r.date, amount: Number(r.amount ?? 0),
+        createdByName: r.created_by_name ?? undefined, description: r.description ?? undefined,
+      })),
+    };
   }
 
   static async getPayroll(

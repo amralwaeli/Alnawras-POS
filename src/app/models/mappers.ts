@@ -302,6 +302,7 @@ export const mapPayroll = (row: any): PayrollSummary => ({
   totalOvertimeMinutes: row.total_overtime_minutes,
   lateDeduction: Number(row.late_deduction ?? 0),
   overtimeBonus: Number(row.overtime_bonus ?? 0),
+  salaryAdvances: Number(row.salary_advances ?? 0),
   netSalary: Number(row.net_salary ?? 0),
   status: row.status,
   approvedBy: row.approved_by ?? undefined,

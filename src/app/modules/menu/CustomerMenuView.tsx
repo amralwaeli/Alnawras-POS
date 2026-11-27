@@ -624,15 +624,15 @@ export function CustomerMenuView({ takeawayOnly = false }: { takeawayOnly?: bool
       {/* ─── MODALS (shared by both layouts) ─── */}
       {!takeawayOnly && showTableModal && (
         <div className="fixed inset-0 z-[101] bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6">
-          <div className="bg-white rounded-[32px] sm:rounded-[50px] w-full max-w-2xl max-h-[90dvh] flex flex-col p-5 sm:p-12 shadow-2xl">
+          <div className="bg-white rounded-[32px] sm:rounded-[55px] w-full max-w-4xl p-5 sm:p-12 shadow-2xl flex flex-col max-h-[90dvh]">
             <div className="flex justify-between items-center gap-3 mb-5 sm:mb-10 shrink-0">
-              <h2 className="text-2xl sm:text-4xl font-black text-gray-900 tracking-tighter uppercase italic leading-none min-w-0">Select Table</h2>
-              <button onClick={() => setShowTableModal(false)} aria-label="Close" className="bg-gray-100 p-3 rounded-full hover:bg-gray-200 shrink-0"><X className="size-6 sm:size-8 text-gray-400" /></button>
+              <h2 className="text-2xl min-[400px]:text-3xl sm:text-5xl font-black text-gray-900 tracking-tighter uppercase italic leading-none min-w-0">Select Table</h2>
+              <button onClick={() => setShowTableModal(false)} aria-label="Close" className="bg-gray-100 p-3 sm:p-4 rounded-full hover:bg-gray-200 shrink-0"><X className="size-7 sm:size-10 text-gray-400" /></button>
             </div>
-            <div className="grid grid-cols-2 min-[400px]:grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-6 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-8 min-h-0 overflow-y-auto custom-scrollbar pr-2">
               {availableTables.map(t => (
-                <button key={t.id} onClick={() => { handleSendToKitchen(t.id); setShowTableModal(false); }} className="p-4 sm:p-8 min-w-0 rounded-[24px] sm:rounded-[35px] border-4 border-emerald-50 bg-emerald-50/30 text-left hover:border-emerald-500 hover:bg-white transition-all shadow-sm active:scale-95">
-                  <p className="text-2xl sm:text-3xl font-black text-gray-900 italic leading-none mb-1 truncate">T-{t.number}</p>
+                <button key={t.id} onClick={() => { handleSendToKitchen(t.id); setShowTableModal(false); }} className="p-4 sm:p-10 min-w-0 rounded-[28px] sm:rounded-[45px] border-4 border-emerald-50 bg-emerald-50/30 text-left hover:border-emerald-500 hover:bg-white transition-all shadow-sm active:scale-95">
+                  <p className="text-3xl sm:text-4xl font-black text-gray-900 italic leading-none tracking-tighter mb-1 truncate">T-{t.number}</p>
                   <p className="text-[10px] font-black text-emerald-600 opacity-60 uppercase tracking-widest">Available</p>
                 </button>
               ))}

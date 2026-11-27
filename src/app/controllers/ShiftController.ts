@@ -7,6 +7,7 @@ export interface Shift {
   branch_id: string;
   opened_at: string;
   closed_at?: string;
+  closed_by_name?: string;
   opening_cash: number;
   closing_cash?: number;
   total_sales?: number;
@@ -14,12 +15,12 @@ export interface Shift {
 }
 
 export class ShiftController {
-  static async getCurrentShift(userId: string, branchId: string): Promise<{ success: boolean; shift?: Shift; error?: string }> {
+  /** One shift for the whole restaurant: whoever opened it, everyone signed in continues it. */
+  static async getCurrentShift(branchId: string): Promise<{ success: boolean; shift?: Shift; error?: string }> {
     try {
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
-        .eq('user_id', userId)
         .eq('branch_id', branchId)
         .eq('status', 'open')
         .maybeSingle();
@@ -45,7 +46,9 @@ export class ShiftController {
         }])
         .select()
         .single();
-      
+
+      // shifts_one_open_per_branch: someone else already opened the shift.
+      if (error?.code === '23505') return { success: false, error: 'A shift is already open for the restaurant — refresh the page' };
       if (error) throw error;
       return { success: true, shift: data };
     } catch (err: any) {
@@ -53,7 +56,7 @@ export class ShiftController {
     }
   }
 
-  static async endShift(shiftId: string, closingCash: number, totalSales: number) {
+  static async endShift(shiftId: string, closingCash: number, totalSales: number, closedByName: string) {
     try {
       const { data, error } = await supabase
         .from('shifts')
@@ -61,6 +64,7 @@ export class ShiftController {
           closed_at: new Date().toISOString(),
           closing_cash: closingCash,
           total_sales: totalSales,
+          closed_by_name: closedByName,
           status: 'closed'
         })
         .eq('id', shiftId)

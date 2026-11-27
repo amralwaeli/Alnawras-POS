@@ -17,7 +17,7 @@ import { PrintService, cleanPrintText, type PrintLine } from '../../services/Pri
 /** The printed shift report: sales by payment method, the cash drawer count, and every payment
  *  out of the drawer during the shift (salary advances by employee, purchases). */
 export function shiftReportLines(r: {
-  businessName: string; cashier: string; openedAt: Date; closedAt: Date;
+  businessName: string; openedBy: string; closedBy: string; openedAt: Date; closedAt: Date;
   openingCash: number; countedCash: number; debtCash: number;
   sales: { revenue: number; discount: number; orders: number; byMethod: Record<string, number> };
   paidOut: { category: string; description: string; amount: number; employee_name?: string | null }[];
@@ -30,7 +30,8 @@ export function shiftReportLines(r: {
   const lines: PrintLine[] = [
     { text: cleanPrintText(r.businessName).toUpperCase(), style: 'large', align: 'center' },
     { text: 'SHIFT REPORT', style: 'bold', align: 'center' },
-    { text: `Cashier: ${cleanPrintText(r.cashier)}` },
+    { text: `Opened by: ${cleanPrintText(r.openedBy)}` },
+    ...(r.closedBy !== r.openedBy ? [{ text: `Closed by: ${cleanPrintText(r.closedBy)}` }] : []),
     { text: `Open:  ${when(r.openedAt)}` },
     { text: `Close: ${when(r.closedAt)}` },
     'rule',
@@ -71,7 +72,7 @@ export function ShiftManagementView() {
 
   useEffect(() => {
     if (currentUser) {
-      ShiftController.getCurrentShift(currentUser.id, currentUser.branchId)
+      ShiftController.getCurrentShift(currentUser.branchId)
         .then(r => {
           if (r.success) setCurrentShift(r.shift || null);
           setLoading(false);
@@ -121,7 +122,7 @@ export function ShiftManagementView() {
       .order('created_at');
     if (debtErr || expErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr ?? expErr)}`); }
 
-    const res = await ShiftController.endShift(currentShift!.id, cash, summary.data!.revenue);
+    const res = await ShiftController.endShift(currentShift!.id, cash, summary.data!.revenue, currentUser!.name);
     setLoading(false);
 
     if (res.success) {
@@ -130,7 +131,7 @@ export function ShiftManagementView() {
       setCashInput('');
       toast.success('Shift ended successfully');
       printShiftReport(shiftReportLines({
-        businessName, cashier: endedShift.user_name, openedAt: new Date(endedShift.opened_at),
+        businessName, openedBy: endedShift.user_name, closedBy: currentUser!.name, openedAt: new Date(endedShift.opened_at),
         closedAt: new Date(endedShift.closed_at ?? Date.now()), openingCash: Number(endedShift.opening_cash),
         countedCash: Number(endedShift.closing_cash ?? cash), sales: summary.data!,
         debtCash: (debtRows ?? []).reduce((s, r: any) => s + Number(r.amount), 0),
@@ -216,7 +217,7 @@ export function ShiftManagementView() {
             <div className="relative z-10 space-y-6">
               <div>
                 <p className="text-emerald-100 font-bold uppercase tracking-widest text-xs">Active Shift</p>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight break-words" dir="auto">{currentUser?.name}</h2>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight break-words" dir="auto">Opened by {currentShift.user_name}</h2>
               </div>
               <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-4 sm:gap-8">
                 <div>

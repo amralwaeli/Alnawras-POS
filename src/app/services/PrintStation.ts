@@ -96,6 +96,17 @@ export function routeItems(items: any[]): Map<string, any[]> {
       if (s) add(s, { id: it.id, product_name: m.optionName, quantity: it.quantity, modifiers: [], added_by_name: it.added_by_name });
     }
   }
+  // Lines that would print the same (name, choices, notes) become one "7 x Lemon Juice" row.
+  for (const [station, lines] of out) {
+    const merged = new Map<string, any>();
+    for (const l of lines) {
+      const key = JSON.stringify([l.product_name || l.productName, (l.modifiers ?? []).map((m: any) => m.optionName || m.option_name), l.notes || '']);
+      const m = merged.get(key);
+      if (!m) merged.set(key, { ...l, ids: [l.id] });
+      else { m.quantity = Number(m.quantity) + Number(l.quantity); if (!m.ids.includes(l.id)) m.ids.push(l.id); }
+    }
+    out.set(station, [...merged.values()]);
+  }
   return out;
 }
 
@@ -110,7 +121,7 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   for (const it of items) sends.set(`${it.order_id}|${it.created_at}`, [...(sends.get(`${it.order_id}|${it.created_at}`) ?? []), it]);
   const jobs: Job[] = [
     ...[...sends.values()].flatMap(g => [...routeItems(g)].map(([station, lines]) => ({
-      ids: [...new Set(lines.map(l => l.id))], cancel: false, station,
+      ids: [...new Set(lines.flatMap(l => l.ids ?? [l.id]))] as string[], cancel: false, station,
       lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatKitchenTicket(label(g[0]), lines, station, g[0].add_on), paper),
     }))),
     ...cancels.flatMap(c => [...new Set([c.station || 'kitchen', ...(c.also ?? [])])].map(station => ({

@@ -25,6 +25,9 @@ import { useBranch } from '../../context/BranchContext';
 import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
 import QRCode from 'qrcode';
 import { friendlyError } from '../../../lib/errors';
+import { isNativeApp } from '../../../lib/platform';
+
+const NO_RECEIPT_PRINTER = 'No receipt printer set up — add one in Printers (station: Receipts)';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SimpleMethod = 'cash' | 'card' | 'qr';
@@ -361,6 +364,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // Own copy of the paid order: the parent drops it from the open-orders list while the print prompt is still showing.
   const [receiptOrder, setReceiptOrder] = useState<any>(null);
   const [lanPrinted, setLanPrinted] = useState(false);
+  const [lastReceiptLines, setLastReceiptLines] = useState<PrintLine[] | null>(null);
   
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
@@ -465,7 +469,12 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     const billNo = order.billNumber ?? '';
     const printers = cachedPrinters(currentUser.branchId)
       .filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
-    if (!printers.length) { printReceipt({ ...order, ...totals }, 'NOT PAID - please check before paying', billNo); return; }
+    if (!printers.length) {
+      // In the app window.open would push Chrome over SmartPos.
+      if (isNativeApp()) toast.error(NO_RECEIPT_PRINTER);
+      else printReceipt({ ...order, ...totals }, 'NOT PAID - please check before paying', billNo);
+      return;
+    }
     const lines = buildReceiptLines({ businessName, billNo, order, cashier: currentUser.name, totals });
     for (const printer of printers) {
       void PrintService.sendToPrinter({ printerIp: printer.ipAddress!, printerPort: printer.port || 9100, bytes: PrintService.render(lines, printer.paperWidth) })
@@ -674,6 +683,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
               ] : []),
             ],
           });
+          setLastReceiptLines(receipt);
 
           for (const printer of cashierPrinters) {
             // Not awaited: a switched-off printer must not hold up the till.
@@ -740,6 +750,26 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     }
   };
 
+  // "Print again": in the app, re-send the paid receipt to the receipt printer instead of opening a browser page.
+  const reprintReceipt = () => {
+    if (!isNativeApp()) {
+      printReceipt({ ...(receiptOrder ?? order), billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo);
+      return;
+    }
+    const printers = cachedPrinters(currentUser.branchId)
+      .filter((p: any) => p.isActive && p.type === 'network' && (p.stations || []).includes('cashier'));
+    if (!printers.length) { toast.error(NO_RECEIPT_PRINTER); return; }
+    // A split-by-item payment builds no receipt at payment: build it from the paid bill.
+    const lines = lastReceiptLines ?? buildReceiptLines({
+      businessName, billNo: lastBillNo, order: receiptOrder ?? order, cashier: currentUser.name,
+      totals: lastTotals ?? totals, payment: [{ text: 'PAYMENT', value: lastSummary }],
+    });
+    for (const printer of printers) {
+      void PrintService.sendToPrinter({ printerIp: printer.ipAddress!, printerPort: printer.port || 9100, bytes: PrintService.render(lines, printer.paperWidth) })
+        .then(res => res.success ? toast.success('Receipt printed') : toast.error(`Receipt printer ${printer.name || printer.ipAddress}: ${res.error}`));
+    }
+  };
+
   // ── Print prompt ─────────────────────────────────────────────────────────
   if (showPrint) {
     return (
@@ -756,7 +786,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
             <div><p className="text-lg font-semibold text-gray-900">Payment Successful!</p><p className="text-sm text-gray-500 mt-1">{lanPrinted ? 'Receipt sent to the printer.' : 'Would you like to print a receipt?'}</p></div>
           </div>
           <div className="px-4 sm:px-6 py-4 border-t space-y-3">
-            <button onClick={() => { printReceipt({ ...(receiptOrder ?? order), billNumber: lastBillNo, ...(lastTotals ?? {}) }, lastSummary, lastBillNo); onClose(); }}
+            <button onClick={() => { reprintReceipt(); onClose(); }}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               {lanPrinted ? 'Print again' : 'Print Receipt'}

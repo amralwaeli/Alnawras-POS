@@ -303,6 +303,8 @@ export const mapPayroll = (row: any): PayrollSummary => ({
   lateDeduction: Number(row.late_deduction ?? 0),
   overtimeBonus: Number(row.overtime_bonus ?? 0),
   salaryAdvances: Number(row.salary_advances ?? 0),
+  daysOff: Number(row.days_off ?? 0),
+  daysOffDeduction: Number(row.days_off_deduction ?? 0),
   netSalary: Number(row.net_salary ?? 0),
   status: row.status,
   approvedBy: row.approved_by ?? undefined,

@@ -648,7 +648,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canCheckIn: true,
     canManageInvoicesQuotations: true,
     canManagePayroll: true,
-    canManageLeave: false,
+    canManageLeave: true,
     canViewOwnAttendance: true,
   },
 };
@@ -772,7 +772,7 @@ export interface LeaveRequest {
   id: string;
   employeeId: string;
   employeeName?: string;
-  leaveType: 'annual' | 'sick' | 'unpaid' | 'emergency' | 'other';
+  leaveType: 'annual' | 'sick' | 'unpaid' | 'emergency' | 'other' | 'day_off';
   startDate: string;
   endDate: string;
   daysCount: number;
@@ -837,6 +837,8 @@ export interface PayrollSummary {
   lateDeduction: number;
   overtimeBonus: number;
   salaryAdvances: number;
+  daysOff: number;
+  daysOffDeduction: number;
   netSalary: number;
   status: 'draft' | 'approved' | 'paid';
   approvedBy?: string;

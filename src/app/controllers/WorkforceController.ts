@@ -4,7 +4,7 @@ import {
   LeaveRequest, LeaveFilters, Result,
 } from '../models/types';
 import { mapEmployee, mapLeaveRequest } from '../models/mappers';
-import { localDateStr } from '../../lib/date';
+import { localDateStr, monthDateRange } from '../../lib/date';
 import { STAFF_COLUMNS } from './StaffController';
 
 const uid = (prefix: string) =>
@@ -470,6 +470,44 @@ export class WorkforceController {
     return { success: true, data: mapLeaveRequest(data) };
   }
 
+  // ── Record days off (approved on save, one row per date) ──────────────────
+  static async recordDaysOff(input: {
+    employeeId: string;
+    dates: string[];          // "YYYY-MM-DD"
+    branchId: string;
+    recordedBy: string;
+    reason?: string;
+  }): Promise<Result<number>> {
+    // Dates already recorded are skipped so a double tap never counts a day twice.
+    const { data: existing, error: readErr } = await supabase
+      .from('leave_requests')
+      .select('start_date')
+      .eq('employee_id', input.employeeId)
+      .eq('leave_type', 'day_off')
+      .eq('status', 'approved')
+      .in('start_date', input.dates);
+    if (readErr) return { success: false, error: readErr.message };
+    const taken = new Set((existing ?? []).map((r: any) => r.start_date));
+    const now = new Date().toISOString();
+    const rows = [...new Set(input.dates)].filter(d => !taken.has(d)).map(d => ({
+      id: uid('leave'),
+      employee_id: input.employeeId,
+      leave_type: 'day_off',
+      start_date: d,
+      end_date: d,
+      days_count: 1,
+      reason: input.reason ?? null,
+      status: 'approved',
+      reviewed_by: input.recordedBy,
+      reviewed_at: now,
+      branch_id: input.branchId,
+    }));
+    if (rows.length === 0) return { success: true, data: 0 };
+    const { error } = await supabase.from('leave_requests').insert(rows);
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: rows.length };
+  }
+
   // ── Approve or reject a leave request ────────────────────────────────────
   static async reviewLeaveRequest(
     id: string,
@@ -499,11 +537,9 @@ export class WorkforceController {
       if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.month) {
-        const year  = filters.year ?? new Date().getFullYear();
-        const month = filters.month.toString().padStart(2, '0');
-        query = query
-          .gte('start_date', `${year}-${month}-01`)
-          .lt('start_date',  `${year}-${(filters.month % 12) + 1 < 10 ? '0' : ''}${(filters.month % 12) + 1}-01`);
+        // monthDateRange: the old hand-built "next month" bound kept the year, so December matched nothing.
+        const { start, end } = monthDateRange(filters.year ?? new Date().getFullYear(), filters.month);
+        query = query.gte('start_date', start).lte('start_date', end);
       }
 
       const { data, error } = await query;

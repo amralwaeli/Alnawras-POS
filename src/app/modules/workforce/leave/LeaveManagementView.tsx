@@ -1,16 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CalendarOff, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
+import { CalendarOff, CheckCircle, XCircle, Clock, RefreshCw, Plus, X } from 'lucide-react';
 import { usePOS } from '../../../context/POSContext';
 import { WorkforceController } from '../../../controllers/WorkforceController';
-import { LeaveRequest, ROLE_PERMISSIONS } from '../../../models/types';
+import { LeaveRequest, EmployeeWithUser, ROLE_PERMISSIONS } from '../../../models/types';
 import { friendlyError } from '../../../../lib/errors';
+import { localDateStr } from '../../../../lib/date';
+import { DAYS_OFF_PER_MONTH } from '../../../../lib/daysOff';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: 'Annual', sick: 'Sick', unpaid: 'Unpaid',
-  emergency: 'Emergency', other: 'Other',
+  emergency: 'Emergency', other: 'Other', day_off: 'Day off',
 };
+
+/** Every date from `from` to `to` inclusive ("YYYY-MM-DD"); just `from` when `to` is empty or earlier. */
+function datesBetween(from: string, to: string): string[] {
+  const [y, m, d] = from.split('-').map(Number);
+  const cur = new Date(y, m - 1, d);
+  const out: string[] = [];
+  do {
+    out.push(localDateStr(cur));
+    cur.setDate(cur.getDate() + 1);
+  } while (to && localDateStr(cur) <= to && out.length < 31);
+  return out;
+}
 
 const STATUS_BADGE: Record<string, string> = {
   pending:  'bg-amber-100 text-amber-700',
@@ -31,6 +45,27 @@ export function LeaveManagementView() {
   const canApprove = currentUser
     ? ['admin', 'hr', 'manager'].includes(currentUser.role)
     : false;
+  const canRecord = currentUser ? !!ROLE_PERMISSIONS[currentUser.role]?.canManageLeave : false;
+
+  // Days-off panel: approved day_off rows for the chosen month, per active employee.
+  const [month, setMonth] = useState(() => localDateStr().slice(0, 7)); // "YYYY-MM"
+  const [employees, setEmployees] = useState<EmployeeWithUser[]>([]);
+  const [monthDaysOff, setMonthDaysOff] = useState<LeaveRequest[]>([]);
+  const [showRecord, setShowRecord] = useState(false);
+
+  const loadDaysOff = useCallback(async () => {
+    const [y, m] = month.split('-').map(Number);
+    if (!y || !m) return;
+    const [emps, leave] = await Promise.all([
+      WorkforceController.getEmployees({ status: 'active' }),
+      WorkforceController.getLeaveRequests(branchId, { status: 'approved', month: m, year: y }),
+    ]);
+    if (emps.success) setEmployees(emps.data);
+    if (leave.success) setMonthDaysOff(leave.data.filter(r => r.leaveType === 'day_off'));
+    else setError(friendlyError(leave.error));
+  }, [branchId, month]);
+
+  useEffect(() => { loadDaysOff(); }, [loadDaysOff]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,15 +120,73 @@ export function LeaveManagementView() {
           <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">Review and manage employee leave requests</p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 min-h-11 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canRecord && (
+            <button
+              onClick={() => setShowRecord(true)}
+              className="flex items-center gap-2 px-4 py-2 min-h-11 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="size-4" />
+              Record day off
+            </button>
+          )}
+          <button
+            onClick={() => { load(); loadDaysOff(); }}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 min-h-11 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Days off this month */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-gray-900">Days off this month</h2>
+            <p className="text-xs text-gray-500">{DAYS_OFF_PER_MONTH} per employee; extra days are deducted from payroll</p>
+          </div>
+          <input
+            type="month"
+            value={month}
+            onChange={e => setMonth(e.target.value)}
+            aria-label="Month"
+            className="min-h-11 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+          />
+        </div>
+        {employees.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-gray-400 text-center">No active employees</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {employees.map(emp => {
+              const used = monthDaysOff.filter(r => r.employeeId === emp.employeeId).length;
+              const extra = used - DAYS_OFF_PER_MONTH;
+              const tone = extra > 0 ? 'text-red-600' : used === DAYS_OFF_PER_MONTH ? 'text-amber-600' : 'text-gray-600';
+              return (
+                <li key={emp.employeeId} className="flex items-center justify-between gap-3 px-4 py-2.5 min-h-11 text-sm">
+                  <span dir="auto" className="font-medium text-gray-900 min-w-0 break-words">{emp.fullName}</span>
+                  <span className={`shrink-0 text-right font-medium ${tone}`}>
+                    {used} of {DAYS_OFF_PER_MONTH} used
+                    {extra > 0 && <span className="block text-xs">+{extra} extra (deducted)</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {showRecord && currentUser && (
+        <RecordDayOffModal
+          employees={employees}
+          branchId={branchId}
+          recordedBy={currentUser.name}
+          onClose={() => setShowRecord(false)}
+          onSaved={() => { setShowRecord(false); load(); loadDaysOff(); }}
+        />
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -236,6 +329,80 @@ export function LeaveManagementView() {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function RecordDayOffModal({ employees, branchId, recordedBy, onClose, onSaved }: {
+  employees: EmployeeWithUser[];
+  branchId: string;
+  recordedBy: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [employeeId, setEmployeeId] = useState('');
+  const [from, setFrom] = useState(() => localDateStr());
+  const [to, setTo] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!employeeId || !from) { setErr('Choose an employee and a date.'); return; }
+    if (to && to < from) { setErr('"To" must be on or after the first date.'); return; }
+    setSaving(true);
+    setErr(null);
+    const r = await WorkforceController.recordDaysOff({
+      employeeId, dates: datesBetween(from, to), branchId, recordedBy, reason: note.trim() || undefined,
+    });
+    setSaving(false);
+    if (!r.success) { setErr(friendlyError(r.error)); return; }
+    if (r.data === 0) { setErr('Those days are already recorded.'); return; }
+    onSaved();
+  };
+
+  const field = 'mt-1 w-full min-h-11 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white';
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="record-day-off-title">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90dvh] overflow-y-auto overscroll-contain">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="record-day-off-title" className="text-lg font-bold text-gray-900">Record day off</h2>
+          <button onClick={onClose} aria-label="Close" className="shrink-0 flex items-center justify-center size-11 -m-2 rounded-lg hover:bg-gray-100"><X className="size-5 text-gray-400" /></button>
+        </div>
+
+        <label className="block text-sm">
+          <span className="text-gray-600">Employee</span>
+          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className={field}>
+            <option value="">Select employee…</option>
+            {employees.map(e => <option key={e.employeeId} value={e.employeeId}>{e.fullName}</option>)}
+          </select>
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            <span className="text-gray-600">Date</span>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={field} />
+          </label>
+          <label className="block text-sm">
+            <span className="text-gray-600">To (optional)</span>
+            <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className={field} />
+          </label>
+        </div>
+
+        <label className="block text-sm">
+          <span className="text-gray-600">Note (optional)</span>
+          <input type="text" dir="auto" value={note} onChange={e => setNote(e.target.value)} className={field} />
+        </label>
+
+        {err && <p className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{err}</p>}
+
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 min-h-11 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button onClick={save} disabled={saving} className="px-4 py-2 min-h-11 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
     </div>
   );

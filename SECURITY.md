@@ -1,7 +1,7 @@
 # Security model
 
 How AlnawrasPOS keeps each restaurant's data separate, and what to keep in mind
-when changing the database. Current as of November 2026 (migrations up to 0056).
+when changing the database. Current as of November 2026 (migrations up to 0057).
 
 ## Who is who
 

@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { Employee, AttendanceLog, PayrollSummary } from '../models/types';
 import { mapEmployee, mapFingerprint, mapAttendanceLog, mapPayroll } from '../models/mappers';
 import { localDateStr, monthDateRange } from '../../lib/date';
+import { daysOffDeduction as computeDaysOffDeduction } from '../../lib/daysOff';
 import { payPeriodForPayroll } from '../../lib/payPeriod';
 import { checkInRule, checkOutRule, stillOpen } from './attendanceRules';
 
@@ -492,7 +493,20 @@ export class HRController {
       const lateDeduction = Math.round(totalLateMinutes * minuteRate * 100) / 100;
       const overtimeBonus = Math.round(totalOvertimeMinutes * minuteRate * 1.5 * 100) / 100;
       const absentDeduction = Math.round(absentDays * dailyRate * 100) / 100;
-      
+
+      // Recorded days off above the monthly allowance cost a day's pay each.
+      const { data: offRows, error: offErr } = await supabase
+        .from('leave_requests')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('leave_type', 'day_off')
+        .eq('status', 'approved')
+        .gte('start_date', start)
+        .lte('start_date', end);
+      if (offErr) throw offErr;
+      const daysOff = (offRows ?? []).length;
+      const { deduction: daysOffDeduction } = computeDaysOffDeduction(daysOff, employee.monthlySalary);
+
       // Salary advances are expenses keyed by the LOGIN user id, paid back out of this payroll.
       let salaryAdvances = 0;
       if (employee.userId) {
@@ -503,7 +517,7 @@ export class HRController {
       }
 
       // Advances are not clamped: a negative net means the employee owes.
-      const netSalary = Math.round((Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction + overtimeBonus) - salaryAdvances) * 100) / 100;
+      const netSalary = Math.round((Math.max(0, employee.monthlySalary - lateDeduction - absentDeduction - daysOffDeduction + overtimeBonus) - salaryAdvances) * 100) / 100;
 
       // One row per employee per month: a stable id (a new one on every recompute
       // broke the Approve button), and never overwrite an approved/paid month.
@@ -530,6 +544,8 @@ export class HRController {
           late_deduction: lateDeduction,
           overtime_bonus: overtimeBonus,
           salary_advances: salaryAdvances,
+          days_off: daysOff,
+          days_off_deduction: daysOffDeduction,
           net_salary: netSalary,
           status: 'draft',
           branch_id: employee.branchId,

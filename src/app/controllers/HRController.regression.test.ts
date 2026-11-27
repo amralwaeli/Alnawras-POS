@@ -72,6 +72,18 @@ describe('payroll is unchanged and independent of performance data', () => {
     expect(r.data.netSalary).toBe(-487.5);
   });
 
+  it('deducts recorded days off above 2 a month at the daily rate', async () => {
+    const off = (id: string, d: string) => ({ id, employee_id: 'EMP-001', leave_type: 'day_off', status: 'approved', start_date: d, end_date: d, days_count: 1, branch_id: 'b1' });
+    db.tables.leave_requests = [
+      off('l1', '2026-11-04'), off('l2', '2026-11-11'), off('l3', '2026-11-18'),
+      off('l4', '2026-10-28'),                                                    // other month
+      { ...off('l5', '2026-11-25'), leave_type: 'annual' },                       // not a day off
+    ];
+    const r: any = await HRController.computePayroll('EMP-001', 11, 2026, 'u-hr');
+    expect(r.data).toMatchObject({ daysOff: 3, daysOffDeduction: 100, netSalary: 2912.5 });
+    expect(db.tables.payroll_summary[0]).toMatchObject({ days_off: 3, days_off_deduction: 100 });
+  });
+
   it('never reads the observations table', async () => {
     await HRController.computePayroll('EMP-001', 11, 2026, 'u-hr');
     expect(db.log.map(l => l.table)).not.toContain('employee_performance_observations');

@@ -76,6 +76,8 @@ export function Layout() {
     path: string; label: string; icon: any;
     permission: keyof typeof ROLE_PERMISSIONS['admin'];
     adminOnly?: boolean;
+    /** With adminOnly: a manager sees it too. */
+    managerToo?: boolean;
     /** Hidden when the branch's super-admin has this feature module disabled. */
     feature?: BranchFeatureKey;
   };
@@ -95,23 +97,23 @@ export function Layout() {
     { path: '/inventory',          label: 'Inventory',      icon: Package,       permission: 'canManageInventory' as const },
     { path: '/reports',            label: 'Reports',        icon: BarChart3,     permission: 'canViewReports' as const, feature: 'reports' },
     { path: '/accounting',         label: 'Accounting',     icon: DollarSign,    permission: 'canManageAccounting' as const, feature: 'accounting' },
-    { path: '/table-management',   label: 'Manage Tables',  icon: Settings,      permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true },
-    { path: '/modifier-groups',    label: 'Modifier Groups', icon: Layers,       permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/table-management',   label: 'Manage Tables',  icon: Settings,      permission: 'canManageInventory' as const, adminOnly: true, managerToo: true },
+    { path: '/product-management', label: 'Products',       icon: Package,       permission: 'canManageInventory' as const, adminOnly: true, managerToo: true },
+    { path: '/manage-menu',        label: 'Manage Menu',    icon: Tag,           permission: 'canManageInventory' as const, adminOnly: true, managerToo: true },
+    { path: '/modifier-groups',    label: 'Modifier Groups', icon: Layers,       permission: 'canManageInventory' as const, adminOnly: true, managerToo: true },
     { path: '/bill-format',        label: 'Bill Format',    icon: ReceiptText,   permission: 'canManageAccounting' as const, adminOnly: true, feature: 'accounting' },
     { path: '/shifts',             label: 'Shifts',         icon: Clock,         permission: 'canManageAccounting' as const, feature: 'accounting' },
     { path: '/printers',           label: 'Printers',       icon: Printer,       permission: 'canProcessPayments' as const },
     { path: '/loyalty',            label: 'Loyalty',        icon: Star,          permission: 'canViewReports' as const, adminOnly: true, feature: 'loyalty' },
     { path: '/debts',              label: 'Customer Debts', icon: HandCoins,     permission: 'canProcessPayments' as const },
-    { path: '/business-settings',  label: 'Business Settings', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true },
+    { path: '/business-settings',  label: 'Business Settings', icon: Percent,      permission: 'canManageInventory' as const, adminOnly: true, managerToo: true },
     { path: '/quotations',         label: 'Quotations',     icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
     { path: '/invoices',           label: 'Invoices',       icon: FileText,      permission: 'canManageInvoicesQuotations' as const, feature: 'invoices' },
     { path: '/table-qr',           label: 'QR Codes',       icon: QrCode,        permission: 'canViewReports' as const, adminOnly: true, feature: 'groupOrdering' },
   ];
 
   const navItems = allNavItems.filter(item => {
-    if (item.adminOnly && currentUser.role !== 'admin') return false;
+    if (item.adminOnly && currentUser.role !== 'admin' && !(item.managerToo && currentUser.role === 'manager')) return false;
     if (item.feature && !hasFeature(item.feature)) return false;
     return !!permissions[item.permission];
   });

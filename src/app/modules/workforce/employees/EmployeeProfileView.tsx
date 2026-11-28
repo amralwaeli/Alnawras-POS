@@ -83,7 +83,9 @@ export function EmployeeProfileView() {
   // Action state
   const [acting, setActing]         = useState(false);
 
-  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'hr';
+  // Owner decision: a manager may edit employees; deactivating stays admin/HR.
+  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'hr' || currentUser?.role === 'manager';
+  const canDeactivate = currentUser?.role === 'admin' || currentUser?.role === 'hr';
 
   // ── Load employee ──
   const loadEmployee = async () => {
@@ -288,7 +290,7 @@ export function EmployeeProfileView() {
               >
                 <Edit2 className="size-4" /> Edit
               </button>
-              {employee.status === 'active' ? (
+              {canDeactivate && (employee.status === 'active' ? (
                 <button
                   onClick={handleDeactivate}
                   disabled={acting}
@@ -304,7 +306,7 @@ export function EmployeeProfileView() {
                 >
                   <UserCheck className="size-4" /> Reactivate
                 </button>
-              )}
+              ))}
             </div>
           )}
         </div>

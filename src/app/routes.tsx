@@ -5,10 +5,12 @@ import { usePOS } from './context/POSContext';
 import { useBranch } from './context/BranchContext';
 import { ROLE_PERMISSIONS, permissionsFor, BranchFeatureKey } from './models/types';
 
-function ProtectedRoute({ children, permission, adminOnly, feature }: {
+function ProtectedRoute({ children, permission, adminOnly, managerToo, feature }: {
   children: React.ReactNode;
   permission?: keyof typeof ROLE_PERMISSIONS['admin'] | (keyof typeof ROLE_PERMISSIONS['admin'])[];   // array: any of them
   adminOnly?: boolean;
+  /** With adminOnly: a manager passes too (owner decision: managers run menu/tables/settings). */
+  managerToo?: boolean;
   /** Redirect home if the branch's super-admin has this module disabled —
    *  blocks direct-URL access to a hidden feature, not just the nav link. */
   feature?: BranchFeatureKey;
@@ -16,7 +18,7 @@ function ProtectedRoute({ children, permission, adminOnly, feature }: {
   const { currentUser } = usePOS();
   const { hasFeature } = useBranch();
   if (!currentUser) return <Navigate to="/" replace />;
-  if (adminOnly && currentUser.role !== 'admin') return <Navigate to="/" replace />;
+  if (adminOnly && currentUser.role !== 'admin' && !(managerToo && currentUser.role === 'manager')) return <Navigate to="/" replace />;
   if (permission && ![permission].flat().some(p => permissionsFor(currentUser)?.[p])) return <Navigate to="/" replace />;
   if (feature && !hasFeature(feature)) return <Navigate to="/" replace />;
   return <>{children}</>;
@@ -149,7 +151,7 @@ export const router = createHashRouter([
 
       // ── Tables ──
       { path: 'tables',              element: <Lazy><ProtectedRoute permission="canViewTables"><TablesView /></ProtectedRoute></Lazy> },
-      { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly><TableManagementView /></ProtectedRoute></Lazy> },
+      { path: 'table-management',    element: <Lazy><ProtectedRoute adminOnly managerToo><TableManagementView /></ProtectedRoute></Lazy> },
 
       // ── Takeaway ordering (cashier-accessible, takeaway-only) ──
       { path: 'takeaway',            element: <Lazy><ProtectedRoute permission="canViewTables"><CustomerMenuView takeawayOnly /></ProtectedRoute></Lazy> },
@@ -158,9 +160,9 @@ export const router = createHashRouter([
       { path: 'pickup-orders',       element: <Lazy><ProtectedRoute permission="canViewTables" feature="pickup"><PickupBoardView /></ProtectedRoute></Lazy> },
 
       // ── Menu / Products ──
-      { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly><ProductManagementView /></ProtectedRoute></Lazy> },
-      { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly><CategoryManagementView /></ProtectedRoute></Lazy> },
-      { path: 'modifier-groups',     element: <Lazy><ProtectedRoute adminOnly><ModifierManagementView /></ProtectedRoute></Lazy> },
+      { path: 'product-management',  element: <Lazy><ProtectedRoute adminOnly managerToo><ProductManagementView /></ProtectedRoute></Lazy> },
+      { path: 'manage-menu',         element: <Lazy><ProtectedRoute adminOnly managerToo><CategoryManagementView /></ProtectedRoute></Lazy> },
+      { path: 'modifier-groups',     element: <Lazy><ProtectedRoute adminOnly managerToo><ModifierManagementView /></ProtectedRoute></Lazy> },
       { path: 'category-management', element: <Navigate to="/manage-menu" replace /> },
       { path: 'printers',            element: <Lazy><ProtectedRoute permission="canProcessPayments"><PrinterManagementView /></ProtectedRoute></Lazy> },
 
@@ -215,7 +217,7 @@ export const router = createHashRouter([
       { path: 'debts',               element: <Lazy><ProtectedRoute permission="canProcessPayments"><DebtAccountsView /></ProtectedRoute></Lazy> },
 
       // ── Tax & Discounts (tenant admin) ──
-      { path: 'business-settings',   element: <Lazy><ProtectedRoute adminOnly><BusinessSettingsView /></ProtectedRoute></Lazy> },
+      { path: 'business-settings',   element: <Lazy><ProtectedRoute adminOnly managerToo><BusinessSettingsView /></ProtectedRoute></Lazy> },
 
       // ── QR ──
       { path: 'table-qr',            element: <Lazy><ProtectedRoute adminOnly feature="groupOrdering"><TableQRView /></ProtectedRoute></Lazy> },

@@ -137,7 +137,9 @@ export function EmployeesView() {
   const present  = employees.filter(e => e.todayStatus === 'present').length;
   const withFP   = employees.filter(e => e.hasFingerprint).length;
 
-  const canEdit   = currentUser?.role === 'admin' || currentUser?.role === 'hr';
+  // Owner decision: a manager may add and edit employees; deactivating stays admin/HR.
+  const canEdit   = currentUser?.role === 'admin' || currentUser?.role === 'hr' || currentUser?.role === 'manager';
+  const canDeactivate = currentUser?.role === 'admin' || currentUser?.role === 'hr';
   const showInactive = filters.status === 'inactive';
 
   return (
@@ -360,7 +362,7 @@ export function EmployeesView() {
                             >
                               <Edit2 className="size-4" />
                             </button>
-                            {emp.status === 'active' ? (
+                            {canDeactivate && (emp.status === 'active' ? (
                               <button
                                 onClick={() => handleDeactivate(emp)}
                                 disabled={deleting === emp.employeeId}
@@ -378,7 +380,7 @@ export function EmployeesView() {
                               >
                                 Activate
                               </button>
-                            )}
+                            ))}
                           </>
                         )}
                       </div>

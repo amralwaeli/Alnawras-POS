@@ -54,6 +54,7 @@ const PerformanceView        = lazy(() => import('./modules/workforce').then(m =
 const FingerprintCheckInView = lazy(() => import('./modules/hr').then(m => ({ default: m.FingerprintCheckInView })));
 
 const ReportsView            = lazy(() => import('./modules/reports').then(m => ({ default: m.ReportsView })));
+const PaidBillsView          = lazy(() => import('./modules/reports/PaidBillsView').then(m => ({ default: m.PaidBillsView })));
 
 const AccountingView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.AccountingView })));
 const BillFormatView         = lazy(() => import('./modules/accounting').then(m => ({ default: m.BillFormatView })));
@@ -171,6 +172,7 @@ export const router = createHashRouter([
 
       // ── Reports ──
       { path: 'reports',             element: <Lazy><ProtectedRoute permission="canViewReports" feature="reports"><ReportsView /></ProtectedRoute></Lazy> },
+      { path: 'paid-bills',          element: <Lazy><ProtectedRoute permission="canProcessPayments"><PaidBillsView /></ProtectedRoute></Lazy> },
 
       // ── Accounting ──
       { path: 'accounting',          element: <Lazy><ProtectedRoute permission="canManageAccounting" feature="accounting"><AccountingView /></ProtectedRoute></Lazy> },

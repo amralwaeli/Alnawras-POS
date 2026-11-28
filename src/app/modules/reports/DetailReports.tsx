@@ -234,6 +234,16 @@ export function CancellationsTab({ branchId }: { branchId: string }) {
         { label: 'Table / type', get: where },
         { label: 'Total', get: r => fmt(n(r.total)), csv: r => n(r.total), right: true },
       ]} />
+      <Table title="Refunds" note={`${n(d.data?.refunds?.count ?? 0)} refunds · ${fmt(n(d.data?.refunds?.total ?? 0))}`} file="refunds" rows={d.data?.refunds?.list ?? []} cols={[
+        { label: 'When', get: r => day(r.at) },
+        { label: 'Bill', get: r => `#${r.bill ?? '—'}` },
+        { label: 'Table / type', get: where },
+        { label: 'Items', get: r => Array.isArray(r.items) ? r.items.join(', ') : (r.items ?? '—') },
+        { label: 'Amount', get: r => fmt(n(r.amount)), csv: r => n(r.amount), right: true },
+        { label: 'Method', get: r => String(r.method ?? '—').toUpperCase() },
+        { label: 'By', get: r => r.by ?? '—' },
+        { label: 'Reason', get: r => r.reason ?? '—' },
+      ]} />
     </Shell>
   );
 }

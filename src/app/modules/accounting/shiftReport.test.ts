@@ -35,4 +35,17 @@ describe('shift report', () => {
     expect(value(lines, '  Card')).toBe('RM 200.00');
     expect(value(lines, 'Bills paid')).toBe('12');
   });
+
+  it('takes cash refunds off the expected cash, not card refunds, and lists every refund', () => {
+    const withRefunds = shiftReportLines({
+      businessName: 'B', openedBy: 'A', closedBy: 'A', openedAt: new Date(), closedAt: new Date(),
+      openingCash: 100, countedCash: 190, debtCash: 0, sales: { revenue: 150, discount: 0, orders: 2, byMethod: { cash: 100, card: 50 } }, paidOut: [],
+      refunds: [{ bill: '12', method: 'cash', amount: 10, reason: 'Cold food' }, { bill: '13', method: 'card', amount: 25, reason: 'Wrong item' }],
+    });
+    expect(value(withRefunds, 'Expected cash')).toBe('RM 190.00');   // 100 + 100 - 10 cash refund (card refund not)
+    expect(value(withRefunds, '- Cash refunds')).toBe('RM 10.00');
+    expect(value(withRefunds, '#12 Cash')).toBe('RM 10.00');
+    expect(value(withRefunds, '#13 Card')).toBe('RM 25.00');
+    expect(withRefunds.some((l: any) => l.text === '  Cold food')).toBe(true);
+  });
 });

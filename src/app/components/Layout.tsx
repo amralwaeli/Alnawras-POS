@@ -33,7 +33,7 @@ export function Layout() {
   // Full-screen roles move between their screens with these links (waiters: back to the menu from Tables).
   const posLinks: [string, string][] =
     // Waiters move between Menu and Tables with the buttons on those screens.
-    currentUser.role === 'cashier' ? [['/tables', 'Tables'], ['/shifts', 'Shift'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']] : [];
+    currentUser.role === 'cashier' ? [['/tables', 'Tables'], ['/shifts', 'Shift'], ['/paid-bills', 'Paid Bills'], ['/debts', 'Customer Debts'], ['/printers', 'Printers']] : [];
   if (isPOSOnlyRole) {
     // These roles only exist in the installed app, where logout just drops the
     // staff PIN (the device stays bound) — so the next person can PIN in.

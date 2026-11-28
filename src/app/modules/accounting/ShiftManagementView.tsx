@@ -21,12 +21,16 @@ export function shiftReportLines(r: {
   openingCash: number; countedCash: number; debtCash: number;
   sales: { revenue: number; discount: number; orders: number; byMethod: Record<string, number> };
   paidOut: { category: string; description: string; amount: number; employee_name?: string | null }[];
+  /** Refunds made during the shift; only CASH ones came out of the drawer. */
+  refunds?: { bill: string | null; method: string; amount: number; reason: string }[];
 }): PrintLine[] {
   const when = (d: Date) => d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   const cashSales = r.sales.byMethod.cash ?? 0;
   const paidOutTotal = r.paidOut.reduce((s, e) => s + e.amount, 0);
-  const expected = r.openingCash + cashSales + r.debtCash - paidOutTotal;
+  const refunds = r.refunds ?? [];
+  const cashRefunds = refunds.filter(f => f.method === 'cash').reduce((s, f) => s + f.amount, 0);
+  const expected = r.openingCash + cashSales + r.debtCash - paidOutTotal - cashRefunds;
   const lines: PrintLine[] = [
     { text: cleanPrintText(r.businessName).toUpperCase(), style: 'large', align: 'center' },
     { text: 'SHIFT REPORT', style: 'bold', align: 'center' },
@@ -46,6 +50,7 @@ export function shiftReportLines(r: {
     { text: '+ Cash sales', value: fmt(cashSales) },
     { text: '+ Debt paid in cash', value: fmt(r.debtCash) },
     { text: '- Paid out', value: fmt(paidOutTotal) },
+    ...(cashRefunds ? [{ text: '- Cash refunds', value: fmt(cashRefunds) }] : []),
     { text: 'Expected cash', value: fmt(expected), style: 'bold' },
     { text: 'Counted cash', value: fmt(r.countedCash), style: 'bold' },
     { text: 'Difference', value: fmt(r.countedCash - expected), style: 'large' },
@@ -56,6 +61,13 @@ export function shiftReportLines(r: {
       const who = e.employee_name ? `${cap(e.category)}: ${cleanPrintText(e.employee_name)}` : cap(e.category);
       lines.push({ text: who, value: fmt(e.amount) });
       if (e.description && e.description !== 'Salary / advance') lines.push({ text: `  ${cleanPrintText(e.description)}` });
+    }
+  }
+  if (refunds.length) {
+    lines.push('rule', { text: 'REFUNDS', style: 'bold' });
+    for (const f of refunds) {
+      lines.push({ text: `#${f.bill ?? '-'} ${cap(f.method)}`, value: fmt(f.amount) });
+      if (f.reason) lines.push({ text: `  ${cleanPrintText(f.reason).slice(0, 32)}` });
     }
   }
   lines.push('rule');
@@ -120,7 +132,12 @@ export function ShiftManagementView() {
       .select('category, description, amount, employee_name')
       .eq('branch_id', currentUser!.branchId).eq('from_drawer', true).gte('created_at', currentShift!.opened_at)
       .order('created_at');
-    if (debtErr || expErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr ?? expErr)}`); }
+    // Refunds made during the shift (migration 0059); cash ones left the drawer.
+    const { data: refundRows, error: refErr } = await supabase.from('refunds')
+      .select('amount, method, reason, refunded_by_name, created_at, orders!inner(bill_number, branch_id)')
+      .eq('orders.branch_id', currentUser!.branchId).gte('created_at', currentShift!.opened_at)
+      .order('created_at');
+    if (debtErr || expErr || refErr) { setLoading(false); return toast.error(`Could not total the shift: ${friendlyError(debtErr ?? expErr ?? refErr)}`); }
 
     const res = await ShiftController.endShift(currentShift!.id, cash, summary.data!.revenue, currentUser!.name);
     setLoading(false);
@@ -136,6 +153,7 @@ export function ShiftManagementView() {
         countedCash: Number(endedShift.closing_cash ?? cash), sales: summary.data!,
         debtCash: (debtRows ?? []).reduce((s, r: any) => s + Number(r.amount), 0),
         paidOut: (paidOut ?? []).map((e: any) => ({ ...e, amount: Number(e.amount) })),
+        refunds: (refundRows ?? []).map((f: any) => ({ bill: f.orders?.bill_number ?? null, method: f.method, amount: Number(f.amount), reason: f.reason ?? '' })),
       }));
     } else {
       toast.error(friendlyError(res.error));

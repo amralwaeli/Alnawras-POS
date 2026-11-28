@@ -6,8 +6,8 @@ import { downloadCsv } from '../../../lib/csv';
 import { ReportsController, ProductSaleRow } from '../../controllers/ReportsController';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { periodRange, usePeriod, PeriodPicker } from './period';
-import { ReportsController as RC, SalesSummary, CompletedOrderRow, BillDetail } from '../../controllers/ReportsController';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { ReportsController as RC, SalesSummary, CompletedOrderRow } from '../../controllers/ReportsController';
+import { BillDialog } from './BillDialog';
 import { friendlyError } from '../../../lib/errors';
 import { CategoriesTab, HoursTab, StaffTab, TablesTab, DiscountsTab, CancellationsTab, Table } from './DetailReports';
 
@@ -131,75 +131,6 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
   );
 }
 
-const time = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-/** Full bill (items, who added / cancelled them, payments), fetched only when opened. */
-function BillDialog({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
-  const [bill, setBill] = useState<BillDetail | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!orderId) return;
-    let cancelled = false;
-    setBill(null); setError('');
-    RC.getBillDetail(orderId).then(res => {
-      if (cancelled) return;
-      if (res.success) setBill(res.data!); else setError(friendlyError(res.error, 'Could not load the bill'));
-    });
-    return () => { cancelled = true; };
-  }, [orderId]);
-
-  const b = bill;
-  return (
-    <Dialog open={!!orderId} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="text-base pr-6">
-            {b ? `Bill #${b.billNumber ?? '—'} · ${b.orderType === 'dine-in' ? `Table ${b.tableNumber}` : b.orderType}${b.completedAt ? ` · paid ${time(b.completedAt)}` : ''}` : 'Bill'}
-          </DialogTitle>
-        </DialogHeader>
-        {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : !b ? <p className="text-sm text-gray-500">Loading…</p> : (
-          <div className="space-y-4 text-sm min-w-0">
-            <p className="text-gray-600">Cashier <b dir="auto">{b.cashierName ?? '—'}</b> · <span className="uppercase">{b.paymentMethod ?? '—'}</span></p>
-            <ul className="divide-y divide-gray-100">
-              {b.items.map((i, n) => (
-                <li key={n} className={`py-2 flex justify-between gap-3 ${i.cancelled ? 'text-gray-400' : 'text-gray-900'}`}>
-                  <div className="min-w-0">
-                    <p className={`font-medium break-words ${i.cancelled ? 'line-through' : ''}`} dir="auto">{i.quantity} x {i.productName}</p>
-                    {i.modifiers && <p className="text-xs text-gray-500 break-words" dir="auto">{i.modifiers}</p>}
-                    <p className="text-xs text-gray-500" dir="auto">by {i.addedBy ?? 'Guest / QR'}</p>
-                    {i.cancelled && <p className="text-xs" dir="auto">Cancelled{i.cancelledBy ? ` by ${i.cancelledBy}` : ''}{i.cancelReason ? ` — ${i.cancelReason}` : ''}</p>}
-                  </div>
-                  <span className={`whitespace-nowrap ${i.cancelled ? 'line-through' : 'font-semibold'}`}>{fmt(i.amount)}</span>
-                </li>
-              ))}
-            </ul>
-            <dl className="space-y-1 border-t border-gray-100 pt-3">
-              {([['Subtotal', b.subtotal], ['Discount', -b.discount], ['Tax', b.tax]] as const).map(([k, v]) => (
-                <div key={k} className="flex justify-between text-gray-600"><dt>{k}</dt><dd className="whitespace-nowrap">{fmt(v)}</dd></div>
-              ))}
-              <div className="flex justify-between font-bold text-gray-900"><dt>Total</dt><dd className="whitespace-nowrap">{fmt(b.total)}</dd></div>
-            </dl>
-            {b.payments.length > 0 && (
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payments</p>
-                <ul className="space-y-1">
-                  {b.payments.map((p, n) => (
-                    <li key={n} className="flex justify-between gap-3 text-gray-600">
-                      <span className="min-w-0 break-words"><b className="uppercase">{p.method}</b> · <span dir="auto">{p.cashierName ?? '—'}</span> · {time(p.at)}</span>
-                      <span className="whitespace-nowrap font-semibold text-gray-900">{fmt(p.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function OverviewTab({ branchId }: { branchId: string }) {
   const p = usePeriod('today');
   const [summary, setSummary] = useState<SalesSummary | null>(null);
@@ -221,8 +152,10 @@ function OverviewTab({ branchId }: { branchId: string }) {
     return () => { cancelled = true; };
   }, [branchId, p.range]);
 
+  // Refunds lower sales on the day they are made; the RPC's revenue stays gross.
+  const net = (summary?.revenue ?? 0) - (summary?.refunds ?? 0);
   const kpis = [
-    { label: 'Revenue',       value: fmt(summary?.revenue ?? 0), icon: DollarSign,   bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
+    { label: 'Revenue',       value: fmt(net), icon: DollarSign,   bg: 'bg-emerald-50', ic: 'bg-emerald-100 text-emerald-600', vc: 'text-emerald-700' },
     { label: 'Bills Paid',    value: summary?.orders ?? 0,       icon: ShoppingCart, bg: 'bg-blue-50',    ic: 'bg-blue-100 text-blue-600',       vc: 'text-blue-700' },
     { label: 'Tax Collected', value: fmt(summary?.tax ?? 0),     icon: TrendingUp,   bg: 'bg-purple-50',  ic: 'bg-purple-100 text-purple-600',   vc: 'text-purple-700' },
     { label: 'Items Sold',    value: summary?.items ?? 0,        icon: Package,      bg: 'bg-amber-50',   ic: 'bg-amber-100 text-amber-600',     vc: 'text-amber-700' },
@@ -243,11 +176,12 @@ function OverviewTab({ branchId }: { branchId: string }) {
           </div>
         ))}
       </div>
-      {summary && Object.keys(summary.byMethod).length > 0 && (
+      {summary && (Object.keys(summary.byMethod).length > 0 || summary.refunds > 0) && (
         <div className="flex flex-wrap gap-2 text-sm text-gray-600">
           {Object.entries(summary.byMethod).map(([m, a]) => (
-            <span key={m} className="bg-white border border-gray-100 rounded-xl px-3 py-1.5"><b className="uppercase">{m}</b> {fmt(Number(a))}</span>
+            <span key={m} className="bg-white border border-gray-100 rounded-xl px-3 py-1.5"><b className="uppercase">{m}</b> {fmt(Number(a) - (summary.refundsByMethod[m] ?? 0))}</span>
           ))}
+          {summary.refunds > 0 && <span className="bg-red-50 border border-red-100 text-red-700 rounded-xl px-3 py-1.5">Refunds −{fmt(summary.refunds)}</span>}
           {summary.discount > 0 && <span className="bg-white border border-gray-100 rounded-xl px-3 py-1.5">Discounts {fmt(summary.discount)}</span>}
         </div>
       )}

@@ -143,13 +143,25 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number): string[
   return out;
 }
 
+// A printer that accepts the connection but never takes the ticket must not freeze the print station.
+const PRINT_TIMEOUT_MS = 10_000;
+
 export class PrintService {
+  /** Sends a print job; always settles within PRINT_TIMEOUT_MS (a late native result is ignored). */
+  static sendToPrinter(job: PrintJob): Promise<{ success: boolean; error?: string }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<{ success: boolean; error?: string }>(resolve => {
+      timer = setTimeout(() => resolve({ success: false, error: 'Printer did not answer in time' }), PRINT_TIMEOUT_MS);
+    });
+    return Promise.race([PrintService.attemptPrint(job), timeout]).finally(() => clearTimeout(timer));
+  }
+
   /**
    * Sends a print job to a LAN printer via a local relay or direct fetch if allowed.
-   * Note: Most browsers block direct TCP/UDP. For a "Best" setup, we use a 
+   * Note: Most browsers block direct TCP/UDP. For a "Best" setup, we use a
    * lightweight local relay or the Android WebView Bridge.
    */
-  static async sendToPrinter(job: PrintJob): Promise<{ success: boolean; error?: string }> {
+  private static async attemptPrint(job: PrintJob): Promise<{ success: boolean; error?: string }> {
     console.log(`[PrintService] Sending job to ${job.printerIp}:${job.printerPort}`);
     
     // 1. The Android app sends the ticket straight to the printer's IP (port 9100).

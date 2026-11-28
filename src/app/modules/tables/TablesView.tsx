@@ -11,6 +11,7 @@ import { PaymentModal } from '../shared/PaymentModal';
 import { PickupController } from '../../controllers/PickupController';
 import { TableController } from '../../controllers/TableController';
 import { friendlyError } from '../../../lib/errors';
+import { OrderController } from '../../controllers/OrderController';
 
 // ─── Move Table modal ───────────────────────────────────────────────────────
 function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (toTableId: string) => void; onClose: () => void }) {
@@ -37,6 +38,83 @@ function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (t
                 </button>
               ))}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cancel takeaway items modal ────────────────────────────────────────────
+// The cancel ticket prints at the item's station through the print station; nothing to print here.
+function CancelTakeawayItemsModal({ order, currentUser, onClose }: { order: any; currentUser: any; onClose: () => void }) {
+  const [items, setItems] = useState<any[]>(() => (order.items ?? []).filter((i: any) => i.status !== 'cancelled' && !i.paid));
+  const [confirming, setConfirming] = useState<any>(null);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handleCancel = async () => {
+    if (!confirming) return;
+    setBusy(true);
+    const res = await OrderController.voidItem(confirming.id, order.id, reason.trim() || undefined, { id: currentUser.id, name: currentUser.name }, currentUser.branchId);
+    setBusy(false);
+    if (!res.success) { toast.error(friendlyError(res.error, 'Could not cancel the item')); return; }
+    toast.success('Item cancelled — the kitchen has been notified');
+    const remaining = items.filter(i => i.id !== confirming.id);
+    setItems(remaining);
+    setConfirming(null);
+    setReason('');
+    if (remaining.length === 0) onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4" onClick={busy ? undefined : onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <h3 className="font-bold text-gray-900">{`Takeaway #${order.billNumber ?? '—'} — cancel items`}</h3>
+          <button onClick={onClose} disabled={busy} aria-label="Close" className="size-11 -mr-2 flex items-center justify-center rounded-lg hover:bg-gray-100 disabled:opacity-50"><X className="size-4 text-gray-400" /></button>
+        </div>
+        <div className="p-4 max-h-[60dvh] overflow-y-auto">
+          {confirming ? (
+            <div className="space-y-3">
+              <p dir="auto" className="text-sm font-semibold text-gray-900 break-words">{`Cancel ${confirming.quantity} x ${confirming.productName}?`}</p>
+              <label className="block text-xs text-gray-500">
+                Reason (optional)
+                <input
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  disabled={busy}
+                  dir="auto"
+                  className="mt-1 w-full min-h-11 px-3 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-red-400"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button onClick={() => { setConfirming(null); setReason(''); }} disabled={busy} className="flex-1 min-h-11 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                  Back
+                </button>
+                <button onClick={() => void handleCancel()} disabled={busy} className="flex-1 min-h-11 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                  {busy ? 'Cancelling…' : 'Confirm cancel'}
+                </button>
+              </div>
+            </div>
+          ) : items.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No items to cancel.</p>
+          ) : (
+            <ul className="space-y-2">
+              {items.map(item => (
+                <li key={item.id} className="flex items-center gap-3 rounded-xl border border-gray-100 p-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p dir="auto" className="text-sm font-semibold text-gray-900 break-words">{`${item.quantity} x ${item.productName}`}</p>
+                    {!!item.modifiers?.length && (
+                      <p dir="auto" className="text-[11px] text-gray-500 break-words">{item.modifiers.map((m: any) => m.optionName).join(', ')}</p>
+                    )}
+                  </div>
+                  <button onClick={() => setConfirming(item)} disabled={busy} className="min-h-11 px-4 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                    Cancel
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
@@ -90,6 +168,7 @@ export function TablesView() {
   const [pickupBusy, setPickupBusy] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [movingTable, setMovingTable] = useState<{ orderId: string; fromTableId: string; fromNumber: number } | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<any>(null);
 
   const handleMoveTable = async (toTableId: string) => {
     if (!movingTable) return;
@@ -422,7 +501,7 @@ export function TablesView() {
         </div>
 
         {/* Takeaway Orders Section - Only for Cashier */}
-        {canPay && takeawayOrders.length > 0 && (
+        {(canPay || canCancelItems) && takeawayOrders.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <ShoppingBag className="size-5 text-purple-600" />
@@ -471,12 +550,19 @@ export function TablesView() {
                           <span className="font-bold text-gray-900 whitespace-nowrap">{fmt(total)}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => openTakeawayOrderModal(order)}
-                        className="w-full min-h-11 py-2 bg-purple-600 text-white rounded-xl text-xs font-semibold hover:bg-purple-700 transition-colors"
-                      >
-                        Process Payment
-                      </button>
+                      {canPay && (
+                        <button
+                          onClick={() => openTakeawayOrderModal(order)}
+                          className="w-full min-h-11 py-2 bg-purple-600 text-white rounded-xl text-xs font-semibold hover:bg-purple-700 transition-colors"
+                        >
+                          Process Payment
+                        </button>
+                      )}
+                      {canCancelItems && (
+                        <button onClick={() => setCancellingOrder(order)} className="w-full min-h-11 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-colors">
+                          Cancel Items
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -695,6 +781,14 @@ export function TablesView() {
           tables={tables}
           onMove={handleMoveTable}
           onClose={() => setMovingTable(null)}
+        />
+      )}
+
+      {cancellingOrder && (
+        <CancelTakeawayItemsModal
+          order={cancellingOrder}
+          currentUser={currentUser}
+          onClose={() => setCancellingOrder(null)}
         />
       )}
 

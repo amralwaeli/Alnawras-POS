@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
-import { routeItems } from './PrintStation';
+import { routeItems, fallbackTargets, offlineBanner } from './PrintStation';
 
 describe('routeItems', () => {
   it('sends a free drink choice to the drinks ticket and the meal to the kitchen', () => {
@@ -44,5 +44,30 @@ describe('routeItems', () => {
   it('keeps a plain item at its own station only', () => {
     const r = routeItems([{ id: 'i3', product_name: 'Tea', quantity: 1, station: 'juice', modifiers: [] }]);
     expect([...r.keys()]).toEqual(['juice']);
+  });
+});
+
+describe('cashier fallback', () => {
+  const kitchen = { id: 'k', stations: ['kitchen'] };
+  const shawarma = { id: 's', stations: ['shawarma'] };
+  const cashier = { id: 'c', stations: ['cashier'] };
+  const kitchenCashier = { id: 'kc', stations: ['kitchen', 'cashier'] };
+
+  it('sends a shawarma ticket the shawarma printer missed to the cashier printers', () => {
+    expect(fallbackTargets('shawarma', [kitchen, shawarma, cashier, kitchenCashier]).map(p => p.id)).toEqual(['c', 'kc']);
+  });
+
+  it('skips a kitchen+cashier printer for a kitchen ticket (it already tried)', () => {
+    expect(fallbackTargets('kitchen', [kitchen, cashier, kitchenCashier]).map(p => p.id)).toEqual(['c']);
+  });
+
+  it('gives a cashier ticket no fallback', () => {
+    expect(fallbackTargets('cashier', [cashier, kitchenCashier])).toEqual([]);
+  });
+
+  it('says where to take the ticket', () => {
+    expect(offlineBanner('shawarma')).toBe('*** SHAWARMA PRINTER OFFLINE — take to Shawarma ***');
+    expect(offlineBanner('juice')).toBe('*** DRINKS PRINTER OFFLINE — take to Drinks ***');
+    expect(offlineBanner('grill')).toBe('*** GRILL PRINTER OFFLINE — take to Grill ***');
   });
 });

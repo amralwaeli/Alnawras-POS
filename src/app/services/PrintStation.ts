@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { isNativeApp } from '../../lib/platform';
-import { PrintService, keepStationRunning } from './PrintService';
+import { PrintService, keepStationRunning, type PrintLine } from './PrintService';
 import { cachedPrinters } from '../controllers/PrinterController';
 import { AlertService } from './AlertService';
 
@@ -110,7 +110,25 @@ export function routeItems(items: any[]): Map<string, any[]> {
   return out;
 }
 
-type Job = { ids: string[]; cancel: boolean; station: string; lines: (paper?: 58 | 80) => ReturnType<typeof PrintService.render> };
+type Job = { ids: string[]; cancel: boolean; station: string; ticket: PrintLine[] };
+
+const stationsOf = (p: { stations?: string[] | null }) => (p.stations?.length ? p.stations : ['kitchen']);
+const STATION_NAMES: Record<string, string> = { kitchen: 'KITCHEN', juice: 'DRINKS', shawarma: 'SHAWARMA' };  // as formatKitchenTicket
+
+const stationName = (station: string) => {
+  const n = STATION_NAMES[station] || station.toUpperCase();
+  return n.charAt(0) + n.slice(1).toLowerCase();
+};
+
+/** First line of a ticket printed at the cashier because its station's printer did not take it. */
+export const offlineBanner = (station: string) =>
+  `*** ${stationName(station).toUpperCase()} PRINTER OFFLINE — take to ${stationName(station)} ***`;
+
+/** Cashier printers to try for a ticket its station did not print; printers of that station already had their try. */
+export function fallbackTargets<P extends { stations?: string[] | null }>(station: string, printers: P[]): P[] {
+  if (station === 'cashier') return [];
+  return printers.filter(p => stationsOf(p).includes('cashier') && !stationsOf(p).includes(station));
+}
 
 async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   if (!items.length && !cancels.length) return;
@@ -122,11 +140,11 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   const jobs: Job[] = [
     ...[...sends.values()].flatMap(g => [...routeItems(g)].map(([station, lines]) => ({
       ids: [...new Set(lines.flatMap(l => l.ids ?? [l.id]))] as string[], cancel: false, station,
-      lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatKitchenTicket(label(g[0]), lines, station, g[0].add_on), paper),
+      ticket: PrintService.formatKitchenTicket(label(g[0]), lines, station, g[0].add_on),
     }))),
     ...cancels.flatMap(c => [...new Set([c.station || 'kitchen', ...(c.also ?? [])])].map(station => ({
       ids: [c.id], cancel: true, station,
-      lines: (paper?: 58 | 80) => PrintService.render(PrintService.formatCancelTicket(label(c), c, c.by || '', c.reason || undefined), paper),
+      ticket: PrintService.formatCancelTicket(label(c), c, c.by || '', c.reason || undefined),
     }))),
   ];
 
@@ -135,8 +153,8 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   const errors = new Map<Job, string>();
   // Printers in parallel, one job at a time per printer (most take a single connection).
   await Promise.all(printers.map(async p => {
-    for (const job of jobs.filter(j => (p.stations?.length ? p.stations : ['kitchen']).includes(j.station))) {
-      const res = await PrintService.sendToPrinter({ printerIp: p.ipAddress!, printerPort: p.port || 9100, bytes: job.lines(p.paperWidth) });
+    for (const job of jobs.filter(j => stationsOf(p).includes(j.station))) {
+      const res = await PrintService.sendToPrinter({ printerIp: p.ipAddress!, printerPort: p.port || 9100, bytes: PrintService.render(job.ticket, p.paperWidth) });
       if (res.success) printedOk.add(job);
       else {
         errors.set(job, `${p.name || p.ipAddress} printer did not print`);
@@ -149,7 +167,21 @@ async function printClaimed(branchId: string, items: any[], cancels: any[]) {
   // printer has nothing to print (e.g. a kitchen screen). The rest go back, with the reason
   // the waiter sees, and are tried again on the next round.
   // An item printed on several tickets is printed only when all of them printed.
-  const covered = (j: Job) => printers.some(p => (p.stations?.length ? p.stations : ['kitchen']).includes(j.station));
+  const covered = (j: Job) => printers.some(p => stationsOf(p).includes(j.station));
+
+  // A station printer that did not take its ticket (e.g. the shawarma printer dropped off
+  // the network): print it at the cashier with a banner saying where to take it.
+  // One ticket at a time, first cashier printer that takes it; rare, so speed does not matter.
+  for (const job of jobs.filter(j => covered(j) && !printedOk.has(j))) {
+    const ticket: PrintLine[] = [{ text: offlineBanner(job.station), style: 'bold', align: 'center' }, ...job.ticket];
+    for (const p of fallbackTargets(job.station, printers)) {
+      const res = await PrintService.sendToPrinter({ printerIp: p.ipAddress!, printerPort: p.port || 9100, bytes: PrintService.render(ticket, p.paperWidth) });
+      if (!res.success) continue;
+      printedOk.add(job);
+      toast.warning(`${stationName(job.station)} printer offline — printed at ${p.name || p.ipAddress}`, { id: `print-fallback-${job.station}-${p.id}` });
+      break;
+    }
+  }
   const failed = jobs.filter(j => covered(j) && !printedOk.has(j));
   const failedItems = new Set(failed.filter(j => !j.cancel).flatMap(j => j.ids));
   const done = [...new Set(jobs.filter(j => !j.cancel).flatMap(j => j.ids))].filter(id => !failedItems.has(id));

@@ -328,7 +328,8 @@ export function TablesView() {
     [orders]
   );
 
-  const canMerge = ['cashier', 'waiter', 'swaiter', 'admin', 'manager'].includes(currentUser.role);
+  // Owner's rule: only cashier, manager and admin merge bills.
+  const canMerge = ['cashier', 'admin', 'manager'].includes(currentUser.role);
   const toMergeBill = (o: any, label: string): MergeBill => ({
     orderId: o.id, label, total: calcOrderTotals(o).total, hasPaid: (o.items ?? []).some((i: any) => i.paid),
   });

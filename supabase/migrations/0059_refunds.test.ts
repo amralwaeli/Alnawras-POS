@@ -97,6 +97,31 @@ describe('0059 refunds', () => {
       `SELECT public.refund_order('A', 'r1', NULL, 'cash', 'x', NULL, NULL)`))).toMatch(/permission denied/);
   });
 
+  it("account refund credits the bill's customer account, up to what was charged", async () => {
+    await db.exec(`
+      INSERT INTO debt_accounts(id, branch_id, name) VALUES ('acc1', 'A', 'Ali');
+      INSERT INTO orders(id, table_number, status, order_type, branch_id, subtotal, tax, discount, total, completed_at, bill_number)
+        VALUES ('r3', 7, 'completed', 'dine-in', 'A', 30, 0, 0, 30, now() - interval '10 days', '0003'),
+               ('r4', 8, 'completed', 'dine-in', 'A', 10, 0, 0, 10, now() - interval '10 days', '0004');
+      INSERT INTO order_items(id, order_id, product_id, product_name, quantity, price, subtotal, added_by, added_by_name, branch_id, status)
+        VALUES ('i5', 'r3', 'fish', 'Fish', 1, 20, 20, 'w', 'W', 'A', 'served'),
+               ('i6', 'r3', 'tea', 'Tea', 1, 10, 10, 'w', 'W', 'A', 'served'),
+               ('i7', 'r4', 'tea', 'Tea', 1, 10, 10, 'w', 'W', 'A', 'served');
+      INSERT INTO debt_entries(branch_id, account_id, kind, amount, order_id) VALUES ('A', 'acc1', 'charge', 25, 'r3');`);
+    const bal = async () => Number(await one(db, `SELECT public._debt_balance('acc1')`));
+    expect(await bal()).toBe(25);                    // 25 on account + 5 cash
+    expect(Number((await refund(DEV_A, 'A', 'r3', ['i5'], 'account', 'Wrong dish')).amount)).toBe(20);
+    expect(await bal()).toBe(5);
+    expect(await refuse(DEV_A, 'A', 'r3', ['i6'], 'account', 'x')).toMatch('more than is left on the customer account');
+    expect(await bal()).toBe(5);
+  });
+
+  it('an account refund on a bill not charged to an account is refused', async () => {
+    expect(await refuse(DEV_A, 'A', 'r4', null, 'account', 'x'))
+      .toMatch('This bill was not charged to a customer account — choose cash, card or QR');
+    expect(await one(db, `SELECT COUNT(*) FROM refunds WHERE order_id = 'r4'`)).toBe(0);
+  });
+
   it('the migration is idempotent', async () => {
     const sql = readFileSync(fileURLToPath(new URL('./0059_refunds.sql', import.meta.url)), 'utf8');
     await expect(db.exec(sql)).resolves.toBeTruthy();

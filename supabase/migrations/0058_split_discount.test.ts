@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const DEV_A = '11111111-1111-1111-1111-111111111111';
 const DEV_B = '22222222-2222-2222-2222-222222222222';
 const DEV_T = '33333333-3333-3333-3333-333333333333';
+const DEV_I = '44444444-4444-4444-4444-444444444444';
 let db: PGlite;
 
 // An open dine-in order with items 15, 26, 40, 14 (ids <order>-1..4).
@@ -29,11 +30,11 @@ beforeAll(async () => {
   db = await makeDb();
   await db.exec(`
     INSERT INTO organizations(id, name) VALUES ('o', 'O');
-    INSERT INTO branches(id, org_id, name) VALUES ('A', 'o', 'A'), ('B', 'o', 'B'), ('T', 'o', 'T');
-    INSERT INTO branch_logins(auth_uid, branch_id) VALUES ('${DEV_A}', 'A'), ('${DEV_B}', 'B'), ('${DEV_T}', 'T');
+    INSERT INTO branches(id, org_id, name) VALUES ('A', 'o', 'A'), ('B', 'o', 'B'), ('T', 'o', 'T'), ('I', 'o', 'I');
+    INSERT INTO branch_logins(auth_uid, branch_id) VALUES ('${DEV_A}', 'A'), ('${DEV_B}', 'B'), ('${DEV_T}', 'T'), ('${DEV_I}', 'I');
     INSERT INTO products(id, name, category, price, branch_id) VALUES ('p', 'P', 'C', 1, 'A');
-    INSERT INTO branch_settings(branch_id, tax_enabled, tax_rate, tax_inclusive) VALUES ('A', false, 0, false), ('T', true, 6, false);
-    ${order('s1', 'A')} ${order('s2', 'A')} ${order('t1', 'T')}`);
+    INSERT INTO branch_settings(branch_id, tax_enabled, tax_rate, tax_inclusive) VALUES ('A', false, 0, false), ('T', true, 6, false), ('I', true, 6, true);
+    ${order('s1', 'A')} ${order('s2', 'A')} ${order('t1', 'T')} ${order('n1', 'I')}`);
 }, 60000);
 
 describe('0058 split discount', () => {
@@ -87,6 +88,15 @@ describe('0058 split discount', () => {
     const [sub, disc, tax, total] = [o.subtotal, o.discount, o.tax, o.total].map(Number);
     expect([sub, disc, tax, total]).toEqual([95, 9.5, 5.13, 90.63]);
     expect(Math.round((sub - disc + tax) * 100) / 100).toBe(total);
+  });
+
+  it('inclusive tax: stored like pay_order (gross subtotal - discount = total, tax inside)', async () => {
+    expect(Number((await pay8(DEV_I, 'n1', [1, 2], 'I', 10)).amount)).toBe(36.9);
+    expect(Number((await pay8(DEV_I, 'n1', [3, 4], 'I', null)).amount)).toBe(48.6);
+    const o = await ord('n1');
+    const [sub, disc, tax, total] = [o.subtotal, o.discount, o.tax, o.total].map(Number);
+    expect([sub, disc, tax, total]).toEqual([95, 9.5, 4.84, 85.5]);   // 85.5 - 85.5/1.06 = 4.84
+    expect(Math.round((sub - disc) * 100) / 100).toBe(total);
   });
 
   it('internals are not callable, and the migration is idempotent', async () => {

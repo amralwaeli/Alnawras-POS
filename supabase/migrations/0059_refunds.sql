@@ -1,7 +1,8 @@
 -- 0059: refunds of paid bills (whole bill or chosen items).
 --   refunds            one row per refund; written only by refund_order (no device write policies)
 --   order_items.refund_id  NULL = not refunded
---   refund_order       checks branch + paid bill, prices the refund, marks the items
+--   refund_order       checks branch + paid bill, prices the refund, marks the items;
+--                      method 'account' credits the customer account the bill was charged to
 --   get_sales_summary  + 'refunds', 'refunds_by_method' (by refund day; 'revenue' stays gross)
 --   get_detail_report  + 'refunds' {count, total, list}
 -- Role check (admin/manager/cashier) and the shift's cash drawer are handled in the app.
@@ -44,6 +45,8 @@ DECLARE
   v_prev   NUMERIC;
   v_amount NUMERIC;
   v_id     TEXT;
+  v_acct   TEXT;
+  v_charged NUMERIC;
 BEGIN
   PERFORM public._assert_device_branch(p_branch_id);
 
@@ -83,10 +86,28 @@ BEGIN
   END IF;
   IF v_amount IS NULL OR v_amount <= 0 THEN RAISE EXCEPTION 'Nothing left to refund'; END IF;
 
+  IF p_method = 'account' THEN       -- pay_order allows one account per bill
+    SELECT e.account_id, SUM(e.amount) INTO v_acct, v_charged FROM debt_entries e
+     WHERE e.order_id = p_order_id AND e.branch_id = p_branch_id AND e.kind = 'charge'
+     GROUP BY e.account_id LIMIT 1;
+    IF v_acct IS NULL THEN
+      RAISE EXCEPTION 'This bill was not charged to a customer account — choose cash, card or QR';
+    END IF;
+    IF v_amount > v_charged - (SELECT COALESCE(SUM(r.amount), 0) FROM refunds r
+                               WHERE r.order_id = p_order_id AND r.method = 'account') + 0.005 THEN
+      RAISE EXCEPTION 'The refund is more than is left on the customer account for this bill — refund the rest by cash, card or QR';
+    END IF;
+  END IF;
+
   v_id := 'ref-' || substr(public._random_token(), 1, 20);
   INSERT INTO refunds(id, branch_id, order_id, item_ids, amount, method, reason, refunded_by_id, refunded_by_name)
   VALUES (v_id, p_branch_id, p_order_id, v_ids, v_amount, p_method, v_reason, p_actor_id, p_actor_name);
   UPDATE order_items SET refund_id = v_id WHERE id = ANY(v_ids);
+  IF v_acct IS NOT NULL THEN         -- a negative adjustment lowers the balance (see 0036 _debt_balance)
+    INSERT INTO debt_entries (branch_id, account_id, kind, amount, order_id, note, created_by, created_by_name)
+    VALUES (p_branch_id, v_acct, 'adjustment', -v_amount, p_order_id,
+            'Refund bill ' || COALESCE(v_order.bill_number, '?'), p_actor_id, p_actor_name);
+  END IF;
 
   RETURN jsonb_build_object('refund_id', v_id, 'amount', v_amount, 'item_ids', to_jsonb(v_ids));
 END; $$;

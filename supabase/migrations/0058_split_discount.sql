@@ -10,7 +10,8 @@
 --   * pay_order_items keeps its 7-arg form (old app versions, no discount) and
 --     gains an 8-arg form with p_discount_pct.
 --   * On completion orders.discount records the discount so
---     subtotal - discount + tax = total = SUM(order_payments.amount).
+--     subtotal - discount + tax = total = SUM(order_payments.amount)
+--     (inclusive tax: subtotal - discount = total, tax inside it, as pay_order).
 --
 -- REQUIRES: 0031. Idempotent.
 -- ============================================================
@@ -47,6 +48,7 @@ DECLARE
   v_collected   NUMERIC := 0;
   v_pretax      NUMERIC := 0;
   v_pct         NUMERIC;
+  v_tax         NUMERIC := 0;
 BEGIN
   SELECT * INTO v_order FROM orders WHERE id = p_order_id AND branch_id = p_branch_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Order not found'; END IF;
@@ -114,7 +116,7 @@ BEGIN
     SELECT COALESCE(SUM(subtotal), 0) INTO v_full_sub  FROM order_items
       WHERE order_id = p_order_id AND status IS DISTINCT FROM 'cancelled';
 
-    IF v_tax_enabled AND v_tax_rate > 0 AND v_tax_incl THEN
+    IF v_tax_enabled AND v_tax_rate > 0 AND v_tax_incl AND v_pct = 0 THEN
       v_pretax := round(v_collected / (1 + v_tax_rate / 100), 2);
       UPDATE orders SET status='completed', completed_at=NOW(), payment_status='paid',
         payment_method='split', bill_number=v_bill_number,
@@ -128,14 +130,19 @@ BEGIN
         subtotal=v_full_sub, tax=round(v_collected - v_full_sub, 2), total=v_collected
         WHERE id = p_order_id;
     ELSE
-      IF v_tax_enabled AND v_tax_rate > 0 THEN
+      -- as pay_order: subtotal is gross; v_pretax = the discounted amount the tax is worked on
+      IF v_tax_enabled AND v_tax_rate > 0 AND v_tax_incl THEN
+        v_pretax := v_collected;                                   -- tax sits inside what was collected
+        v_tax    := round(v_collected - v_collected / (1 + v_tax_rate / 100), 2);
+      ELSIF v_tax_enabled AND v_tax_rate > 0 THEN
         v_pretax := round(v_collected / (1 + v_tax_rate / 100), 2);
+        v_tax    := v_collected - v_pretax;
       ELSE
         v_pretax := v_collected;
       END IF;
       UPDATE orders SET status='completed', completed_at=NOW(), payment_status='paid',
         payment_method='split', bill_number=v_bill_number,
-        subtotal=v_full_sub, tax=(v_collected - v_pretax), total=v_collected,
+        subtotal=v_full_sub, tax=v_tax, total=v_collected,
         discount=GREATEST(0, v_full_sub - v_pretax)
         WHERE id = p_order_id;
     END IF;

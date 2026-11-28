@@ -40,6 +40,12 @@ export function takenByNames(items: { added_by_name?: string | null; status?: st
   return names.length ? names.join(', ') : 'Guest / QR';
 }
 
+/** Distinct cashiers who took the bill's payments (orders.cashier_name is never written), or null. */
+export function cashierNames(payments: { cashier_name?: string | null }[] | null | undefined): string | null {
+  const names = [...new Set((payments ?? []).map(p => p.cashier_name?.trim()).filter(Boolean))];
+  return names.length ? names.join(', ') : null;
+}
+
 export class ReportsController {
   /** Totals for bills PAID in [from, to) (migration 0033), plus expenses dated
    *  in the same range — computed in the database, never from the live POS list. */
@@ -80,7 +86,7 @@ export class ReportsController {
     const { data, error } = await supabase
       .from('orders')
       .select('id, bill_number, table_number, order_type, total, payment_method, completed_at, cashier_name'
-        + (withStaff ? ', order_items(added_by_name, status)' : ''))
+        + (withStaff ? ', order_items(added_by_name, status), order_payments(cashier_name)' : ''))
       .eq('branch_id', branchId).eq('status', 'completed')
       .gte('completed_at', from.toISOString()).lt('completed_at', to.toISOString())
       .order('completed_at', { ascending: false })
@@ -91,7 +97,7 @@ export class ReportsController {
       data: (data ?? []).map((r: any) => ({
         id: r.id, billNumber: r.bill_number, tableNumber: r.table_number, orderType: r.order_type ?? 'dine-in',
         total: Number(r.total ?? 0), paymentMethod: r.payment_method, completedAt: new Date(r.completed_at),
-        cashierName: r.cashier_name ?? null, takenBy: withStaff ? takenByNames(r.order_items) : '',
+        cashierName: r.cashier_name || (withStaff ? cashierNames(r.order_payments) : null), takenBy: withStaff ? takenByNames(r.order_items) : '',
       })),
     };
   }
@@ -112,7 +118,7 @@ export class ReportsController {
       data: {
         billNumber: o.bill_number, tableNumber: o.table_number, orderType: o.order_type ?? 'dine-in',
         completedAt: o.completed_at ? new Date(o.completed_at) : null,
-        paymentMethod: o.payment_method, cashierName: o.cashier_name ?? null,
+        paymentMethod: o.payment_method, cashierName: o.cashier_name || cashierNames(o.order_payments),
         subtotal: Number(o.subtotal ?? 0), discount: Number(o.discount ?? 0), tax: Number(o.tax ?? 0), total: Number(o.total ?? 0),
         items: (o.order_items ?? []).map((i: any) => ({
           id: i.id, refundId: i.refund_id ?? null, productName: i.product_name, quantity: Number(i.quantity ?? 1),

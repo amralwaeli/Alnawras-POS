@@ -145,15 +145,40 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number): string[
 
 // A printer that accepts the connection but never takes the ticket must not freeze the print station.
 const PRINT_TIMEOUT_MS = 10_000;
+// Printers (ip:port) with a timed-out send still running. A slow printer still prints that ticket
+// later, so a retry or fallback sent to it meanwhile would come out twice.
+const busyPrinters = new Set<string>();
+// Last queued send per printer (ip:port): sends to one printer run one at a time (receipt and
+// kitchen ticket share the cashier printer, which takes a single connection).
+const printerQueue = new Map<string, Promise<void>>();
+const BUSY = { success: false, error: 'Printer is still busy with the last ticket' };
 
 export class PrintService {
-  /** Sends a print job; always settles within PRINT_TIMEOUT_MS (a late native result is ignored). */
+  /** Sends a print job after earlier sends to the same printer settle; each send settles within
+   *  PRINT_TIMEOUT_MS of starting (a late native result is ignored). While an earlier timed-out
+   *  send to that printer is still unfinished, fails at once without sending. */
   static sendToPrinter(job: PrintJob): Promise<{ success: boolean; error?: string }> {
+    const key = `${job.printerIp}:${job.printerPort || 9100}`;
+    if (busyPrinters.has(key)) return Promise.resolve(BUSY);
+    const run = (printerQueue.get(key) ?? Promise.resolve())
+      .then(() => (busyPrinters.has(key) ? BUSY : PrintService.sendNow(job, key)));
+    const tail = run.then(() => {}, () => {});
+    printerQueue.set(key, tail);
+    void tail.then(() => { if (printerQueue.get(key) === tail) printerQueue.delete(key); });
+    return run;
+  }
+
+  private static sendNow(job: PrintJob, key: string): Promise<{ success: boolean; error?: string }> {
+    let settled = false;
+    const attempt = PrintService.attemptPrint(job).finally(() => { settled = true; busyPrinters.delete(key); });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<{ success: boolean; error?: string }>(resolve => {
-      timer = setTimeout(() => resolve({ success: false, error: 'Printer did not answer in time' }), PRINT_TIMEOUT_MS);
+      timer = setTimeout(() => {
+        if (!settled) busyPrinters.add(key);
+        resolve({ success: false, error: 'Printer did not answer in time' });
+      }, PRINT_TIMEOUT_MS);
     });
-    return Promise.race([PrintService.attemptPrint(job), timeout]).finally(() => clearTimeout(timer));
+    return Promise.race([attempt, timeout]).finally(() => clearTimeout(timer));
   }
 
   /**

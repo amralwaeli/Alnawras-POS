@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
-import { takenByNames } from './ReportsController';
+import { takenByNames, cashierNames } from './ReportsController';
+
+describe('cashierNames', () => {
+  it('joins distinct payment cashiers, null when none', () => {
+    expect(cashierNames([{ cashier_name: 'sara' }, { cashier_name: 'omar' }, { cashier_name: 'sara' }])).toBe('sara, omar');
+    expect(cashierNames([{ cashier_name: null }])).toBeNull();
+    expect(cashierNames(undefined)).toBeNull();
+  });
+});
 
 describe('takenByNames', () => {
   it('lists distinct live adders, skipping cancelled items', () => {

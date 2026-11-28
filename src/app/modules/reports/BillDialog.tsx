@@ -44,7 +44,7 @@ export function BillDialog({ orderId, onClose }: { orderId: string | null; onClo
   const estimate = b ? refundEstimate(b.total, refunded, b.items, whole ? null : chosen) : 0;
 
   const startRefund = () => {
-    const pm = b?.paymentMethod ?? '';
+    const pm = (b?.paymentMethod ?? '').toLowerCase();   // pay_order stores 'CASH', 'CARD', ...
     setMethod((METHODS.some(([m]) => m === pm) ? pm : 'cash') as RefundMethod);   // 'split' bills default to cash
     setWhole(true); setChosen([]); setReason(''); setRefunding(true);
   };

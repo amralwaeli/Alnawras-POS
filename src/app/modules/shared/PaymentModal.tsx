@@ -457,7 +457,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   // The split %: chosen by the cashier until the first payment, then locked to what the server stored.
   const splitPct = lockedToSplit
     ? (usedSplitPct ?? Number(order?.splitDiscountPct ?? 0))
-    : Math.min(Math.max(Number(splitPctText) || 0, 0), 100);
+    : Math.round(Math.min(Math.max(Number(splitPctText) || 0, 0), 100) * 100) / 100;   // server keeps NUMERIC(5,2)
   // What the selected guest actually pays — same as pay_order_items: % off first, then exclusive branch tax.
   const { net: splitSelectedNet, due: splitSelectedDue } = useMemo(
     () => splitDue(splitSelectedTotal, splitPct, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive),

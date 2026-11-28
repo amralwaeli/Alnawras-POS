@@ -90,7 +90,16 @@ export function QROrderingView() {
     );
     setVoiding(false);
     if (res.success) {
-      setExistingItems(prev => prev.filter(i => i.id !== voidTarget.id));
+      const remaining = existingItems.filter(i => i.id !== voidTarget.id);
+      setExistingItems(remaining);
+      // 0061 closes a bill whose last live item is voided: the next round must start a new bill.
+      if (!remaining.some(i => i.status !== 'cancelled')) {
+        const { data } = await supabase.from('orders').select('status').eq('id', orderId).single();
+        if (data && data.status !== 'open') {
+          setOrderId(null);
+          setTable(prev => prev ? { ...prev, currentOrderId: null } : prev);
+        }
+      }
       toast.success('Item voided — the kitchen has been notified');
       setVoidTarget(null);
       setVoidReason('');

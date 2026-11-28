@@ -6,7 +6,8 @@ import { downloadCsv } from '../../../lib/csv';
 import { ReportsController, ProductSaleRow } from '../../controllers/ReportsController';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { periodRange, usePeriod, PeriodPicker } from './period';
-import { ReportsController as RC, SalesSummary, CompletedOrderRow } from '../../controllers/ReportsController';
+import { ReportsController as RC, SalesSummary, CompletedOrderRow, BillDetail } from '../../controllers/ReportsController';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { friendlyError } from '../../../lib/errors';
 import { CategoriesTab, HoursTab, StaffTab, TablesTab, DiscountsTab, CancellationsTab, Table } from './DetailReports';
 
@@ -130,18 +131,88 @@ function ProductPerformanceTab({ branchId }: { branchId: string }) {
   );
 }
 
+const time = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+/** Full bill (items, who added / cancelled them, payments), fetched only when opened. */
+function BillDialog({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
+  const [bill, setBill] = useState<BillDetail | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!orderId) return;
+    let cancelled = false;
+    setBill(null); setError('');
+    RC.getBillDetail(orderId).then(res => {
+      if (cancelled) return;
+      if (res.success) setBill(res.data!); else setError(friendlyError(res.error, 'Could not load the bill'));
+    });
+    return () => { cancelled = true; };
+  }, [orderId]);
+
+  const b = bill;
+  return (
+    <Dialog open={!!orderId} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-base pr-6">
+            {b ? `Bill #${b.billNumber ?? '—'} · ${b.orderType === 'dine-in' ? `Table ${b.tableNumber}` : b.orderType}${b.completedAt ? ` · paid ${time(b.completedAt)}` : ''}` : 'Bill'}
+          </DialogTitle>
+        </DialogHeader>
+        {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : !b ? <p className="text-sm text-gray-500">Loading…</p> : (
+          <div className="space-y-4 text-sm min-w-0">
+            <p className="text-gray-600">Cashier <b dir="auto">{b.cashierName ?? '—'}</b> · <span className="uppercase">{b.paymentMethod ?? '—'}</span></p>
+            <ul className="divide-y divide-gray-100">
+              {b.items.map((i, n) => (
+                <li key={n} className={`py-2 flex justify-between gap-3 ${i.cancelled ? 'text-gray-400' : 'text-gray-900'}`}>
+                  <div className="min-w-0">
+                    <p className={`font-medium break-words ${i.cancelled ? 'line-through' : ''}`} dir="auto">{i.quantity} x {i.productName}</p>
+                    {i.modifiers && <p className="text-xs text-gray-500 break-words" dir="auto">{i.modifiers}</p>}
+                    <p className="text-xs text-gray-500" dir="auto">by {i.addedBy ?? 'Guest / QR'}</p>
+                    {i.cancelled && <p className="text-xs" dir="auto">Cancelled{i.cancelledBy ? ` by ${i.cancelledBy}` : ''}{i.cancelReason ? ` — ${i.cancelReason}` : ''}</p>}
+                  </div>
+                  <span className={`whitespace-nowrap ${i.cancelled ? 'line-through' : 'font-semibold'}`}>{fmt(i.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="space-y-1 border-t border-gray-100 pt-3">
+              {([['Subtotal', b.subtotal], ['Discount', -b.discount], ['Tax', b.tax]] as const).map(([k, v]) => (
+                <div key={k} className="flex justify-between text-gray-600"><dt>{k}</dt><dd className="whitespace-nowrap">{fmt(v)}</dd></div>
+              ))}
+              <div className="flex justify-between font-bold text-gray-900"><dt>Total</dt><dd className="whitespace-nowrap">{fmt(b.total)}</dd></div>
+            </dl>
+            {b.payments.length > 0 && (
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payments</p>
+                <ul className="space-y-1">
+                  {b.payments.map((p, n) => (
+                    <li key={n} className="flex justify-between gap-3 text-gray-600">
+                      <span className="min-w-0 break-words"><b className="uppercase">{p.method}</b> · <span dir="auto">{p.cashierName ?? '—'}</span> · {time(p.at)}</span>
+                      <span className="whitespace-nowrap font-semibold text-gray-900">{fmt(p.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OverviewTab({ branchId }: { branchId: string }) {
   const p = usePeriod('today');
   const [summary, setSummary] = useState<SalesSummary | null>(null);
   const [orders, setOrders] = useState<CompletedOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openBill, setOpenBill] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     const { from, to } = p.range;
-    Promise.all([RC.getSalesSummary(branchId, from, to), RC.getCompletedOrders(branchId, from, to)]).then(([s, o]) => {
+    Promise.all([RC.getSalesSummary(branchId, from, to), RC.getCompletedOrders(branchId, from, to, 300, true)]).then(([s, o]) => {
       if (cancelled) return;
       if (s.success) { setSummary(s.data!); setError(''); } else setError(friendlyError(s.error, 'Could not load the report'));
       if (o.success) setOrders(o.data!);
@@ -203,10 +274,10 @@ function OverviewTab({ branchId }: { branchId: string }) {
           {orders.length >= 300 && <p className="text-xs text-gray-500 mt-0.5">Showing the latest 300 — the totals above include all.</p>}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="bg-gray-50 text-left">
-                {['Bill', 'Table / Type', 'Payment', 'Total', 'Paid at'].map(h => (
+                {['Bill', 'Table / Type', 'Taken by', 'Cashier', 'Payment', 'Total', 'Paid at', ''].map(h => (
                   <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -216,18 +287,27 @@ function OverviewTab({ branchId }: { branchId: string }) {
                 <tr key={o.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3.5 text-sm font-mono text-gray-600">#{o.billNumber ?? '—'}</td>
                   <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 break-words" dir="auto">{o.takenBy}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600" dir="auto">{o.cashierName ?? '—'}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600">{o.paymentMethod ?? '—'}</td>
                   <td className="px-5 py-3.5 text-sm font-bold text-gray-900 whitespace-nowrap">{fmt(o.total)}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">{o.completedAt.toLocaleString()}</td>
+                  <td className="px-3 py-2">
+                    <button onClick={() => setOpenBill(o.id)} aria-label={`View bill ${o.billNumber ?? ''}`}
+                      className="min-h-11 text-xs font-semibold px-3 py-2 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+                      View
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!loading && orders.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-500 text-sm">No bills paid in this period</td></tr>
+                <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-500 text-sm">No bills paid in this period</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+      <BillDialog orderId={openBill} onClose={() => setOpenBill(null)} />
     </div>
   );
 }

@@ -196,6 +196,7 @@ export const mapOrder = (row: any): Order => ({
   customerPhone: row.customer_phone ?? undefined,
   customerEmail: row.customer_email ?? undefined,
   paymentReceiptUrl: row.payment_receipt_url ?? undefined,
+  splitDiscountPct: Number(row.split_discount_pct ?? 0),
 });
 
 // ── Staff / users ────────────────────────────────────────────────────────────

@@ -97,6 +97,8 @@ export interface Order {
   customerPhone?: string;
   customerEmail?: string;
   paymentReceiptUrl?: string;
+  /** Split-by-item discount %, locked on the order by the first guest's payment (0 = none). */
+  splitDiscountPct?: number;
 }
 
 // ==================== Products & Inventory ====================

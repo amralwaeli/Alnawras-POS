@@ -23,7 +23,7 @@ import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import { DeviceService } from '../../services/DeviceService';
 import { PrintService, cleanPrintText, type PrintLine, type ReceiptLine } from '../../services/PrintService';
 import { useBranch } from '../../context/BranchContext';
-import { computeTax, presetDiscountAmount, taxInclusiveDue } from '../../../lib/money';
+import { computeTax, presetDiscountAmount, splitDue } from '../../../lib/money';
 import QRCode from 'qrcode';
 import { friendlyError } from '../../../lib/errors';
 import { isNativeApp } from '../../../lib/platform';
@@ -394,6 +394,9 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
   const [splitAmountReceived, setSplitAmountReceived] = useState('');
   const [paidItemIds, setPaidItemIds] = useState<Set<string>>(new Set());
   const [splitProcessing, setSplitProcessing] = useState(false);
+  // One discount % for every guest on the split; editable only before the first item is paid.
+  const [splitPctText, setSplitPctText] = useState('');
+  const [usedSplitPct, setUsedSplitPct] = useState<number | null>(null);
 
   const loyaltySettings = branchSettings.loyalty;
 
@@ -413,6 +416,8 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setSplitMethod('cash');
     setSplitAmountReceived('');
     setPaidItemIds(new Set());
+    setSplitPctText('');
+    setUsedSplitPct(null);
     setPresetDiscount(0);
     setAppliedPresetId(null);
     setDebtAccountId(null);
@@ -446,11 +451,23 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     () => unpaidItems.filter(i => splitSelected.has(i.id)).reduce((s, i) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0),
     [unpaidItems, splitSelected]
   );
-  // What the selected guest actually pays — the RPC adds exclusive branch tax
-  // per split, so the button/validation must show the same tax-inclusive figure.
-  const splitSelectedDue = useMemo(
-    () => taxInclusiveDue(splitSelectedTotal, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive),
-    [splitSelectedTotal, branchSettings]
+  // Once any item is paid (in this window or before), whole-order payment modes
+  // are no longer safe — they'd re-charge items another guest already paid for.
+  const lockedToSplit = paidItemIds.size > 0 || ((order?.items ?? []) as any[]).some(i => i.paid && i.status !== 'cancelled');
+  // The split %: chosen by the cashier until the first payment, then locked to what the server stored.
+  const splitPct = lockedToSplit
+    ? (usedSplitPct ?? Number(order?.splitDiscountPct ?? 0))
+    : Math.min(Math.max(Number(splitPctText) || 0, 0), 100);
+  // What the selected guest actually pays — same as pay_order_items: % off first, then exclusive branch tax.
+  const { net: splitSelectedNet, due: splitSelectedDue } = useMemo(
+    () => splitDue(splitSelectedTotal, splitPct, branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive),
+    [splitSelectedTotal, splitPct, branchSettings]
+  );
+  // What is still owed on the bill (approximate: each guest's share is rounded separately).
+  const splitLeftDue = useMemo(
+    () => splitDue(unpaidItems.reduce((s, i) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0), splitPct,
+      branchSettings.taxEnabled, branchSettings.taxRate, branchSettings.taxInclusive).due,
+    [unpaidItems, splitPct, branchSettings]
   );
 
   const baseTotals = useMemo(() => calcOrderTotals(order), [order]);
@@ -499,10 +516,6 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
     setAppliedPresetId('custom');
   };
   
-  // Once any split-by-item payment has landed on this order, whole-order
-  // payment modes are no longer safe to use — they'd re-charge the full
-  // total, including items already paid for by another guest.
-  const lockedToSplit = paidItemIds.size > 0;
   useEffect(() => {
     if (lockedToSplit && paymentMode !== 'split-items') setPaymentMode('split-items');
   }, [lockedToSplit, paymentMode]);
@@ -738,10 +751,13 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
         p_cashier_id: currentUser.id,
         p_cashier_name: currentUser.name,
         p_branch_id: currentUser.branchId,
+        // Before the first payment: the chosen %; after it: the locked % (never a different one).
+        p_discount_pct: splitPct > 0 ? splitPct : null,
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
 
+      setUsedSplitPct(splitPct);
       setPaidItemIds(prev => new Set([...prev, ...splitSelected]));
       toast.success(`Paid ${fmt(Number(row.amount))} via ${splitMethod.toUpperCase()}`);
       setSplitSelected(new Set());
@@ -876,6 +892,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
               {loyaltyDiscount > 0 && <div className="flex justify-between text-sm text-amber-600"><span className="min-w-0 break-words">⭐ {loyaltySettings.pointsLabel} Redemption</span><span>−{fmt(loyaltyDiscount)}</span></div>}
               {totals.tax > 0 && <div className="flex justify-between text-sm text-gray-500"><span className="min-w-0 break-words">{branchSettings.taxLabel}{branchSettings.taxInclusive ? ' (incl.)' : ` (${branchSettings.taxRate}%)`}</span><span>{fmt(totals.tax)}</span></div>}
               <div className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{fmt(totals.total)}</span></div>
+              {lockedToSplit && <div className="flex justify-between text-sm font-bold text-pink-700"><span>Left to pay</span><span>{fmt(splitLeftDue)}</span></div>}
             </div>
 
             {canTakePayment && (
@@ -1045,6 +1062,35 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
 
                 {paymentMode === 'split-items' && (
                   <div className="space-y-2 bg-pink-50 rounded-xl p-3 border border-pink-100">
+                    <div className="bg-white rounded-lg border border-pink-100 p-2.5 space-y-1.5">
+                      <p className="text-xs font-semibold text-pink-800">Discount for everyone</p>
+                      {lockedToSplit ? (
+                        <p className="text-xs text-gray-700">{splitPct > 0 ? `Discount ${splitPct}% for every guest` : 'No discount on this bill'}</p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {branchSettings.discountPresets.filter(p => p.type === 'percentage').map(preset => {
+                            const active = splitPct === preset.value;
+                            return (
+                              <button key={preset.id} type="button" dir="auto" aria-pressed={active}
+                                onClick={() => setSplitPctText(active ? '' : String(preset.value))}
+                                className={`min-h-10 max-w-full break-words px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
+                                  active ? 'border-pink-600 bg-pink-600 text-white' : 'border-pink-200 text-pink-700'
+                                }`}>
+                                {preset.label} · {preset.value}%
+                              </button>
+                            );
+                          })}
+                          <label className="flex items-center gap-1 text-xs text-gray-600">
+                            <input type="number" min="0" max="100" step="any" inputMode="decimal" placeholder="0"
+                              value={splitPctText} onChange={e => setSplitPctText(e.target.value)}
+                              aria-label="Discount percent for every guest"
+                              className="w-16 min-h-10 px-2 rounded-lg border border-pink-200 text-sm focus:outline-none focus:border-pink-400" />
+                            %
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between gap-2 text-xs mb-1">
                       <span className="font-medium text-pink-800">Select what this guest is paying for</span>
                       <span className="font-semibold text-pink-600 shrink-0 whitespace-nowrap">{unpaidItems.length} item{unpaidItems.length !== 1 ? 's' : ''} left</span>
@@ -1099,10 +1145,16 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
                             <span className="text-pink-700 font-medium">Selected items</span>
                             <span className="text-gray-600 whitespace-nowrap">{fmt(splitSelectedTotal)}</span>
                           </div>
-                          {splitSelectedDue > splitSelectedTotal && (
+                          {splitSelectedNet < splitSelectedTotal && (
+                            <div className="flex justify-between items-center text-xs text-emerald-600">
+                              <span>Discount {splitPct}%</span>
+                              <span className="whitespace-nowrap">−{fmt(splitSelectedTotal - splitSelectedNet)}</span>
+                            </div>
+                          )}
+                          {splitSelectedDue > splitSelectedNet && (
                             <div className="flex justify-between items-center text-xs text-gray-500">
                               <span>{branchSettings.taxLabel} ({branchSettings.taxRate}%)</span>
-                              <span>{fmt(splitSelectedDue - splitSelectedTotal)}</span>
+                              <span>{fmt(splitSelectedDue - splitSelectedNet)}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-center font-bold text-gray-900">

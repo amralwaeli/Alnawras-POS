@@ -60,3 +60,19 @@ export function taxInclusiveDue(
   const tax = computeTax(netAmount, taxEnabled, taxRate, taxInclusive);
   return taxInclusive ? netAmount : round2(netAmount + tax);
 }
+
+/**
+ * What one split-by-item guest owes, matching pay_order_items: the bill-wide
+ * split discount % comes off the selected subtotal first (rounded to 2dp),
+ * then tax is applied exactly as taxInclusiveDue does.
+ */
+export function splitDue(
+  subtotal: number,
+  pct: number,
+  taxEnabled: boolean,
+  taxRate: number,
+  taxInclusive: boolean,
+): { net: number; due: number } {
+  const net = round2(subtotal * (1 - Math.min(Math.max(pct, 0), 100) / 100));
+  return { net, due: taxInclusiveDue(net, taxEnabled, taxRate, taxInclusive) };
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { round2, computeTax, presetDiscountAmount, taxInclusiveDue } from './money';
+import { round2, computeTax, presetDiscountAmount, taxInclusiveDue, splitDue } from './money';
 import type { DiscountPreset } from '../app/models/types';
 
 describe('round2', () => {
@@ -65,5 +65,20 @@ describe('taxInclusiveDue', () => {
 
   it('equals the amount when tax is disabled', () => {
     expect(taxInclusiveDue(100, false, 6, false)).toBe(100);
+  });
+});
+
+describe('splitDue', () => {
+  it('takes the split % off the selected subtotal before tax', () => {
+    expect(splitDue(41, 10, false, 0, false)).toEqual({ net: 36.9, due: 36.9 });
+    expect(splitDue(54, 10, false, 0, false).due).toBe(48.6);
+  });
+
+  it('adds exclusive tax on the discounted amount', () => {
+    expect(splitDue(41, 10, true, 6, false)).toEqual({ net: 36.9, due: 39.11 }); // 36.90 + 2.21
+  });
+
+  it('is the plain tax-inclusive due at 0%', () => {
+    expect(splitDue(50, 0, true, 10, false).due).toBe(55);
   });
 });

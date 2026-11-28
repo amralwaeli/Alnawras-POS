@@ -27,12 +27,14 @@ beforeAll(async () => {
     INSERT INTO tables(id, number, capacity, branch_id, status, current_order_id, ordering_enabled, needs_waiter)
       VALUES ('t5', 5, 4, 'A', 'occupied', 'o5', true, true), ('t7', 7, 4, 'A', 'occupied', 'o7', false, false),
              ('t8', 8, 4, 'A', 'occupied', 'o8', false, false);
-    INSERT INTO orders(id, table_id, table_number, status, order_type, branch_id, subtotal, tax, discount, total, waiters)
-      VALUES ('o5', 't5', 5, 'open', 'dine-in', 'A', 20, 0, 0, 20, '["w1","w2"]'),
-             ('o7', 't7', 7, 'open', 'dine-in', 'A', 15, 0, 2, 15, '["w2"]'),
-             ('tk', NULL, 0, 'open', 'takeaway', 'A', 12, 0, 0, 12, '[]'),
-             ('o8', 't8', 8, 'open', 'dine-in', 'A', 10, 0, 0, 10, '[]'),
-             ('done', NULL, 0, 'completed', 'takeaway', 'A', 10, 0, 0, 10, '[]');
+    INSERT INTO orders(id, table_id, table_number, status, order_type, branch_id, subtotal, tax, discount, total, waiters, bill_number)
+      VALUES ('o5', 't5', 5, 'open', 'dine-in', 'A', 20, 0, 0, 20, '["w1","w2"]', NULL),
+             ('o7', 't7', 7, 'open', 'dine-in', 'A', 15, 0, 2, 15, '["w2"]', NULL),
+             ('tk', NULL, 0, 'open', 'takeaway', 'A', 12, 0, 0, 12, '[]', '0012'),
+             ('o8', 't8', 8, 'open', 'dine-in', 'A', 10, 0, 0, 10, '[]', NULL),
+             ('done', NULL, 0, 'completed', 'takeaway', 'A', 10, 0, 0, 10, '[]', NULL),
+             ('tk15', NULL, 0, 'open', 'takeaway', 'A', 0, 0, 0, 0, '[]', '0015'),
+             ('tk20', NULL, 0, 'open', 'takeaway', 'A', 0, 0, 0, 0, '[]', '0020');
     INSERT INTO order_items(id, order_id, product_id, product_name, quantity, price, subtotal, added_by, added_by_name, branch_id, status, printed_at)
       VALUES ${item('a1', 'o5', 20)}, ${item('a2', 'o5', 30, `'cancelled', '2026-11-01T10:05:00Z'`)},
              ${item('b1', 'o7', 15, `'pending', NULL`)}, ${item('c1', 'tk', 12)}, ${item('d1', 'o8', 10)};
@@ -47,7 +49,8 @@ describe('0060 merge orders', () => {
   it('merges table 5 into table 7: items, totals, tables, print state', async () => {
     const before = await db.query<any>(`SELECT id, printed_at, status FROM order_items ORDER BY id`);
     const r = await merge(DEV_A, 'A', 'o5', 'o7');
-    expect(r).toEqual({ into_order_id: 'o7', moved_items: 2 });
+    expect(r).toEqual({ into_order_id: 'o7', moved_items: 2, merged_label: 'Merged: Table 7 + Table 5' });
+    expect(await one(db, `SELECT merged_label FROM orders WHERE id = 'o7'`)).toBe('Merged: Table 7 + Table 5');
     expect((await db.query<any>(`SELECT id FROM order_items WHERE order_id = 'o7' ORDER BY id`)).rows.map(x => x.id))
       .toEqual(['a1', 'a2', 'b1']);
     const o7 = (await db.query<any>(`SELECT subtotal, tax, discount, total, waiters FROM orders WHERE id = 'o7'`)).rows[0];
@@ -66,7 +69,8 @@ describe('0060 merge orders', () => {
   });
 
   it('merges a takeaway into a table', async () => {
-    expect(await merge(DEV_A, 'A', 'tk', 'o7')).toEqual({ into_order_id: 'o7', moved_items: 1 });
+    expect(await merge(DEV_A, 'A', 'tk', 'o7'))
+      .toEqual({ into_order_id: 'o7', moved_items: 1, merged_label: 'Merged: Table 7 + Table 5 + Takeaway #0012' });
     expect(Number(await one(db, `SELECT total FROM orders WHERE id = 'o7'`))).toBe(47);
     expect(await one(db, `SELECT COUNT(*) FROM orders WHERE id = 'tk'`)).toBe(0);
     expect(await one(db, `SELECT status FROM tables WHERE id = 't7'`)).toBe('occupied');
@@ -82,6 +86,14 @@ describe('0060 merge orders', () => {
     expect(await as(db, 'anon', null, () => fails(db, `SELECT public.merge_orders('A', 'o8', 'o7', 'x')`)))
       .toMatch(/permission denied/);
     expect(await one(db, `SELECT COUNT(*) FROM order_items WHERE order_id = 'o8'`)).toBe(1);
+  });
+
+  it('names a takeaway merged into a takeaway, and keeps every name when a merged bill is merged again', async () => {
+    expect((await merge(DEV_A, 'A', 'tk20', 'tk15')).merged_label).toBe('Merged: Takeaway #0015 + Takeaway #0020');
+    expect((await merge(DEV_A, 'A', 'o7', 'tk15')).merged_label)
+      .toBe('Merged: Takeaway #0015 + Takeaway #0020 + Table 7 + Table 5 + Takeaway #0012');
+    expect(await one(db, `SELECT merged_label FROM orders WHERE id = 'tk15'`))
+      .toBe('Merged: Takeaway #0015 + Takeaway #0020 + Table 7 + Table 5 + Takeaway #0012');
   });
 
   it('the migration is idempotent', async () => {

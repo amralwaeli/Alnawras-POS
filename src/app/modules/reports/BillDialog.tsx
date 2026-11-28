@@ -69,7 +69,7 @@ export function BillDialog({ orderId, onClose }: { orderId: string | null; onClo
       <DialogContent className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base pr-6">
-            {b ? `Bill #${b.billNumber ?? '—'} · ${b.orderType === 'dine-in' ? `Table ${b.tableNumber}` : b.orderType}${b.completedAt ? ` · paid ${time(b.completedAt)}` : ''}` : 'Bill'}
+            {b ? `Bill #${b.billNumber ?? '—'} · ${b.mergedLabel ?? (b.orderType === 'dine-in' ? `Table ${b.tableNumber}` : b.orderType)}${b.completedAt ? ` · paid ${time(b.completedAt)}` : ''}` : 'Bill'}
           </DialogTitle>
         </DialogHeader>
         {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : !b ? <p className="text-sm text-gray-500">Loading…</p> : refunding ? (

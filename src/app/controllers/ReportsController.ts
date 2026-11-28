@@ -17,13 +17,13 @@ export interface SalesSummary {
 }
 
 export interface CompletedOrderRow {
-  id: string; billNumber: string | null; tableNumber: number; orderType: string;
+  id: string; billNumber: string | null; tableNumber: number; orderType: string; mergedLabel?: string;
   total: number; paymentMethod: string | null; completedAt: Date;
   cashierName: string | null; takenBy: string;
 }
 
 export interface BillDetail {
-  billNumber: string | null; tableNumber: number; orderType: string; completedAt: Date | null;
+  billNumber: string | null; tableNumber: number; orderType: string; mergedLabel?: string; completedAt: Date | null;
   paymentMethod: string | null; cashierName: string | null;
   subtotal: number; discount: number; tax: number; total: number;
   items: { id: string; refundId: string | null; productName: string; quantity: number; amount: number; modifiers: string; addedBy: string | null;
@@ -85,7 +85,7 @@ export class ReportsController {
   static async getCompletedOrders(branchId: string, from: Date, to: Date, limit = 300, withStaff = false): Promise<{ success: boolean; data?: CompletedOrderRow[]; error?: string }> {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, bill_number, table_number, order_type, total, payment_method, completed_at, cashier_name'
+      .select('id, bill_number, table_number, order_type, merged_label, total, payment_method, completed_at, cashier_name'
         + (withStaff ? ', order_items(added_by_name, status), order_payments(cashier_name)' : ''))
       .eq('branch_id', branchId).eq('status', 'completed')
       .gte('completed_at', from.toISOString()).lt('completed_at', to.toISOString())
@@ -95,7 +95,7 @@ export class ReportsController {
     return {
       success: true,
       data: (data ?? []).map((r: any) => ({
-        id: r.id, billNumber: r.bill_number, tableNumber: r.table_number, orderType: r.order_type ?? 'dine-in',
+        id: r.id, billNumber: r.bill_number, tableNumber: r.table_number, orderType: r.order_type ?? 'dine-in', mergedLabel: r.merged_label ?? undefined,
         total: Number(r.total ?? 0), paymentMethod: r.payment_method, completedAt: new Date(r.completed_at),
         cashierName: r.cashier_name || (withStaff ? cashierNames(r.order_payments) : null), takenBy: withStaff ? takenByNames(r.order_items) : '',
       })),
@@ -106,7 +106,7 @@ export class ReportsController {
   static async getBillDetail(orderId: string): Promise<{ success: boolean; data?: BillDetail; error?: string }> {
     const { data: r, error } = await supabase
       .from('orders')
-      .select('bill_number, table_number, order_type, completed_at, payment_method, cashier_name, subtotal, discount, tax, total, '
+      .select('bill_number, table_number, order_type, merged_label, completed_at, payment_method, cashier_name, subtotal, discount, tax, total, '
         + 'order_items(id, refund_id, product_name, quantity, price, subtotal, modifiers, added_by_name, status, cancelled_by_name, cancel_reason), '
         + 'order_payments(method, amount, cashier_name, created_at), '
         + 'refunds(amount, method, reason, refunded_by_name, created_at)')
@@ -116,7 +116,7 @@ export class ReportsController {
     return {
       success: true,
       data: {
-        billNumber: o.bill_number, tableNumber: o.table_number, orderType: o.order_type ?? 'dine-in',
+        billNumber: o.bill_number, tableNumber: o.table_number, orderType: o.order_type ?? 'dine-in', mergedLabel: o.merged_label ?? undefined,
         completedAt: o.completed_at ? new Date(o.completed_at) : null,
         paymentMethod: o.payment_method, cashierName: o.cashier_name || cashierNames(o.order_payments),
         subtotal: Number(o.subtotal ?? 0), discount: Number(o.discount ?? 0), tax: Number(o.tax ?? 0), total: Number(o.total ?? 0),

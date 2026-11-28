@@ -16,8 +16,15 @@
 --                        pointed at the merged bill (it may be another table's)
 --   order_groups         closed with the from table's guest/QR sessions, as pay does
 --
+-- The merged bill is named "Merged: " + every bill in it, the into bill first,
+-- then the others in merge order (orders.merged_label).
+--
 -- REQUIRES: 0031, 0049. Idempotent.
 -- ============================================================
+
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS merged_label TEXT;
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_merged_label_len;
+ALTER TABLE public.orders ADD CONSTRAINT orders_merged_label_len CHECK (char_length(merged_label) <= 500);
 
 CREATE OR REPLACE FUNCTION public.merge_orders(
   p_branch_id TEXT, p_from_order_id TEXT, p_into_order_id TEXT, p_actor_name TEXT
@@ -30,6 +37,7 @@ DECLARE
   v_moved  INT;
   v_sub    NUMERIC;
   v_group  TEXT;
+  v_label  TEXT;
 BEGIN
   PERFORM public._assert_device_branch(p_branch_id);
   IF p_from_order_id IS NOT DISTINCT FROM p_into_order_id THEN
@@ -84,6 +92,19 @@ BEGIN
     UPDATE tables SET status = 'occupied', current_order_id = p_into_order_id WHERE id = v_into.table_id;
   END IF;
 
+  -- Each part: the bill's merged names without 'Merged: ', else its own name.
+  v_label := left('Merged: ' ||
+    COALESCE(regexp_replace(v_into.merged_label, '^Merged: ', ''),
+      CASE v_into.order_type WHEN 'dine-in' THEN 'Table ' || v_into.table_number
+        WHEN 'takeaway' THEN 'Takeaway' || COALESCE(' #' || NULLIF(v_into.bill_number, ''), '')
+        WHEN 'pickup' THEN 'Pickup' || COALESCE(' #' || NULLIF(v_into.bill_number, ''), '') END, 'Bill')
+    || ' + ' ||
+    COALESCE(regexp_replace(v_from.merged_label, '^Merged: ', ''),
+      CASE v_from.order_type WHEN 'dine-in' THEN 'Table ' || v_from.table_number
+        WHEN 'takeaway' THEN 'Takeaway' || COALESCE(' #' || NULLIF(v_from.bill_number, ''), '')
+        WHEN 'pickup' THEN 'Pickup' || COALESCE(' #' || NULLIF(v_from.bill_number, ''), '') END, 'Bill'), 500);
+  UPDATE orders SET merged_label = v_label WHERE id = p_into_order_id;
+
   DELETE FROM orders WHERE id = p_from_order_id;
 
   INSERT INTO audit_logs(id, action, entity, entity_id, user_id, user_name, branch_id, details)
@@ -92,7 +113,7 @@ BEGIN
             jsonb_build_object('from', p_from_order_id, 'from_table', v_from.table_number,
                                'from_type', v_from.order_type, 'from_total', v_from.total, 'moved_items', v_moved));
 
-  RETURN jsonb_build_object('into_order_id', p_into_order_id, 'moved_items', v_moved);
+  RETURN jsonb_build_object('into_order_id', p_into_order_id, 'moved_items', v_moved, 'merged_label', v_label);
 END; $$;
 
 REVOKE ALL ON FUNCTION public.merge_orders(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon;
@@ -101,3 +122,4 @@ GRANT EXECUTE ON FUNCTION public.merge_orders(TEXT, TEXT, TEXT, TEXT) TO authent
 NOTIFY pgrst, 'reload schema';
 
 -- ROLLBACK (manual): DROP FUNCTION IF EXISTS public.merge_orders(TEXT, TEXT, TEXT, TEXT);
+--                    ALTER TABLE public.orders DROP COLUMN IF EXISTS merged_label;

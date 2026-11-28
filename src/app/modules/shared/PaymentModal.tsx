@@ -78,7 +78,10 @@ export function buildReceiptLines(o: {
     'rule',
     { text: 'Bill #', value: o.billNo || '-' },
     { text: 'Date', value: when },
-    { text: o.order.orderType === 'takeaway' || o.order.orderType === 'pickup' ? 'Order' : 'Table', value: where },
+    // A merged bill names every table/takeaway it holds instead of the single Table row.
+    o.order.mergedLabel
+      ? { text: cleanPrintText(o.order.mergedLabel).toUpperCase(), style: 'bold', align: 'center' }
+      : { text: o.order.orderType === 'takeaway' || o.order.orderType === 'pickup' ? 'Order' : 'Table', value: where },
     { text: 'Cashier', value: cleanPrintText(o.cashier || 'N/A') },
     'rule',
     ...items.flatMap((i: any): PrintLine[] => {
@@ -847,6 +850,7 @@ export function PaymentModal({ isOpen, onClose, order, onPaid, currentUser }: Pa
             <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b">
               <div className="min-w-0">
                 <h2 className="font-bold text-lg truncate">{getOrderType(order) === 'takeaway' ? 'Takeaway Order' : getOrderType(order) === 'pickup' ? 'Pickup Order' : `Table ${order.tableNumber}`}</h2>
+                {order.mergedLabel && <p className="text-xs font-bold text-violet-700 break-words">{order.mergedLabel}</p>}
                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                   <Clock className="size-3" />
                   {order.billNumber ? `Bill #${order.billNumber} • ` : ''}

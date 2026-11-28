@@ -99,6 +99,8 @@ export interface Order {
   paymentReceiptUrl?: string;
   /** Split-by-item discount %, locked on the order by the first guest's payment (0 = none). */
   splitDiscountPct?: number;
+  /** Set on a bill that other bills were merged into, e.g. "Merged: Table 7 + Table 5". */
+  mergedLabel?: string;
 }
 
 // ==================== Products & Inventory ====================

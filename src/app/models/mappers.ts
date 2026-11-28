@@ -197,6 +197,7 @@ export const mapOrder = (row: any): Order => ({
   customerEmail: row.customer_email ?? undefined,
   paymentReceiptUrl: row.payment_receipt_url ?? undefined,
   splitDiscountPct: Number(row.split_discount_pct ?? 0),
+  mergedLabel: row.merged_label ?? undefined,
 });
 
 // ── Staff / users ────────────────────────────────────────────────────────────

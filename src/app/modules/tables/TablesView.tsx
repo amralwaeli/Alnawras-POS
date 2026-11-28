@@ -436,6 +436,7 @@ export function TablesView() {
         order_type: getOrderType(data),
         billNumber: data.bill_number,
         splitDiscountPct: Number(data.split_discount_pct ?? 0),
+        mergedLabel: data.merged_label ?? undefined,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -526,6 +527,7 @@ export function TablesView() {
         order_type: getOrderType(data),
         billNumber: data.bill_number,
         splitDiscountPct: Number(data.split_discount_pct ?? 0),
+        mergedLabel: data.merged_label ?? undefined,
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -631,6 +633,7 @@ export function TablesView() {
                       <p className="font-bold text-gray-900 text-lg">
                         {`Takeaway #${order.billNumber ?? '—'}`}
                       </p>
+                      {order.mergedLabel && <p className="mt-1 mb-1 inline-block max-w-full break-words rounded-lg bg-violet-100 px-2 py-1 text-[11px] font-bold text-violet-700">{order.mergedLabel}</p>}
                       <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
                         <Clock className="size-3" /> {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : '—'}
                       </p>
@@ -779,6 +782,7 @@ export function TablesView() {
                   </div>
                 </div>
                 <p className="font-bold text-gray-900 text-lg">Table {table.number}</p>
+                {order?.mergedLabel && <p className="mt-1 mb-1 inline-block max-w-full break-words rounded-lg bg-violet-100 px-2 py-1 text-[11px] font-bold text-violet-700">{order.mergedLabel}</p>}
                 <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                   <Users className="size-3" /> {table.capacity} seats
                 </p>

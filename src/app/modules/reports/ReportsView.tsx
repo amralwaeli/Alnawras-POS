@@ -220,7 +220,7 @@ function OverviewTab({ branchId }: { branchId: string }) {
               {orders.map(o => (
                 <tr key={o.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3.5 text-sm font-mono text-gray-600">#{o.billNumber ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType}</td>
+                  <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{o.mergedLabel ?? (o.orderType === 'dine-in' ? `Table ${o.tableNumber}` : o.orderType)}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600 break-words" dir="auto">{o.takenBy}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600" dir="auto">{o.cashierName ?? '—'}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600">{o.paymentMethod ?? '—'}</td>

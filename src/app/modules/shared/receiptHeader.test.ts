@@ -22,4 +22,17 @@ describe('receipt header', () => {
     const lines = buildReceiptLines({ ...base, businessName: 'Smart Cafe' });
     expect(lines[2]).toEqual({ text: 'Branch 2', align: 'center' });
   });
+
+  it('a merged bill prints its merged name in place of the Table row', () => {
+    setBranding({ invoiceFrom: '' });
+    const order = { items: [], tableNumber: 7, mergedLabel: 'Merged: Table 7 + Takeaway #0012' };
+    const lines = buildReceiptLines({ ...base, order, businessName: 'Smart Cafe' });
+    expect(lines).toContainEqual({ text: 'MERGED: TABLE 7 + TAKEAWAY #0012', style: 'bold', align: 'center' });
+    expect(lines.some(l => typeof l === 'object' && 'text' in l && l.text === 'Table')).toBe(false);
+  });
+
+  it('a normal bill keeps the Table row', () => {
+    const lines = buildReceiptLines({ ...base, order: { items: [], tableNumber: 7 }, businessName: 'Smart Cafe' });
+    expect(lines).toContainEqual({ text: 'Table', value: 'Table 7' });
+  });
 });

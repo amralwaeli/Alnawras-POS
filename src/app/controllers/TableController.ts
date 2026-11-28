@@ -155,6 +155,35 @@ export class TableController {
   }
 
   /**
+   * Merge one open bill into another (merge_orders RPC): every item of the FROM
+   * bill moves into the INTO bill, the FROM bill is removed and its table freed.
+   * The server refuses partly paid bills; items are not printed again.
+   */
+  static async mergeOrders(
+    branchId: string,
+    fromOrderId: string,
+    intoOrderId: string,
+    actorName: string
+  ): Promise<Result<{ into_order_id: string; moved_items: number }>> {
+    if (fromOrderId === intoOrderId) {
+      return { success: false, error: 'Pick a different bill to merge into' };
+    }
+    try {
+      const { data, error } = await supabase.rpc('merge_orders', {
+        p_branch_id: branchId,
+        p_from_order_id: fromOrderId,
+        p_into_order_id: intoOrderId,
+        p_actor_name: actorName,
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('Error merging bills:', error);
+      return { success: false, error: error?.message || 'Could not merge the bills' };
+    }
+  }
+
+  /**
    * Turn customer QR self-ordering on/off for a table. Staff-only toggle —
    * customers never set this themselves. See migration 0014.
    */

@@ -4,7 +4,7 @@ import { useBranch } from '../../context/BranchContext';
 import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { fmt, orderTotal } from '../../../lib/currency';
-import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package, ArrowLeftRight, X, QrCode } from 'lucide-react';
+import { UtensilsCrossed, Users, DollarSign, Clock, ShoppingBag, Package, ArrowLeftRight, X, QrCode, Merge } from 'lucide-react';
 import { toast } from 'sonner';
 import { ROLE_PERMISSIONS, permissionsFor } from '../../models/types';
 import { PaymentModal } from '../shared/PaymentModal';
@@ -38,6 +38,76 @@ function MoveTableModal({ tables, onMove, onClose }: { tables: any[]; onMove: (t
                 </button>
               ))}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Merge bills modal ──────────────────────────────────────────────────────
+type MergeBill = { orderId: string; label: string; total: number; hasPaid: boolean };
+const PARTLY_PAID_MSG = 'A bill that is partly paid cannot be merged — finish the split first';
+
+function MergeBillsModal({ from, bills, currentUser, onClose }: { from: MergeBill; bills: MergeBill[]; currentUser: any; onClose: () => void }) {
+  const [into, setInto] = useState<MergeBill | null>(null);
+  const [busy, setBusy] = useState(false);
+  const others = bills.filter(b => b.orderId !== from.orderId);
+
+  const handleMerge = async () => {
+    if (!into) return;
+    setBusy(true);
+    const res = await TableController.mergeOrders(currentUser.branchId, from.orderId, into.orderId, currentUser.name);
+    setBusy(false);
+    if (!res.success) { toast.error(friendlyError(res.error, 'Could not merge the bills')); return; }
+    toast.success('Bills merged');
+    onClose(); // tables/orders refresh via realtime
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4" onClick={busy ? undefined : onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <h3 className="font-bold text-gray-900">{`Merge ${from.label} into…`}</h3>
+          <button onClick={onClose} disabled={busy} aria-label="Close" className="size-11 -mr-2 flex items-center justify-center rounded-lg hover:bg-gray-100 disabled:opacity-50"><X className="size-4 text-gray-400" /></button>
+        </div>
+        <div className="p-4 max-h-[60dvh] overflow-y-auto">
+          {from.hasPaid ? (
+            <p className="text-sm text-red-600 text-center py-8">{PARTLY_PAID_MSG}</p>
+          ) : into ? (
+            <div className="space-y-3">
+              {into.hasPaid ? (
+                <p className="text-sm text-red-600">{PARTLY_PAID_MSG}</p>
+              ) : (
+                <p className="text-sm font-semibold text-gray-900">{`All items of ${from.label} will move into ${into.label}'s bill. ${from.label} will be free.`}</p>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setInto(null)} disabled={busy} className="flex-1 min-h-11 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                  Back
+                </button>
+                {!into.hasPaid && (
+                  <button onClick={() => void handleMerge()} disabled={busy} className="flex-1 min-h-11 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                    {busy ? 'Merging…' : 'Confirm'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : others.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No other open bills to merge into.</p>
+          ) : (
+            <ul className="space-y-2">
+              {others.map(b => (
+                <li key={b.orderId}>
+                  <button
+                    onClick={() => setInto(b)}
+                    className="w-full min-h-11 px-3 py-2 rounded-xl border-2 border-gray-100 hover:border-emerald-400 hover:bg-emerald-50 flex items-center justify-between gap-3 text-sm transition-colors"
+                  >
+                    <span className="font-bold text-gray-700">{b.label}</span>
+                    <span className="font-semibold text-gray-900 whitespace-nowrap">{fmt(b.total)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
@@ -169,6 +239,7 @@ export function TablesView() {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [movingTable, setMovingTable] = useState<{ orderId: string; fromTableId: string; fromNumber: number } | null>(null);
   const [cancellingOrder, setCancellingOrder] = useState<any>(null);
+  const [mergingFrom, setMergingFrom] = useState<string | null>(null);
 
   const handleMoveTable = async (toTableId: string) => {
     if (!movingTable) return;
@@ -257,6 +328,25 @@ export function TablesView() {
     [orders]
   );
 
+  const canMerge = ['cashier', 'waiter', 'swaiter', 'admin', 'manager'].includes(currentUser.role);
+  const toMergeBill = (o: any, label: string): MergeBill => ({
+    orderId: o.id, label, total: calcOrderTotals(o).total, hasPaid: (o.items ?? []).some((i: any) => i.paid),
+  });
+  // Every open bill on screen: occupied tables first, then takeaway orders.
+  const openBills: MergeBill[] = [
+    ...tables.flatMap(t => { const o = getOrder(t.id); return o ? [toMergeBill(o, `Table ${t.number}`)] : []; }),
+    ...takeawayOrders.map(o => toMergeBill(o, `Takeaway #${o.billNumber ?? '—'}`)),
+  ];
+  const mergeFromBill = openBills.find(b => b.orderId === mergingFrom);
+  const mergeButton = (orderId: string) => canMerge && (
+    <button
+      onClick={() => setMergingFrom(orderId)}
+      className="w-full min-h-11 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+    >
+      <Merge className="size-3.5" /> Merge
+    </button>
+  );
+
   const filteredTables = getFilteredTables();
   const available = filteredTables.filter(t => t.status === 'available').length;
   // Ready to Bill includes both occupied tables AND open takeaway orders
@@ -272,7 +362,7 @@ export function TablesView() {
         return;
       }
 
-      const orderItemsSelect = `id, order_id, product_id, product_name, quantity, price, subtotal, status, added_by_name, created_at`;
+      const orderItemsSelect = `id, order_id, product_id, product_name, quantity, price, subtotal, status, added_by_name, created_at, paid`;
 
       let data: any = null;
       let error: any = null;
@@ -344,6 +434,7 @@ export function TablesView() {
         orderType: getOrderType(data),
         order_type: getOrderType(data),
         billNumber: data.bill_number,
+        splitDiscountPct: Number(data.split_discount_pct ?? 0),
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -355,6 +446,7 @@ export function TablesView() {
           status: item.status || 'pending',
           addedByName: item.added_by_name || 'Unknown',
           addedAt: item.created_at ? new Date(item.created_at) : new Date(),
+          paid: item.paid ?? false,
         })),
       };
 
@@ -396,7 +488,8 @@ export function TablesView() {
             subtotal,
             status,
             added_by_name,
-            created_at
+            created_at,
+            paid
           )
         `)
         .eq('id', order.id)
@@ -431,6 +524,7 @@ export function TablesView() {
         orderType: getOrderType(data),
         order_type: getOrderType(data),
         billNumber: data.bill_number,
+        splitDiscountPct: Number(data.split_discount_pct ?? 0),
         items: (data.order_items || []).map((item: any) => ({
           id: item.id,
           orderId: item.order_id,
@@ -442,6 +536,7 @@ export function TablesView() {
           status: item.status || 'pending',
           addedByName: item.added_by_name || 'Unknown',
           addedAt: item.created_at ? new Date(item.created_at) : new Date(),
+          paid: item.paid ?? false,
         })),
       };
 
@@ -563,6 +658,7 @@ export function TablesView() {
                           Cancel Items
                         </button>
                       )}
+                      {mergeButton(order.id)}
                     </div>
                   </div>
                 );
@@ -742,6 +838,7 @@ export function TablesView() {
                         <ArrowLeftRight className="size-3.5" /> Move Table
                       </button>
                     )}
+                    {mergeButton(order.id)}
                   </div>
                 ) : (
                   <>
@@ -781,6 +878,15 @@ export function TablesView() {
           tables={tables}
           onMove={handleMoveTable}
           onClose={() => setMovingTable(null)}
+        />
+      )}
+
+      {mergeFromBill && (
+        <MergeBillsModal
+          from={mergeFromBill}
+          bills={openBills}
+          currentUser={currentUser}
+          onClose={() => setMergingFrom(null)}
         />
       )}
 
